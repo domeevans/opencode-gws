@@ -1,0 +1,19 @@
+{
+  "description": "Unmodified gws 0.22.5 binary for @joe-broadhead/opencode-gws",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joe-broadhead/opencode-gws.git",
+    "directory": "packages/gws-bin"
+  },
+  "homepage": "https://github.com/joe-broadhead/opencode-gws#readme",
+  "bugs": {
+    "url": "https://github.com/joe-broadhead/opencode-gws/issues"
+  },
+  "files": [
+    "bin/gws",
+    "LICENSE",
+    "NOTICE",
+    "provenance.json"
+  ]
+}

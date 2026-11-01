@@ -1,0 +1,79 @@
+// Example OpenCode config for opencode-gws.
+//
+// The first plugin entry is the minimum: no options, one read-only
+// "default" account (Gmail, Drive, Calendar, Docs, Sheets).
+// The second entry is annotated. Both option objects load.
+//
+// Both entries name the published package; use one of them.
+// Sign in: run /connect and choose Google Workspace, or run
+// opencode auth login gws-<alias>.
+//
+// Commits ask by default. Reads do not. To let a write run in
+// noninteractive `opencode run`, add an allow rule. Every rule includes
+// "resource". Send, share, delete, and admin do not offer Always.
+// Do not put the plugin's ask block in the top-level permissions.
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    { "action": "gws.write", "resource": "work:*", "effect": "allow" }
+  ],
+  "plugins": [
+    {
+      "package": "@joe-broadhead/opencode-gws"
+    },
+    {
+      "package": "@joe-broadhead/opencode-gws",
+      "options": {
+        "accounts": {
+          "work": {
+            "enabledServices": ["gmail", "drive", "calendar", "docs", "sheets"],
+            "access": "read"
+          },
+          "reports": {
+            "mode": "interactive",
+            "enabledServices": ["admin-reports"],
+            "access": "read",
+            "scopes": ["admin.reports.audit.readonly"]
+          },
+          "batch": {
+            "mode": "access_token",
+            "enabledServices": ["gmail"],
+            "tokenEnv": "GWS_BATCH_TOKEN"
+          }
+        },
+        "services": ["gmail", "drive", "calendar", "docs", "sheets", "admin-reports"],
+        "allowUntestedHost": false,
+        "policy": {
+          "planTtlSeconds": 300,
+          "rules": [
+            {
+              "id": "work-recipients",
+              "effect": "deny",
+              "categories": ["send", "share"],
+              "accounts": ["work"],
+              "allowedRecipientDomains": ["example.com"]
+            }
+          ]
+        },
+        "execution": {
+          "timeoutMs": 120000,
+          "maxPages": 10,
+          "maxItems": 1000
+        },
+        "audit": {
+          "enabled": true,
+          "sink": "jsonl"
+        },
+        "skills": {
+          "enabled": true,
+          "exclude": []
+        },
+        "admin": {
+          "enabled": false,
+          "requireReason": true,
+          "allowedServices": ["admin-reports"]
+        }
+      }
+    }
+  ]
+}

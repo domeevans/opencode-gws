@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "@opentui/solid",
+    // Solid's JSX.Element names the DOM Node type; the host suite uses `await using`.
+    "lib": ["ES2023", "ESNext.Disposable", "DOM"],
+    "rootDir": ".",
+    // Tests import the manifest format from scripts/; plain JavaScript, not checked.
+    "allowJs": true,
+    "noEmit": true
+  },
+  // Every source file, including the TUI part, and the whole test tree.
+  "include": ["src", "test", "vitest.config.ts", "vitest.host.config.ts"],
+  "exclude": []
+}

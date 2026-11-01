@@ -1,0 +1,75 @@
+{
+  "name": "@joe-broadhead/opencode-gws",
+  "version": "0.0.0",
+  "description": "Unofficial OpenCode plugin for Google Workspace (gws CLI)",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joe-broadhead/opencode-gws.git"
+  },
+  "homepage": "https://github.com/joe-broadhead/opencode-gws#readme",
+  "bugs": {
+    "url": "https://github.com/joe-broadhead/opencode-gws/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "google-workspace"
+  ],
+  "opencode": {
+    "host": ">=2.2.3 <2.3.0"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./tui": "./dist/tui.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "manifest/generated.json",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "node scripts/clean.mjs && node scripts/bundle.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "lint": "biome check",
+    "test": "vitest run",
+    "test:host": "vitest run -c vitest.host.config.ts",
+    "test:pack": "node scripts/pack-smoke.mjs",
+    "test:tui": "bun --conditions=browser test/tui-renderer.mjs",
+    "fetch:gws": "node scripts/fetch-gws.mjs",
+    "check": "npm run lint && npm run typecheck && npm run build && npm test && npm run test:host && npm run test:pack && npm run generated:check && npm run test:tui",
+    "generated:check": "node scripts/generate-docs.mjs --check",
+    "manifest": "node scripts/generate-manifest.mjs",
+    "drift": "node scripts/drift.mjs",
+    "docs:coverage": "node scripts/generate-docs.mjs"
+  },
+  "optionalDependencies": {
+    "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.0",
+    "@joe-broadhead/opencode-gws-bin-darwin-x64": "0.0.0",
+    "@joe-broadhead/opencode-gws-bin-linux-arm64-gnu": "0.0.0",
+    "@joe-broadhead/opencode-gws-bin-linux-x64-gnu": "0.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@babel/preset-typescript": "7.27.1",
+    "@biomejs/biome": "2.6.4",
+    "@opencode/client": "2.2.3",
+    "@opencode/plugin": "2.2.3",
+    "@opencode/sdk": "2.2.3",
+    "@opencode/theme": "2.2.3",
+    "@opentui/core": "0.8.0",
+    "@opentui/solid": "0.8.0",
+    "@types/node": "24.19.2",
+    "babel-preset-solid": "1.9.16",
+    "esbuild": "0.28.2",
+    "solid-js": "1.9.17",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5",
+    "zod": "4.6.7"
+  }
+}

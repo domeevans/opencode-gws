@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+# Downloaded gws archives, built gws packages, and extra host SDKs.
+.cache/
+# gws binaries come from the platform packages, never from git.
+native/*/
+# Test temporary directories created inside the repository.
+.fake-gws-*/
+.tools-test-*/
+.backend-test-*/

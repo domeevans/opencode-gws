@@ -1,0 +1,13 @@
+@joe-broadhead/opencode-gws-bin-<target>
+
+bin/gws is the unmodified Google Workspace CLI (gws) 0.22.5 release binary
+for <triple>, from https://github.com/googleworkspace/cli/releases/tag/v0.22.5.
+It is licensed under the Apache License, Version 2.0; LICENSE is the license
+file shipped in the same release archive. The gws CLI is not an officially
+supported Google product.
+
+provenance.json records the release archive URL and the SHA-256 digests of
+the archive and the binary.
+
+This package exists only to supply gws to @joe-broadhead/opencode-gws, an
+unofficial OpenCode plugin. It is not affiliated with or endorsed by Google.

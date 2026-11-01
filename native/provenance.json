@@ -1,0 +1,80 @@
+{
+  "name": "Google Workspace CLI (gws)",
+  "version": "0.22.5",
+  "license": "Apache-2.0",
+  "source": {
+    "repository": "https://github.com/googleworkspace/cli",
+    "tag": "v0.22.5",
+    "commit": "705fb0ecac6f4249679958f6325b809b63fdde17"
+  },
+  "release": "https://github.com/googleworkspace/cli/releases/tag/v0.22.5",
+  "verification": {
+    "archive": "Each archive sha256 equals the GitHub release asset digest and the .sha256 file upstream publishes beside the archive.",
+    "attestation": {
+      "predicateType": "https://slsa.dev/provenance/v1",
+      "workflow": "https://github.com/googleworkspace/cli/.github/workflows/release.yml@refs/tags/v0.22.5",
+      "run": "https://github.com/googleworkspace/cli/actions/runs/23813381253/attempts/1"
+    },
+    "binary": "The binary sha256 and size are recorded from the verified archive by scripts/build-bin-packages.mjs --record."
+  },
+  "targets": {
+    "darwin-arm64": {
+      "triple": "aarch64-apple-darwin",
+      "os": "darwin",
+      "cpu": "arm64",
+      "archive": {
+        "url": "https://github.com/googleworkspace/cli/releases/download/v0.22.5/google-workspace-cli-aarch64-apple-darwin.tar.gz",
+        "sha256": "1d2a9ffd5bc9b2c2c4b48630daf082fad13d9e57d741988a2c248eed562f7dac",
+        "bytes": 6119841
+      },
+      "binary": {
+        "sha256": "0f27b8b0815bf09cdf95da48d3c604f05ceb8f16bf5c9f0ba355b1f957cdd47e",
+        "bytes": 15371280
+      }
+    },
+    "darwin-x64": {
+      "triple": "x86_64-apple-darwin",
+      "os": "darwin",
+      "cpu": "x64",
+      "archive": {
+        "url": "https://github.com/googleworkspace/cli/releases/download/v0.22.5/google-workspace-cli-x86_64-apple-darwin.tar.gz",
+        "sha256": "51f9bd731404d4bba26c36e2e30dd68c56dccd1f834c01252cb0b14d6a6544b2",
+        "bytes": 6384868
+      },
+      "binary": {
+        "sha256": "cfaf3c184ffe4ed4609cc6fbd75cc64ffa97b4cb7a71ceb7302ab8e89cd3f163",
+        "bytes": 16210932
+      }
+    },
+    "linux-arm64-gnu": {
+      "triple": "aarch64-unknown-linux-gnu",
+      "os": "linux",
+      "cpu": "arm64",
+      "libc": "glibc",
+      "archive": {
+        "url": "https://github.com/googleworkspace/cli/releases/download/v0.22.5/google-workspace-cli-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "94490295d9580e1e88574e715a0a162991747d12d62f8c7b8dcc8268b6c1cea0",
+        "bytes": 6615778
+      },
+      "binary": {
+        "sha256": "b68337faf1436fb2b3a287207cd57fef784a20fb4ab4f2429e51c4e0cfa0b50b",
+        "bytes": 18113600
+      }
+    },
+    "linux-x64-gnu": {
+      "triple": "x86_64-unknown-linux-gnu",
+      "os": "linux",
+      "cpu": "x64",
+      "libc": "glibc",
+      "archive": {
+        "url": "https://github.com/googleworkspace/cli/releases/download/v0.22.5/google-workspace-cli-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "de78ecdbd2f1a84cca0063a7ecbc440240fc14b6ebccbb17f4646b792a8c5c1f",
+        "bytes": 6765622
+      },
+      "binary": {
+        "sha256": "ab59c4bab4e7848740ba8cc3ef186152dab90121c45835b49bd1bf2a5c259b86",
+        "bytes": 19259000
+      }
+    }
+  }
+}
