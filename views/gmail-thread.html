@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gmail thread</title>
+<style>
+  :root { color: var(--jelly-text, #222); background: var(--jelly-surface, #fff); font: 14px/1.45 var(--jelly-font, system-ui, sans-serif); }
+  body { margin: 0; padding: 12px 14px; }
+  h1 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+  ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  li { border: 1px solid var(--jelly-border, #ddd); border-radius: var(--jelly-radius, 8px); background: var(--jelly-raised, transparent); padding: 10px 12px; }
+  .head { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; margin-bottom: 6px; }
+  .from { font-weight: 600; overflow-wrap: anywhere; }
+  .at, .note { color: var(--jelly-muted, #666); font-size: 12px; }
+  .body { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+</style>
+</head>
+<body>
+<main id="thread" aria-live="polite"></main>
+<script>
+// jelly-view.js: a client of Jelly's view bridge. Paste it into the page's own <script>:
+// a sealed page loads no script by URL and is given no global. Call jellyView() as the
+// script starts; it resolves with the client when the app says hello.
+function jellyView() {
+  return new Promise((resolve) => {
+    addEventListener("message", function hello(event) {
+      const said = event.data;
+      if (event.source !== parent || said?.v !== 1 || said.kind !== "hello" || !event.ports[0])
+        return;
+      removeEventListener("message", hello);
+      const port = event.ports[0];
+      const listeners = new Set();
+      const latest = new Map();
+      const queue = [];
+      let sequence = 0;
+      let current;
+      const theme = (tokens) => {
+        const style = document.documentElement.style;
+        for (const [name, value] of Object.entries(tokens))
+          if (name === "scheme") style.colorScheme = value;
+          else style.setProperty(`--jelly-${name}`, value);
+      };
+      // The app answers one request at a time, so requests go in turn.
+      const next = () => {
+        if (current !== undefined || queue.length === 0) return;
+        current = queue.shift();
+        current.timer = setTimeout(
+          () => settle({ ok: false, error: "No answer from the app" }),
+          15000,
+        );
+        port.postMessage(current.message);
+      };
+      const settle = (answer) => {
+        const done = current;
+        current = undefined;
+        clearTimeout(done.timer);
+        if (answer.ok) done.resolve(answer.value);
+        else done.reject(new Error(answer.error));
+        next();
+      };
+      port.onmessage = ({ data }) => {
+        if (data?.v !== 1) return;
+        if (typeof data.kind !== "string") {
+          if (current !== undefined && data.re === current.message.id) settle(data);
+          return;
+        }
+        // A call waiting for the person is answered by `until`, not in 15 s.
+        if (data.kind === "rpc.waiting" && data.re === current?.message.id) {
+          clearTimeout(current.timer);
+          current.timer = setTimeout(
+            () => settle({ ok: false, error: "No answer from the app" }),
+            Math.max(0, Date.parse(data.until) - Date.now()) + 15000,
+          );
+        }
+        if (data.kind === "theme.changed") theme(data.theme);
+        // A wait is news only while it lasts, so a later listener is not told of it.
+        if (data.kind !== "rpc.waiting") latest.set(data.kind, data);
+        for (const listener of listeners) listener(data);
+      };
+      port.start();
+      theme(said.theme);
+      const request = (op, fields = {}) =>
+        new Promise((resolve, reject) => {
+          queue.push({ resolve, reject, message: { ...fields, v: 1, id: String(++sequence), op } });
+          next();
+        });
+      resolve({
+        hello: said,
+        // A listener first hears the latest push of each kind that came before it.
+        on(listener) {
+          for (const push of latest.values()) listener(push);
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        request,
+        data: () => request("data.get"),
+        state: () => request("state.get"),
+        setState: (revision, data) => request("state.set", { revision, data }),
+        call: (method, input = {}) => request("rpc.call", { method, input }),
+        openAgent: (prefill) => request("open-agent", prefill === undefined ? {} : { prefill }),
+        resize: (height) =>
+          request("resize", { height: Math.min(1200, Math.max(1, Math.ceil(height))) }),
+        decline: () => request("decline"),
+      });
+    });
+  });
+}
+
+/**
+ * gws_read's answer for gmail.users.threads.get, as a subject and its messages.
+ * Null for any other operation, so the view declines and the call keeps its
+ * ordinary look. Bodies come from the text/plain part when the read asked for
+ * it, else from Gmail's snippet; nothing is fetched and no HTML is rendered.
+ */
+function threadOf(output) {
+  if (!output || output.operation !== "gmail.users.threads.get") return null;
+  const data = output.data || {};
+  const messages = Array.isArray(data.messages) ? data.messages : [];
+  if (messages.length === 0) return null;
+  const header = (message, name) => {
+    const headers = (message.payload && message.payload.headers) || [];
+    const found = headers.find((entry) => String(entry.name).toLowerCase() === name);
+    return found ? String(found.value) : "";
+  };
+  const plain = (part) => {
+    if (!part) return "";
+    if (part.mimeType === "text/plain" && part.body && typeof part.body.data === "string") {
+      const binary = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+      return new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0)));
+    }
+    for (const child of part.parts || []) {
+      const text = plain(child);
+      if (text !== "") return text;
+    }
+    return "";
+  };
+  return {
+    subject: header(messages[0], "subject") || "(no subject)",
+    messages: messages.map((message) => {
+      const time = Number(message.internalDate);
+      return {
+        from: header(message, "from") || "Unknown sender",
+        at: Number.isFinite(time) && time > 0 ? new Date(time).toISOString() : header(message, "date"),
+        body: (plain(message.payload) || String(message.snippet || "")).trim().slice(0, 4000),
+      };
+    }),
+    truncated: output.truncated === true,
+  };
+}
+
+function draw(root, thread) {
+  root.replaceChildren();
+  const title = document.createElement("h1");
+  title.textContent = thread.subject;
+  const list = document.createElement("ol");
+  for (const message of thread.messages) {
+    const item = document.createElement("li");
+    const head = document.createElement("div");
+    head.className = "head";
+    const from = document.createElement("span");
+    from.className = "from";
+    from.textContent = message.from;
+    const at = document.createElement("time");
+    at.className = "at";
+    at.textContent = message.at.replace("T", " ").replace(/:\d\d\.\d+Z$/, " UTC");
+    at.dateTime = message.at;
+    const body = document.createElement("p");
+    body.className = "body";
+    body.textContent = message.body || "No text in this message.";
+    head.append(from, at);
+    item.append(head, body);
+    list.append(item);
+  }
+  root.append(title, list);
+  if (thread.truncated) {
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = "Gmail's answer was cut short; not every message is shown.";
+    root.append(note);
+  }
+}
+
+if (typeof document !== "undefined" && document.getElementById("thread")) {
+  jellyView().then(async (view) => {
+    const thread = threadOf((await view.data())?.output);
+    if (thread === null) return view.decline();
+    draw(document.getElementById("thread"), thread);
+    view.resize(document.documentElement.scrollHeight);
+  });
+}
+</script>
+</body>
+</html>
