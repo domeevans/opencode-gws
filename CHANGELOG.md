@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - `gws_read` is a direct tool instead of a pinned Code Mode tool, so a host can show each read's result. A Code Mode script can no longer call `tools.gws.read`; the model calls `gws_read` directly.
 
+### Fixed
+
+- Invalid helper input, such as `gmail.read` without `id`, is refused with `GWS_VALIDATION_ERROR` and the helper's next step before any permission check or `gws` run, instead of a raw zod error.
+
 ## [0.0.0] - 2026-11-01
 
 ### Added

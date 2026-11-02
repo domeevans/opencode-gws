@@ -117,6 +117,14 @@ export class Operations {
       })
     }
     this.visible(helper.service)
+    // Check the flags here, so bad input is a GWS_VALIDATION_ERROR before any assert or spawn, not a ZodError from build.
+    const flags = adapter.inputSchema.safeParse(request.input ?? {})
+    if (!flags.success) {
+      const issues = flags.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")
+      throw new GwsError("GWS_VALIDATION_ERROR", `'${helper.id}' input: ${issues}`, {
+        next: `Fix the input; gws_schema with operation "${helper.id}" shows its flags.`,
+      })
+    }
     return { request, entry: helperAsEntry(helper), helper: adapter }
   }
 
