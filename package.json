@@ -28,6 +28,7 @@
     "dist",
     "skills",
     "manifest/generated.json",
+    "views",
     "README.md",
     "LICENSE",
     "NOTICE",
@@ -71,5 +72,102 @@
     "typescript": "5.9.3",
     "vitest": "5.0.5",
     "zod": "4.6.7"
+  },
+  "jelly": {
+    "tools": [
+      {
+        "name": "gws.status",
+        "permission": "gws.status",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "gws.catalog",
+        "permission": "gws.catalog",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "gws.schema",
+        "permission": "gws.schema",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "gws.read",
+        "permission": "gws.read",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "gws.plan",
+        "permission": "gws.plan",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "gws.write",
+        "permission": "gws.write",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "gws.export",
+        "permission": "gws.export",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "gws.send",
+        "permission": "gws.send",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "gws.share",
+        "permission": "gws.share",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "gws.delete",
+        "permission": "gws.delete",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "gws.admin",
+        "permission": "gws.admin",
+        "effect": "deny",
+        "readOnly": false
+      }
+    ],
+    "skills": [
+      "opencode-gws",
+      "opencode-gws-recipes",
+      "opencode-gws-admin"
+    ],
+    "rpc": [],
+    "views": [
+      {
+        "v": 1,
+        "id": "gmail-thread",
+        "place": "tool-result",
+        "tools": [
+          "gws_read"
+        ],
+        "title": "Gmail thread",
+        "page": "views/gmail-thread.html",
+        "grants": [
+          "data"
+        ]
+      }
+    ],
+    "contributes": {
+      "homeFeeds": [],
+      "homeWidgets": [],
+      "workKinds": [],
+      "settings": []
+    }
   }
 }

@@ -39,7 +39,7 @@ describe("main package", () => {
   })
 
   it("whitelists the published files", () => {
-    expect(pkg.files).toEqual(["dist", "skills", "manifest/generated.json", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
+    expect(pkg.files).toEqual(["dist", "skills", "manifest/generated.json", "views", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
   })
 
   it("pins every dev dependency exactly, with the OpenCode SDKs at 2.2.3", () => {
