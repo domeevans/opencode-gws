@@ -74,6 +74,7 @@
     "zod": "4.6.7"
   },
   "jelly": {
+    "title": "Google Workspace",
     "tools": [
       {
         "name": "gws.status",
@@ -161,6 +162,13 @@
         "grants": [
           "data"
         ]
+      }
+    ],
+    "signIns": [
+      {
+        "id": "google",
+        "label": "Google Workspace",
+        "integration": "gws-*"
       }
     ],
     "contributes": {

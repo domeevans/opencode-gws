@@ -4,6 +4,8 @@
 package's `package.json` as JSON, without loading the plugin, when a person reviews the exact
 version, and uses it as follows.
 
+Jelly names the plugin **Google Workspace** (`jelly.title`), with the package name and version beneath.
+
 ## Tools and permissions
 
 11 tools are declared (5 read-only). Jelly's agents have no base "allow everything"
@@ -42,14 +44,9 @@ skill ids collide with another plugin's or the agent's own.
 
 ## Signing in
 
-OpenCode's integration `gws-<alias>` (OAuth with your own Desktop app client: client ID and secret in the form, or `oauthClient` in the options). Jelly shows it as the card `integration:gws-default`.
+`jelly.signIns` declares one sign-in, `google`, for OpenCode's integration `gws-*`: every account (`gws-<alias>`) folds into it, so the card waits while any account waits. Each account signs in with OAuth through a Desktop app client. Jelly holds the person's Desktop client and fills in `clientId` and `clientSecret`, so its form shows only Access (starting on `default`, read-only) and the write acknowledgement while it applies, and no `oauthClient` option is needed. Jelly writes only `{ mode: "interactive", enabledServices }` for each account.
 
-<!-- AUTH-PLACEHOLDER (Jelly rd152): settings and secrets for signing in from Jelly are being
-designed by Jelly's auth lane. Until that lands this package declares no `contributes.settings`;
-add the auth declarations here and in package.json when that design is agreed. -->
-**Not yet declared for Jelly.** How this plugin's sign-in appears in Jelly (desktop and web,
-expiry, reconnect and sign-out) is still being designed; this section and
-`jelly.contributes.settings` will say it once it is.
+Jelly folds the declared sign-ins into this plugin's one card, which shows each as Connected, Not signed in or Sign in again (expired or revoked), and starts, renews and signs out of each. An agent's `jelly_connection_request`, or a tool result that names this plugin's "Run /connect and choose …" next step, opens the same card. The plugin still signs in through OpenCode, as it does without Jelly; the declaration only tells Jelly which of the engine's integrations and servers are this plugin's.
 
 ## Versions
 
