@@ -43,15 +43,15 @@ describe("errors the model reads", () => {
   })
 
   it("gives a Code Mode program the same message to catch, without metadata", async () => {
-    const caught = await codeMode(d, call("read", { account: "nobody", operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" }))
+    const caught = await codeMode(d, call("plan", { account: "nobody", operation: "gmail.users.labels.create", params: { userId: "me" }, body: { name: "x" } }))
     expect(caught["error"]).toEqual({ message: "ACCOUNT_UNKNOWN: 'nobody' is not configured. Next step: Pass one of the configured accounts: personal.", name: "Error" })
   })
 
   it("carries a disabled API's enable link", async () => {
     process.env["FAKE_GWS_FAIL"] = "disabled"
     try {
-      const caught = await codeMode(d, call("read", { operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" }))
-      expect((caught["error"] as { message: string }).message).toMatch(
+      const failed = await turn(d, { tool: "gws_read", input: { operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" } })
+      expect((JSON.parse(failed.result) as { error: { message: string } }).error.message).toMatch(
         /^API_DISABLED: Gmail API has not been used in project 000000000000.*Next step: Ask the user to open https:\/\/console\.developers\.google\.com\/apis\/api\/gmail\.googleapis\.com\/overview\?project=000000000000 and enable the API for project 000000000000/,
       )
     } finally {

@@ -13,9 +13,9 @@ import { request } from "../support/requests.js"
  * host; only the model and `gws` are scripted.
  */
 
-const CODE_MODE = ["status", "catalog", "schema", "read", "plan"]
+const CODE_MODE = ["status", "catalog", "schema", "plan"]
 const COMMITS = ["write", "send", "share", "delete", "export", "admin"]
-const TOOLS = [...CODE_MODE, ...COMMITS]
+const TOOLS = [...CODE_MODE, "read", ...COMMITS]
 
 const PERMISSIONS = [
   { action: "gws.write", resource: "*", effect: "deny" as const },
@@ -91,7 +91,7 @@ describe("tool registry", () => {
     expect(tools.map((tool) => tool.id).sort()).toEqual(TOOLS.map((name) => `gws_${name}`).sort())
     for (const tool of tools) {
       expect(tool.options).toMatchObject({ namespace: "gws", permission: `gws.${tool.name}`, codemode: CODE_MODE.includes(tool.name) })
-      expect(tool.options?.pinned).toBe(["catalog", "read", "plan"].includes(tool.name) ? true : undefined)
+      expect(tool.options?.pinned).toBe(["catalog", "plan"].includes(tool.name) ? true : undefined)
     }
   })
 
@@ -108,17 +108,17 @@ describe("tool registry", () => {
   })
 })
 
-describe("tool execution through Code Mode", () => {
-  it("runs status, catalog, schema, and read against the fake gws", async () => {
+describe("tool execution", () => {
+  it("runs status, catalog and schema in Code Mode and read as a direct tool, against the fake gws", async () => {
     const before = host.invocations().length
     const result = await execute(`
       const status = await tools.gws.status({})
       const catalog = await tools.gws.catalog({ query: "messages.send", service: "gmail" })
       const schema = await tools.gws.schema(${JSON.stringify(request("gmail.users.getProfile"))})
-      const read = await tools.gws.read(${JSON.stringify(request("gmail.users.messages.list", { params: { userId: "me" }, fields: "messages(id)" }))})
-      return { status, catalog, schema, read }
+      return { status, catalog, schema }
     `)
-    const { status, catalog, schema, read } = result as Record<string, Record<string, unknown>>
+    const { status, catalog, schema } = result as Record<string, Record<string, unknown>>
+    const read = await direct("read", request("gmail.users.messages.list", { params: { userId: "me" }, fields: "messages(id)" }))
 
     expect(status).toMatchObject({
       pluginVersion: packageJson.version,

@@ -42,30 +42,31 @@ describe("the eleven tools", () => {
     await d?.host.close()
   })
 
-  it("offers status, catalog, schema, read, and plan in Code Mode, with catalog, read, and plan pinned, and the commits as direct tools", async () => {
+  it("offers status, catalog, schema, and plan in Code Mode, with catalog and plan pinned, and read and the commits as direct tools", async () => {
     const found = await codeMode(d, `return search({ namespace: "gws", limit: 50 })`)
     const paths = (found["items"] as Array<{ path: string }>).map((item) => item.path).sort()
-    expect(paths).toEqual(["tools.gws.catalog", "tools.gws.plan", "tools.gws.read", "tools.gws.schema", "tools.gws.status"])
+    expect(paths).toEqual(["tools.gws.catalog", "tools.gws.plan", "tools.gws.schema", "tools.gws.status"])
     const offered = d.host.model.requests.at(-1)!
-    expect(offered.tools).toEqual(expect.arrayContaining(COMMITS.map((category) => `gws_${category}`)))
-    expect(offered.tools).not.toEqual(expect.arrayContaining(["gws_read", "gws_plan", "gws_catalog"]))
-    for (const name of ["catalog", "read", "plan"]) expect(offered.system).toContain(`tools.gws.${name}(`)
+    expect(offered.tools).toEqual(expect.arrayContaining(["gws_read", ...COMMITS.map((category) => `gws_${category}`)]))
+    expect(offered.tools).not.toEqual(expect.arrayContaining(["gws_plan", "gws_catalog"]))
+    for (const name of ["catalog", "plan"]) expect(offered.system).toContain(`tools.gws.${name}(`)
   })
 
   it("runs status, catalog, schema, read, and plan, with only the read and the dry run reaching gws", async () => {
     const before = d.host.invocations().length
+    const direct = await turn(d, { tool: "gws_read", input: { operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" } })
+    const read = JSON.parse(direct.result) as Record<string, unknown>
     const result = await codeMode(
       d,
       `
       const status = await tools.gws.status({})
       const catalog = await tools.gws.catalog({ query: "send email" })
       const schema = await tools.gws.schema({ operation: "gmail.users.getProfile" })
-      const read = await tools.gws.read(${JSON.stringify({ operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" })})
       const plan = await tools.gws.plan(${JSON.stringify({ operation: "gmail.users.labels.create", params: { userId: "me" }, body: { name: "x" } })})
-      return { status, catalog, schema, read, plan }
+      return { status, catalog, schema, plan }
     `,
     )
-    const { status, catalog, schema, read, plan: planned } = result as Record<string, Record<string, unknown>>
+    const { status, catalog, schema, plan: planned } = result as Record<string, Record<string, unknown>>
     expect(status).toMatchObject({ accounts: [expect.objectContaining({ alias: ACCOUNT, connected: true })] })
     expect(catalog["entries"]).toEqual(expect.arrayContaining([expect.objectContaining({ id: "gmail.users.messages.send", executable: true, commitTool: "gws_send" })]))
     expect(schema).toMatchObject({ ok: true, account: ACCOUNT, schema: { id: "gmail.users.getProfile" } })
