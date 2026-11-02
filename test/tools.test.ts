@@ -185,6 +185,9 @@ describe("tool registration", () => {
     })
     // The host reserves `execute` for Code Mode, so no direct tool may take that name.
     expect(h.tools.has("execute")).toBe(false)
+    // The Code Mode namespace text names gws_read as the direct tool it is, never as a Code Mode call.
+    expect(NAMESPACE.description).toContain("the direct tool gws_read")
+    expect(NAMESPACE.description).not.toMatch(/\bwith read\b/)
   })
 
   it("describes what each tool does without internal jargon, and names the direct commit tools", async () => {

@@ -8,8 +8,8 @@ import { call, codeMode, commits, COMMITS, driver, plan, turn, type Commit, type
 
 /**
  * All eleven tools in the real host, driven by the scripted model against
- * the fake gws. status, catalog, schema, read, and plan run in Code Mode;
- * the six commit tools are direct tools the model calls by name. Each
+ * the fake gws. status, catalog, schema, and plan run in Code Mode; read
+ * and the six commit tools are direct tools the model calls by name. Each
  * commit runs only after its permission prompts are approved, and each
  * category has a path where nothing commits. admin is refused by default
  * and runs with admin.enabled, an allow rule, and a reason (tools-admin.test.ts).
