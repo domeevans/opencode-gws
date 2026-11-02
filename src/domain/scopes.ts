@@ -10,7 +10,7 @@ import type { AccessLevel } from "./types.js"
  * method is covered by its service's read set and every change by its write
  * set, except the methods listed below, which stay outside both levels on
  * purpose (sensitive or narrow scopes such as mail settings, delegation,
- * permanent delete, Classroom rosters and add-ons, or the directory).
+ * permanent delete, or Classroom rosters and add-ons).
  */
 
 export const SCOPE_PREFIX = "https://www.googleapis.com/auth/"
@@ -33,7 +33,8 @@ const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
   sheets: { read: ["spreadsheets.readonly"], write: ["spreadsheets"] },
   slides: { read: ["presentations.readonly"], write: ["presentations"] },
   tasks: { read: ["tasks.readonly"], write: ["tasks"] },
-  people: { read: ["contacts.readonly"], write: ["contacts"] },
+  // Other contacts and the organisation directory are read-only scopes, so read and write both request them.
+  people: { read: ["contacts.readonly", "contacts.other.readonly", "directory.readonly"], write: ["contacts", "contacts.other.readonly", "directory.readonly"] },
   chat: {
     read: ["chat.spaces.readonly", "chat.messages.readonly", "chat.memberships.readonly"],
     write: ["chat.spaces", "chat.messages", "chat.memberships"],
@@ -152,8 +153,6 @@ export const EXTRA_SCOPE_METHODS: ReadonlySet<string> = new Set([
   "gmail.users.settings.sendAs.smimeInfo.setDefault", "gmail.users.settings.sendAs.update", "gmail.users.settings.sendAs.verify",
   "gmail.users.settings.updateAutoForwarding", "gmail.users.settings.updateImap", "gmail.users.settings.updateLanguage",
   "gmail.users.settings.updatePop", "gmail.users.settings.updateVacation", "gmail.users.threads.delete",
-  // people: other contacts and the organisation directory
-  "people.otherContacts.list", "people.otherContacts.search", "people.people.listDirectoryPeople", "people.people.searchDirectoryPeople",
 ])
 
 /** A service's scope sets; a service outside the table requests nothing. */

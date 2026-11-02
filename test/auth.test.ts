@@ -505,9 +505,9 @@ describe("scope preflight", () => {
   })
 
   it("names an extra scope for operations outside both access levels", async () => {
-    const runtime = await readOnly(["people"])
-    await expect(runtime.read(request("people.people.listDirectoryPeople", { params: { readMask: "names", sources: ["DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE"] } }), call)).rejects.toThrow(
-      /^AUTH_SCOPE_MISSING: .*one of: directory\.readonly\)\. Next step: Add one of them to accounts\.personal\.scopes; then, to sign in again, run \/connect and choose Google Workspace/,
+    const runtime = await readOnly(["drive"])
+    await expect(runtime.read(request("drive.apps.list", { fields: "items(id)" }), call)).rejects.toThrow(
+      /^AUTH_SCOPE_MISSING: .*one of: drive\.apps\.readonly\)\. Next step: Add one of them to accounts\.personal\.scopes; then, to sign in again, run \/connect and choose Google Workspace/,
     )
     expect(invocations(runtime)).toEqual([])
   })

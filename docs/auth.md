@@ -77,7 +77,7 @@ Every interactive sign-in also requests the identity scopes `openid`, `https://w
 | keep | `https://www.googleapis.com/auth/keep.readonly` | `https://www.googleapis.com/auth/keep` |
 | meet | `https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
 | modelarmor | _(none)_ | _(none)_ |
-| people | `https://www.googleapis.com/auth/contacts.readonly` | `https://www.googleapis.com/auth/contacts` |
+| people | `https://www.googleapis.com/auth/contacts.readonly`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` | `https://www.googleapis.com/auth/contacts`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` |
 | script | `https://www.googleapis.com/auth/script.projects.readonly`<br>`https://www.googleapis.com/auth/script.processes`<br>`https://www.googleapis.com/auth/script.metrics` | `https://www.googleapis.com/auth/script.projects`<br>`https://www.googleapis.com/auth/script.processes`<br>`https://www.googleapis.com/auth/script.metrics` |
 | sheets | `https://www.googleapis.com/auth/spreadsheets.readonly` | `https://www.googleapis.com/auth/spreadsheets` |
 | slides | `https://www.googleapis.com/auth/presentations.readonly` | `https://www.googleapis.com/auth/presentations` |
@@ -223,10 +223,6 @@ Methods neither access level covers. Add one of the method's manifest scopes to 
 - `gmail.users.settings.updatePop`
 - `gmail.users.settings.updateVacation`
 - `gmail.users.threads.delete`
-- `people.otherContacts.list`
-- `people.otherContacts.search`
-- `people.people.listDirectoryPeople`
-- `people.people.searchDirectoryPeople`
 
 <!-- /generated:scopes -->
 

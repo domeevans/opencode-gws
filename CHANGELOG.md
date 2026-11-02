@@ -19,6 +19,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- People's read and write sign-ins request `directory.readonly` and `contacts.other.readonly`, both read-only, so `people.people.searchDirectoryPeople`, `people.people.listDirectoryPeople`, `people.otherContacts.list` and `people.otherContacts.search` no longer fail with `AUTH_SCOPE_MISSING`.
 - Invalid helper input, such as `gmail.read` without `id`, is refused with `GWS_VALIDATION_ERROR` and the helper's next step before any permission check or `gws` run, instead of a raw zod error.
 
 ## [0.0.0] - 2026-11-01

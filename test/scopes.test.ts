@@ -60,6 +60,16 @@ describe("scope table against the manifest", () => {
     expect(ACCESS_SCOPES.modelarmor).toEqual({ read: [], write: [] })
   })
 
+  it("lets People's read sign-in search and list the directory and other contacts", () => {
+    const read = requestedScopes(["people"], "read")
+    for (const id of ["people.people.searchDirectoryPeople", "people.people.listDirectoryPeople", "people.otherContacts.list", "people.otherContacts.search"]) {
+      expect(commandIndex().methods.get(id)?.category, id).toBe("read")
+      expect(grants(acceptedScopes(id), read), id).toBe(true)
+      expect(grants(acceptedScopes(id), requestedScopes(["people"], "write")), id).toBe(true)
+    }
+    for (const scope of ACCESS_SCOPES.people!.read) expect(scope).toMatch(/\.readonly$/)
+  })
+
   it("gives composite services the union of their parts", () => {
     expect(ACCESS_SCOPES.workflow!.read).toEqual(expect.arrayContaining([...ACCESS_SCOPES.gmail!.read, ...ACCESS_SCOPES.calendar!.read, ...ACCESS_SCOPES.tasks!.read]))
     expect(ACCESS_SCOPES.events!.write).toEqual(expect.arrayContaining([...ACCESS_SCOPES.chat!.write]))
