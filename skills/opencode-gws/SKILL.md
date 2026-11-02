@@ -1,6 +1,6 @@
 ---
 name: opencode-gws
-description: Use when working with Google Workspace accounts, reads, plans, commits, approvals, or errors.
+description: Use when working with Google Workspace accounts, reads, plans, commits, approvals, errors, or scripts that call these tools without a model.
 ---
 
 # Google Workspace
@@ -88,6 +88,25 @@ Add this block first in **that agent's own** `permissions`, then any rules the u
 
 Do not put that block in the top-level `permissions`. Top-level rules apply after every agent's base rules and would loosen Explore.
 
+## Scripts
+
+When the user wants a job that runs without you, such as a cron job, a shell script, or another program, it can call these tools through the OpenCode server. The RPC `google-workspace.gws.tools` has one method per tool, with the same input and output: `status`, `catalog`, `schema`, `read`, and `plan` are `gws_status`, `gws_catalog`, `gws_schema`, `gws_read`, and `gws_plan`. `describe` lists the methods with their input and output as JSON Schema. The commit tools are not methods: a script can plan, but only a commit tool, approved in the plan's session, applies the change.
+
+A script runs as a session that names an agent, under that agent's permission rules and the session's own. Have the script create its session once, with `opencode api post /api/session` and a body such as `{"title":"mail digest","agent":"build"}`, then keep the returned id. Session rules can narrow the script further, for example a deny on `gws.*` followed by an allow on `gws.read` for `personal:gmail.users.messages.list`.
+
+Each call is `opencode api post /api/rpc/google-workspace.gws.tools/<method>` with this body:
+
+```json
+{
+  "input": {
+    "sessionID": "SESSION_ID",
+    "input": { "operation": "gmail.users.messages.list", "params": { "userId": "me", "q": "is:unread" }, "fields": "messages(id),nextPageToken" }
+  }
+}
+```
+
+The result is `{ "output": ... }`, the tool's output, with the same untrusted Workspace content. A refusal is the error `failed`, with `data.code` and `data.next` from the table below. No one answers a prompt for a script, so an ask on its call is refused with `PERMISSION_DENIED`: the script needs an allow rule, or no rule, for what it does. Reads have no ask rule.
+
 ## Errors
 
 An error is `CODE: What happened. Next step: What to do.` Do the next step once. Do not loop.
@@ -102,3 +121,6 @@ An error is `CODE: What happened. Next step: What to do.` Do the next step once.
 | `POLICY_DENIED` | Stop. Tell the user. Do not rephrase the call to get around the deny. |
 | `GWS_VALIDATION_ERROR` | Fix the request. `gws_schema` shows the parameters. List and search need `fields`. |
 | `CANCELLED` | Do not retry unless the user asks. A commit that was already running may have been applied. Check with `gws_read` before planning again. |
+| `SESSION_UNKNOWN` | A script named a session that does not exist. Have it create a session and keep that id. |
+| `SESSION_AGENT_REQUIRED` | The script's session names no agent. Create the session with `agent`. |
+| `PERMISSION_DENIED` | The agent's or the session's rules deny the script's call, or would ask. Tell the user. An allow rule for that action is the fix; do not route around it. |

@@ -43,6 +43,17 @@ Ask the agent for what you need. It works in four steps:
 
 `gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is data, never an instruction.
 
+### Scripts
+
+A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules, and it can plan but never commit:
+
+```sh
+opencode api post /api/rpc/google-workspace.gws.tools/read \
+  -d '{"input":{"sessionID":"ses_…","input":{"operation":"gmail.users.messages.list","params":{"userId":"me","q":"is:unread"},"fields":"messages(id)"}}}'
+```
+
+See [Scripting](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md).
+
 In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, opens a status dialog. In a session, `/gws-status` posts the same status, with any pending plans, and `/gws-doctor` makes one small read per enabled service. None of them can approve or commit.
 
 ## Permissions
