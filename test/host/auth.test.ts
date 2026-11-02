@@ -30,6 +30,13 @@ afterAll(async () => {
 const at = () => ({ location: host.location })
 
 /** One scripted model turn that runs `code` in Code Mode; returns what the model saw. */
+/** One scripted model turn that calls gws_read directly; returns what the model saw. */
+async function read(input: unknown): Promise<Record<string, unknown>> {
+  host.model.script({ tool: "gws_read", input })
+  await prompt(host, sessionID, "run")
+  return JSON.parse(host.model.lastToolResult() ?? "{}") as Record<string, unknown>
+}
+
 async function execute(code: string): Promise<Record<string, unknown>> {
   host.model.script({ code })
   await prompt(host, sessionID, "run")
@@ -86,8 +93,9 @@ describe("scope preflight with a read-only sign-in", () => {
 
   it("runs a read", async () => {
     const before = host.invocations().length
-    const result = await execute(call("read", request("gmail.users.getProfile", { account: "default", params: { userId: "me" } })))
+    const result = await read(request("gmail.users.getProfile", { account: "default", params: { userId: "me" } }))
     expect(result["error"]).toBeUndefined()
+    expect(result).toMatchObject({ ok: true, operation: "gmail.users.getProfile" })
     expect(host.invocations().length).toBe(before + 1)
   })
 

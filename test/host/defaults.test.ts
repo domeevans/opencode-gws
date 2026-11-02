@@ -25,6 +25,13 @@ async function execute(code: string): Promise<Record<string, unknown>> {
   return JSON.parse(host.model.lastToolResult()!) as Record<string, unknown>
 }
 
+/** One scripted model turn that calls gws_read directly; returns what the model saw. */
+async function read(input: unknown): Promise<Record<string, unknown>> {
+  host.model.script({ tool: "gws_read", input })
+  await prompt(host, sessionID, "run")
+  return JSON.parse(host.model.lastToolResult() ?? "{}") as Record<string, unknown>
+}
+
 function call(tool: string, input: unknown): string {
   return `try { return { value: await tools.gws.${tool}(${JSON.stringify(input)}) } } catch (e) { return { error: String(e?.message ?? e) } }`
 }
@@ -35,8 +42,9 @@ const asked = () => host.events.filter((event) => event.type === "permission.ask
 describe("default ask rules", () => {
   it("reads without a permission prompt", async () => {
     const before = asked().length
-    const read = await execute(call("read", { operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" }))
-    expect(read["error"]).toBeUndefined()
+    const result = await read({ operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" })
+    expect(result["error"]).toBeUndefined()
+    expect(result).toMatchObject({ ok: true, category: "read" })
     expect(asked().length).toBe(before)
   })
 
