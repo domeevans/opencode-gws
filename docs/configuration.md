@@ -23,7 +23,7 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 | `enabledServices` | every manifest service, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
 | `access` | `"read"`; `"write"` on the implicit `default` account | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
 | `scopes` | none | Extra scope URLs or short names, always shown at sign-in. Interactive accounts only. |
-| `oauthClient` | none | `{ "clientId", "clientSecret" }` for this account. Overrides the plugin client. Interactive accounts only. |
+| `oauthClient` | none | `{ "clientId", "clientSecret" }` of a Desktop app client, or Google's downloaded client JSON (`{ "installed": … }` or `{ "web": … }`), for this account. Overrides the plugin client. Interactive accounts only. |
 
 An account whose config sets `access` to read, with no write service, does not offer write on the sign-in form. With no explicit `access`, the form defaults to read and still offers write, which needs the acknowledgment. The implicit `default` account defaults to write and still offers Read-only.
 
@@ -34,7 +34,9 @@ An account whose config sets `access` to read, with no write service, does not o
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `services` | the union of every account's `enabledServices` | Limits what catalog, schema, read, and plan accept. A service here must be enabled by at least one account. It does not add tools. |
-| `oauthClient` | none | `{ clientId, clientSecret }` of a Desktop app client, usually set by organisation config. When set, the sign-in form hides its client fields and uses these values. An account `oauthClient` overrides it. See [auth.md](auth.md). |
+| `oauthClient` | none | `{ clientId, clientSecret }` of a Desktop app client, or Google's downloaded client JSON, usually set by organisation config. When set, the sign-in form hides its client fields and uses this client; a Web client's secret is never put in the form. An account `oauthClient` overrides it. See [auth.md](auth.md). |
+| `redirectUri` | none: a loopback redirect | The absolute URL Google redirects to after consent, when the browser is not on the machine OpenCode runs on, such as `https://host.example/oauth/return`. `https`, unless it is loopback. Needs `callbackPort` and a Web application client that lists it exactly. See [auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine). |
+| `callbackPort` | none: a random port | The port on `127.0.0.1` where the sign-in listens and the redirect is forwarded. Alone, a loopback redirect on that port. |
 | `binary.path` | the platform package | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
 | `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0` and show a warning in status. 2.2.2, 2.3.0, 3.0.0, prereleases, and dev builds are untested. |
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
@@ -193,7 +195,9 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
 | `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
 | `AUTH_CLIENT_REQUIRED` | No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one. | Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
-| `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, or a value in the wrong format. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
+| `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, a value in the wrong format, or a client JSON that is not Google's downloaded client JSON. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
+| `AUTH_REDIRECT_INVALID` | The sign-in's redirectUri is not an absolute https (or loopback http) URL, or callbackPort is missing or not a port. | Set redirectUri to an absolute https URL and callbackPort to a port from 1 to 65535, or leave both unset for a loopback redirect. |
+| `AUTH_REDIRECT_MISMATCH` | Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser. | Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client. |
 | `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |
 | `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
 | `GWS_API_ERROR` | Google returned an error; the message carries Google's text. | Fix the ids or parameters once from the message; if it fails again, report it. |

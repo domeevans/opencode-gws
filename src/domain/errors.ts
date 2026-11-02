@@ -96,8 +96,17 @@ export const ErrorCode = {
     next: "Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator.",
   },
   AUTH_CLIENT_INVALID: {
-    meaning: "The sign-in form has only one of the client ID and secret, or a value in the wrong format.",
+    meaning: "The sign-in form has only one of the client ID and secret, a value in the wrong format, or a client JSON that is not Google's downloaded client JSON.",
     next: "Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps.",
+  },
+  AUTH_REDIRECT_INVALID: {
+    meaning: "The sign-in's redirectUri is not an absolute https (or loopback http) URL, or callbackPort is missing or not a port.",
+    next: "Set redirectUri to an absolute https URL and callbackPort to a port from 1 to 65535, or leave both unset for a loopback redirect.",
+  },
+  AUTH_REDIRECT_MISMATCH: {
+    meaning:
+      "Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser.",
+    next: "Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client.",
   },
   AUTH_WRITE_UNCONFIRMED: {
     meaning: "Read and write access was chosen in the sign-in form without confirming the write scopes.",

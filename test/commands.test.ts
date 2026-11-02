@@ -251,7 +251,7 @@ describe("/gws-status setup steps", () => {
     expect(text).toContain("Testing status gets refresh tokens that expire after 7 days")
     expect(text).toContain("https://developers.google.com/identity/protocols/oauth2#expiration")
     expect(text).toContain("type Desktop app at https://console.developers.google.com/auth/clients")
-    expect(text).toContain("A Web client does not work.")
+    expect(text).toContain("A Web client works only with a redirectUri registered on it, for OpenCode on another machine.")
     expect(text).toContain("run /connect and choose Google Workspace (personal), or run opencode auth login gws-personal")
   })
 

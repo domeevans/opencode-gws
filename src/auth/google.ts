@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http"
+import { checkClientRedirect, isLoopback, resolveRedirect, type Redirect } from "../domain/redirect.js"
 import { grantedScopes } from "../domain/scopes.js"
 import type { AccessLevel } from "../domain/types.js"
 import type { ClientChoice } from "./client.js"
@@ -8,9 +9,12 @@ import { readSignIn, signInClient, signInMetadata } from "./credential.js"
 /**
  * Google OAuth for the Workspace integration.
  *
- * The browser flow uses a Desktop OAuth client with a loopback redirect and
- * PKCE (S256). The module writes no file: tokens, the client, and the
- * granted scopes go into the OpenCode credential it returns.
+ * The browser flow uses PKCE (S256) and a random state, with a Desktop
+ * OAuth client and a loopback redirect to 127.0.0.1 on a random port, or
+ * with the redirect and callback port a host supplies (domain/redirect.ts),
+ * for which a Web application client works too. The module writes no file:
+ * tokens, the client, and the granted scopes go into the OpenCode
+ * credential it returns.
  */
 
 export const GOOGLE_AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -45,6 +49,8 @@ interface GoogleAuthorizeInput {
   access: AccessLevel
   /** Every scope to request, identity scopes included. */
   scopes: readonly string[]
+  /** The host-supplied redirect; loopback on a random port when absent. */
+  redirect?: Redirect
   options?: GoogleAuthOptions
 }
 
@@ -146,12 +152,21 @@ export function buildAuthorizeUrl(input: BuildAuthorizeUrlInput): string {
   return url.toString()
 }
 
-/** What OpenCode shows next to the sign-in URL: the account, the access level, and every scope. */
-function signInInstructions(alias: string, access: AccessLevel, scopes: readonly string[]): string {
+/** What redirect_uri_mismatch from Google means for this sign-in's redirect. */
+export function mismatchHint(redirectUri: string, fixed: boolean): string {
+  if (!fixed) return "If Google shows redirect_uri_mismatch, the client is not a Desktop app."
+  if (isLoopback(redirectUri)) {
+    return `If Google shows redirect_uri_mismatch, use a Desktop app client, or a Web application client that lists ${redirectUri} exactly.`
+  }
+  return `If Google shows redirect_uri_mismatch, the Web application client does not list ${redirectUri} exactly as an authorised redirect URI; Google matches it character for character.`
+}
+
+/** What OpenCode shows next to the sign-in URL: the account, the access level, every scope, and the redirect hint. */
+function signInInstructions(alias: string, access: AccessLevel, scopes: readonly string[], hint: string): string {
   return [
     `Sign in to Google Workspace (${alias}) with ${access === "write" ? "read and write" : "read-only"} access.`,
     `Google will ask you to approve exactly these scopes: ${scopes.join(", ")}.`,
-    "If Google shows redirect_uri_mismatch, the client is not a Desktop app.",
+    hint,
   ].join(" ")
 }
 
@@ -268,11 +283,17 @@ function page(title: string, body: string): string {
 </html>`
 }
 
-async function listenOnLoopback(server: Server): Promise<number> {
+async function listenOnLoopback(server: Server, port: number): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
     const onError = (): void => {
       server.off("listening", onListening)
-      reject(new Error("Google sign-in could not start a local callback server."))
+      reject(
+        new Error(
+          port
+            ? `Google sign-in could not listen on 127.0.0.1:${port}; another program may be using callbackPort ${port}.`
+            : "Google sign-in could not start a local callback server.",
+        ),
+      )
     }
     const onListening = (): void => {
       server.off("error", onError)
@@ -285,7 +306,7 @@ async function listenOnLoopback(server: Server): Promise<number> {
     }
     server.once("error", onError)
     server.once("listening", onListening)
-    server.listen(0, "127.0.0.1")
+    server.listen(port, "127.0.0.1")
   })
 }
 
@@ -320,6 +341,9 @@ function respond(response: ServerResponse, status: number, title: string, body: 
 export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<GoogleOAuthAuthorization> {
   const options = input.options ?? {}
   const { client } = input.client
+  const redirect = input.redirect ?? resolveRedirect({})
+  // Before anything listens or the browser opens: a redirect Google would refuse for this client.
+  checkClientRedirect(client, redirect.uri || undefined)
   const scopes = [...input.scopes]
   const pkce = createPkce()
   const state = createOAuthState()
@@ -342,7 +366,7 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
   let finished = false
   let processing = false
   let timer: NodeJS.Timeout | undefined
-  let port = 0
+  let redirectUri = redirect.uri
 
   const finish = async (error?: Error, credential?: OAuthCredential): Promise<void> => {
     if (finished) return
@@ -361,7 +385,7 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
         return
       }
       const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1")
-      if (requestUrl.pathname !== "/" && requestUrl.pathname !== "/callback") {
+      if (!redirect.paths.includes(requestUrl.pathname)) {
         respond(response, 404, "Not found", "<p>This is not the OAuth callback.</p>")
         return
       }
@@ -403,7 +427,7 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
           code,
           client_id: client.clientId,
           client_secret: client.clientSecret,
-          redirect_uri: `http://127.0.0.1:${port}`,
+          redirect_uri: redirectUri,
           code_verifier: pkce.verifier,
         })
         const token = await postToken(tokenEndpoint, body, fetchImpl, [code, pkce.verifier, client.clientSecret])
@@ -450,7 +474,8 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
   })
 
   try {
-    port = await listenOnLoopback(server)
+    const port = await listenOnLoopback(server, redirect.port)
+    if (!redirectUri) redirectUri = `http://127.0.0.1:${port}`
   } catch (error) {
     await closeServer(server)
     throw error
@@ -470,7 +495,7 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
   try {
     url = buildAuthorizeUrl({
       clientId: client.clientId,
-      redirectUri: `http://127.0.0.1:${port}`,
+      redirectUri,
       scopes,
       state,
       codeChallenge: pkce.challenge,
@@ -483,7 +508,7 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
 
   return {
     url,
-    instructions: signInInstructions(input.alias, input.access, scopes),
+    instructions: signInInstructions(input.alias, input.access, scopes, mismatchHint(redirectUri, redirect.uri !== "")),
     expiresAt: now() + timeoutMs,
     mode: "auto",
     callback,

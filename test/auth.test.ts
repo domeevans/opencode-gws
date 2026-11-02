@@ -153,8 +153,8 @@ describe("integration identity", () => {
       { id: "gws-work", name: "Google Workspace (work)" },
     ])
     expect(methods.map((method) => [method.integrationID, method.label?.(), method.method.form.length])).toEqual([
-      ["gws-personal", "personal", 4],
-      ["gws-work", "work", 4],
+      ["gws-personal", "personal", 7],
+      ["gws-work", "work", 7],
     ])
   })
 })

@@ -3,6 +3,7 @@ import * as z from "zod"
 import { GwsError } from "./errors.js"
 import type { AccountProfile, PluginConfig } from "./types.js"
 import { adminServices, canonicalService, loadManifest } from "./manifest.js"
+import { redirectProblem } from "./redirect.js"
 import { scopeUrl } from "./scopes.js"
 
 const absolutePath = z.string().min(1).refine((value) => isAbsolute(value), {
@@ -13,14 +14,32 @@ const envVarName = z.string().regex(/^[A-Z_][A-Z0-9_]*$/, {
   message: "must be an environment variable name (values are resolved at runtime, never stored)",
 })
 
-/** A Google OAuth client (Desktop app). */
+/** A Google OAuth client ID and secret. */
 export const CLIENT_ID_PATTERN = /^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$/
 export const CLIENT_SECRET_PATTERN = /^[A-Za-z0-9_-]+$/
 
-export const OAuthClientSchema = z.strictObject({
-  clientId: z.string().regex(CLIENT_ID_PATTERN, { message: "must be a Google OAuth client ID (…apps.googleusercontent.com)" }),
-  clientSecret: z.string().regex(CLIENT_SECRET_PATTERN, { message: "must be a Google OAuth client secret" }),
-})
+export const ClientIdSchema = z.string().regex(CLIENT_ID_PATTERN, { message: "must be a Google OAuth client ID (…apps.googleusercontent.com)" })
+export const ClientSecretSchema = z.string().regex(CLIENT_SECRET_PATTERN, { message: "must be a Google OAuth client secret" })
+
+/** A Desktop app client's ID and secret. */
+export const DesktopClientSchema = z.strictObject({ clientId: ClientIdSchema, clientSecret: ClientSecretSchema })
+
+/**
+ * Google's downloaded client JSON: `installed` for a Desktop app client, or
+ * `web` for a Web application client, which must list its redirect URIs.
+ * Other keys (project_id, auth_uri, …) are ignored.
+ */
+export const ClientJsonSchema = z.union([
+  z
+    .object({ installed: z.object({ client_id: ClientIdSchema, client_secret: ClientSecretSchema }) })
+    .transform(({ installed }) => ({ clientId: installed.client_id, clientSecret: installed.client_secret })),
+  z
+    .object({ web: z.object({ client_id: ClientIdSchema, client_secret: ClientSecretSchema, redirect_uris: z.array(z.string().min(1)).min(1) }) })
+    .transform(({ web }) => ({ clientId: web.client_id, clientSecret: web.client_secret, redirectUris: web.redirect_uris })),
+])
+
+/** An OAuth client option: a Desktop client's ID and secret, or Google's client JSON. */
+export const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema])
 
 const accessLevel = z.enum(["read", "write"])
 
@@ -82,6 +101,8 @@ const configSchema = z.strictObject({
   accounts: z.record(z.string().min(1), accountProfile).optional(),
   services: z.array(z.string().min(1)).min(1).optional(),
   oauthClient: OAuthClientSchema.optional(),
+  redirectUri: z.string().min(1).optional(),
+  callbackPort: z.number().int().min(1).max(65_535).optional(),
   policy: z
     .strictObject({
       planTtlSeconds: z.number().int().positive().optional(),
@@ -156,6 +177,11 @@ export function loadConfig(raw: unknown): PluginConfig {
     throw invalid(`The plugin options are not valid (${issues})`)
   }
   const parsed = result.data
+  if (parsed.redirectUri !== undefined) {
+    const problem = redirectProblem(parsed.redirectUri)
+    if (problem) throw invalid(`The redirectUri option ${problem}`, "Set redirectUri to the absolute URL Google redirects to, such as https://host.example/oauth/return.")
+    if (parsed.callbackPort === undefined) throw invalid("The redirectUri option is set without callbackPort", "Set callbackPort to the local port the redirect reaches.")
+  }
   const configured: Record<string, z.output<typeof accountProfile>> = parsed.accounts ?? defaultAccounts()
   if (Object.keys(configured).length === 0) {
     throw invalid("The accounts option has no account", "Add at least one account alias to accounts, or remove accounts for the default account.")
@@ -214,6 +240,10 @@ export function loadConfig(raw: unknown): PluginConfig {
     accounts,
     services,
     ...(parsed.oauthClient ? { oauthClient: parsed.oauthClient } : {}),
+    redirect: {
+      ...(parsed.redirectUri !== undefined ? { redirectUri: parsed.redirectUri } : {}),
+      ...(parsed.callbackPort !== undefined ? { callbackPort: parsed.callbackPort } : {}),
+    },
     binary: {
       path: parsed.binary?.path,
     },

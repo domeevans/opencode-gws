@@ -19,12 +19,15 @@ The form renders before authentication starts.
 | OAuth client ID, OAuth client secret | When no `oauthClient` option sets a client. | The ID and secret of your Desktop app client. Leave both blank to reuse the client from this account's previous sign-in. When `oauthClient` is set (for example by organisation config), both fields are hidden and submit the option's values. The host refuses a malformed ID or secret before any network call. |
 | Access | Always | **Read-only** or **Read and write**. It starts on the account's configured access: Read and write for the implicit `default` account, Read-only for an account without `access`. Each option's description lists the scope URLs it will request. An account whose config sets `access` to read, with no write service, does not offer write. |
 | I understand this grants write access | Required when Access is Read and write | The acknowledgment. Without it the sign-in stops with `AUTH_WRITE_UNCONFIRMED`. |
+| OAuth client JSON, OAuth redirect URI, OAuth callback port | Never: a host fills them | Google's downloaded client JSON (it replaces the client ID and secret), and the `redirectUri` and `callbackPort` of [a sign-in from another machine](#sign-in-when-opencode-runs-on-another-machine). The redirect fields default to the plugin options of the same names. |
 
-If Google shows `redirect_uri_mismatch`, the client is not a Desktop app.
+If Google shows `redirect_uri_mismatch` with the default loopback redirect, the client is not a Desktop app. With a `redirectUri`, the Web application client does not list it exactly; the sign-in instructions name the redirect.
 
 ## OAuth client
 
 No Google OAuth client ships with the plugin. Each sign-in uses your own Desktop app client, or the one your organisation sets through `oauthClient`. Google treats a Desktop client's secret as non-confidential. Security does not rest on the secret. It rests on PKCE (S256), the loopback redirect to `127.0.0.1`, and the user's consent on Google's screen.
+
+`oauthClient` is `{ "clientId", "clientSecret" }` for a Desktop app client, or the JSON Google Cloud console downloads for a client: `{ "installed": … }` for a Desktop app, `{ "web": … }` for a Web application, which keeps its `redirect_uris`. A Web client works only with a host-supplied redirect (below), and its secret is confidential.
 
 Precedence, first match wins:
 
@@ -48,6 +51,28 @@ Set `oauthClient` in user, project, or system config. An organisation client of 
 5. **Copy its ID and secret.** Copy the client ID (`….apps.googleusercontent.com`) and the client secret, then run `/connect`, choose Google Workspace, and enter them. Choose the access: every change still needs a plan and your approval.
 
 Then run `/gws-doctor`. It makes one small read per enabled service and reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, or `API_DISABLED` with the enable URL.
+
+## Sign in when OpenCode runs on another machine
+
+By default Google sends the browser back to `http://127.0.0.1:<random port>`, where the sign-in listens. That works only when the browser and OpenCode are on the same computer. When OpenCode runs on a server and the person signs in from a browser elsewhere, the host that serves OpenCode supplies the redirect:
+
+- `redirectUri`: the absolute URL Google redirects to, for example `https://host.example/oauth/return`. It must be `https`, unless it points at `127.0.0.1`, `[::1]` or `localhost`.
+- `callbackPort`: the port on `127.0.0.1` where the sign-in listens. The host forwards Google's redirect, path and query unchanged, to `http://127.0.0.1:<callbackPort><path of redirectUri>`.
+
+Set them as plugin options, or let the host fill the hidden form fields of the same names for one sign-in; a filled field wins over its option. `redirectUri` needs `callbackPort`. `callbackPort` alone keeps a loopback redirect, on that fixed port.
+
+The authorize URL and the token exchange then carry `redirectUri`. The listener accepts only the redirect's path, with the same state and PKCE checks, and only once. Without either setting, nothing changes.
+
+Google accepts only loopback redirects for a Desktop app client, so a public redirect needs a **Web application** client:
+
+1. Under [Clients](https://console.developers.google.com/auth/clients), create a client of type **Web application**, and add the exact `redirectUri` under **Authorised redirect URIs**.
+2. Download its JSON and give it to the sign-in: in the form's hidden **OAuth client JSON** field, filled by the host, or as `oauthClient`.
+
+Before the browser opens, the sign-in refuses with `AUTH_REDIRECT_MISMATCH` a Desktop client with a non-loopback redirect, and a Web client whose `redirect_uris` do not include `redirectUri`. A malformed redirect or port is `AUTH_REDIRECT_INVALID`.
+
+A Web client's secret is confidential. The plugin keeps it with the sign-in in OpenCode's credential store, never puts it in the form, a status, a tool result or an error, and redacts it from token errors. Prefer the form field to `oauthClient`: a config file is a file an agent's tools may read.
+
+Google matches a non-loopback redirect exactly, character for character, so every public address must be registered on the Web client. A deployment with many hosts registers each one, or uses one relay address that forwards each callback to the right host.
 
 ## What the default consent asks for
 

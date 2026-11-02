@@ -59,7 +59,8 @@ describe("the default account's sign-in", () => {
     expect(data.name).toBe("Google Workspace")
     const method = data.methods.find((entry) => entry.type === "oauth") as { form?: Array<Record<string, unknown>> } | undefined
     const form = method?.form ?? []
-    expect(form.map((field) => field["key"])).toEqual(["clientId", "clientSecret", "access", "confirmWrite"])
+    expect(form.map((field) => field["key"])).toEqual(["clientId", "clientSecret", "access", "confirmWrite", "clientJson", "redirectUri", "callbackPort"])
+    for (const field of form.slice(4)) expect(field).toMatchObject({ hidden: true, required: false })
     expect(form[0]).toMatchObject({ type: "string", required: false })
     expect(form[0]).not.toHaveProperty("hidden")
     expect(form[1]).toMatchObject({ type: "string", required: false })

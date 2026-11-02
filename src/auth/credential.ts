@@ -1,19 +1,20 @@
 import * as z from "zod"
-import { OAuthClientSchema } from "../domain/config.js"
+import { ClientIdSchema, ClientSecretSchema } from "../domain/config.js"
 import type { AccessLevel } from "../domain/types.js"
 import type { ClientChoice } from "./client.js"
 
 /**
  * What a Google sign-in stores in the OpenCode credential's `metadata`,
  * next to the tokens: the client it used (so refresh keeps working when the
- * default changes), the access level, and the scopes it requested and
- * Google granted. It lives only in OpenCode's credential store; the plugin
+ * default changes; a Web client also keeps its redirect URIs), the access
+ * level, and the scopes it requested and Google granted. It lives only in OpenCode's credential store; the plugin
  * writes no credential or client file.
  */
 
 const SignInMetadata = z.object({
-  clientId: OAuthClientSchema.shape.clientId,
-  clientSecret: OAuthClientSchema.shape.clientSecret,
+  clientId: ClientIdSchema,
+  clientSecret: ClientSecretSchema,
+  clientRedirectUris: z.array(z.string()).optional(),
   clientSource: z.enum(["account", "plugin", "pasted"]),
   access: z.enum(["read", "write"]),
   requestedScopes: z.array(z.string()),
@@ -28,9 +29,11 @@ export function signInMetadata(input: {
   requestedScopes: readonly string[]
   grantedScopes: readonly string[]
 }): SignInMetadata {
+  const { redirectUris } = input.client.client
   return {
     clientId: input.client.client.clientId,
     clientSecret: input.client.client.clientSecret,
+    ...(redirectUris ? { clientRedirectUris: [...redirectUris] } : {}),
     clientSource: input.client.source,
     access: input.access,
     requestedScopes: [...input.requestedScopes],
@@ -46,5 +49,6 @@ export function readSignIn(metadata: Readonly<Record<string, unknown>> | undefin
 
 /** The client a stored sign-in used. */
 export function signInClient(metadata: SignInMetadata): ClientChoice {
-  return { client: { clientId: metadata.clientId, clientSecret: metadata.clientSecret }, source: metadata.clientSource }
+  const { clientId, clientSecret, clientRedirectUris } = metadata
+  return { client: { clientId, clientSecret, ...(clientRedirectUris ? { redirectUris: clientRedirectUris } : {}) }, source: metadata.clientSource }
 }
