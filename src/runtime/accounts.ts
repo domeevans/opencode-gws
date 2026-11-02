@@ -7,6 +7,7 @@ import type { Audit } from "../domain/audit.js"
 import type { AuthProblemCode, AuthState } from "../domain/auth-state.js"
 import { throwIfCancelled } from "../domain/errors.js"
 import { authProblem, type AuthRemediation } from "../domain/result.js"
+import { appOnly } from "../domain/app-only.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
 import type { AccountProfile, PluginConfig, ProcessResult } from "../domain/types.js"
@@ -189,16 +190,19 @@ export class Accounts {
   }
 
   private scopeMissing(account: string, profile: AccountProfile, operation: string, accepted: readonly string[]): string {
+    if (appOnly(operation)) {
+      return (
+        `AUTH_SCOPE_MISSING: ${operation} needs a scope Google grants only to an app's own credentials (a Chat app or a Classroom add-on), never to a person's sign-in, so '${account}' cannot run it. ` +
+        "Next step: Tell the user this method cannot run with a Google sign-in, and use another method."
+      )
+    }
     const read = signInScopes(profile, "read")
-    const write = signInScopes(profile, "write")
     const named = accepted.slice(0, 5).map(shortScope).join(", ")
-    const extra = `add one of them to accounts.${account}.scopes`
     const connect = this.connect(account)
+    // The write set covers every method a person's sign-in can run (test/scopes.test.ts), so a miss is a re-consent or write.
     const next = accepted.some((scope) => read.includes(scope))
       ? `to sign in again, ${connect}, and approve every scope Google lists.`
-      : accepted.some((scope) => write.includes(scope))
-        ? `to sign in again, ${connect}, and choose Read and write; or ${extra}.`
-        : `${extra}; then, to sign in again, ${connect}.`
+      : `to sign in again, ${connect}, and choose Read and write; or add one of them to accounts.${account}.scopes.`
     return `AUTH_SCOPE_MISSING: The sign-in for '${account}' has not granted a scope ${operation} needs (one of: ${named}). Next step: ${capitalize(next)}`
   }
 

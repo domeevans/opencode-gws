@@ -139,7 +139,7 @@
       {
         "name": "gws.admin",
         "permission": "gws.admin",
-        "effect": "deny",
+        "effect": "ask",
         "readOnly": false
       }
     ],

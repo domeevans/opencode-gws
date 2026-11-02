@@ -18,7 +18,7 @@ opencode plugin add @joe-broadhead/opencode-gws
 
 npm also installs the matching `@joe-broadhead/opencode-gws-bin-<target>` package, which holds the unmodified `gws` binary at the version the plugin pins ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
 
-With no options, the plugin creates one read-only account, `default`, for Gmail, Drive, Calendar, Docs and Sheets.
+With no options, the plugin creates one account, `default`, with every Workspace service it covers at Read and write, so one consent grants every scope it can use. Every change still needs a plan and your approval. To narrow it, set `accounts` ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#accounts)).
 
 ## Sign in
 
@@ -28,7 +28,7 @@ Run `/connect` and choose **Google Workspace**. The TUI shows the sign-in link: 
 opencode auth login gws-default
 ```
 
-No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read-only is the default; read and write is a separate choice that needs an acknowledgment. With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
+No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists about 46 scopes, and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
 
 Details and the scope table: [docs/auth.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md).
 
@@ -101,7 +101,7 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | Code | What to do |
 | --- | --- |
 | `AUTH_REQUIRED` | Run `/connect` and choose Google Workspace, or run `opencode auth login gws-<alias>`. |
-| `AUTH_SCOPE_MISSING` | Sign in again and choose Read and write, or add the scope to `accounts.<alias>.scopes`. Nothing ran. |
+| `AUTH_SCOPE_MISSING` | Sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in. Nothing ran. |
 | `AUTH_CLIENT_REQUIRED` | Run `/connect` and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
 | `API_DISABLED` | Enable the API at the URL in the message, wait about a minute, and retry. `/gws-doctor` checks every service. |
 | `HOST_UNTESTED` | Use OpenCode 2.2.3 or a later 2.2.x, or set `"allowUntestedHost": true`. |

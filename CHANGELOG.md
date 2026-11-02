@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- `appOnly` on `gws_catalog` entries and `gws_schema` results: the 29 methods only a Chat app's or a Classroom add-on's own credentials can run (`chat.bot`, `chat.import`, `classroom.addons.*`). No access level requests those scopes, and the scope check refuses them with a next step that says no sign-in can run them.
 - A `jelly` section in `package.json`: each tool with its permission, its default effect and whether it only reads, the skill ids, views. Jelly reads it without loading the plugin and applies the declared asks, because its agents have no base allow rule for this plugin's own default rules to follow. `docs/jelly.md` explains it.
 - `title` and `signIns` in the `jelly` section: the name Jelly shows on the plugin's card, and what the plugin signs in to, so that one card can say whether each sign-in is connected and start, renew or end it. `docs/jelly.md` lists them.
 - A Gmail thread view for Jelly, `views/gmail-thread.html`, shipped in the package.
@@ -15,6 +16,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- With no `accounts` option, the `default` account enables every manifest service at Read and write. Read and write now requests every scope a Google sign-in can use, Gmail settings, `https://mail.google.com/` (permanent delete), the Chat user scopes, the Classroom roster and coursework scopes, `drive.apps.readonly` and `cloud-platform` included: 46 scopes in one consent. Read-only is still in the form, and `enabledServices`, `access`, `services` and your own `accounts` narrow it as before.
+- `admin.enabled` defaults to `true`. Admin plans still need an allowed service, a reason, the ask on `gws.admin`, and `gws_admin`; `admin.enabled: false` or `admin.allowedServices: []` refuses them. The Jelly declaration asks for `gws.admin` instead of denying it.
+- The form's Read-only choice is labelled **Read-only**.
 - `gws_read` is a direct tool instead of a pinned Code Mode tool, so a host can show each read's result. A Code Mode script can no longer call `tools.gws.read`; the model calls `gws_read` directly.
 
 ### Fixed

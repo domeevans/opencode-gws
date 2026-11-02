@@ -14,11 +14,10 @@ writes each declared `ask` or `deny` as that tool's default instead (the person'
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
 changes nothing in Jelly.
 
-- Ask: `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete`.
-- Off: `gws.admin`.
+- Ask: `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete`, `gws.admin`.
 - Everything else runs, as the plugin's own rules let it.
 
-`gws.admin` is declared `deny`: the plugin's own admin gate is off unless configured, and Jelly sets up no admin account.
+`gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
 
 A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
 default. Keep `jelly.tools` in step with the known-tool list; `test/views.test.ts` checks

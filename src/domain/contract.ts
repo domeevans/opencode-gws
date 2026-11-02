@@ -161,6 +161,7 @@ const CatalogEntry = z.object({
   executable: z.boolean().describe("The plugin can run it (a service: at least one of its operations); false for denied, deploy, and watch entries"),
   commitTool: z.string().optional().describe('The tool that commits its plan, e.g. "gws_send"; absent for reads'),
   alternative: z.string().optional().describe("For a helper that cannot run: the method id that does the same job"),
+  appOnly: z.literal(true).optional().describe("Only an app's own credentials (a Chat app or a Classroom add-on) can run it; a Google sign-in cannot"),
 })
 
 export const CatalogOutput = z.object({
@@ -191,6 +192,7 @@ export const SchemaOutput = z.object({
   ok: z.literal(true),
   account: z.string(),
   schema: ResolvedSchema.optional().describe("Present for a method"),
+  appOnly: z.literal(true).optional().describe("Only an app's own credentials (a Chat app or a Classroom add-on) can run this method; a Google sign-in cannot"),
   helper: HelperEntry.extend({
     input: z.unknown().optional().describe("JSON Schema of the helper's input flags; absent when the helper cannot run"),
   })

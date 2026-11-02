@@ -75,7 +75,7 @@ function offersWrite(profile: AccountProfile): boolean {
 }
 
 function accessOptions(profile: AccountProfile): AccessField["options"] {
-  const read = { value: "read" as const, label: "Read-only (recommended)", description: `Requests: ${signInScopes(profile, "read").join(" ")}` }
+  const read = { value: "read" as const, label: "Read-only", description: `Requests: ${signInScopes(profile, "read").join(" ")}` }
   if (!offersWrite(profile)) return [read]
   return [read, { value: "write", label: "Read and write", description: `Requests: ${signInScopes(profile, "write").join(" ")}` }]
 }

@@ -89,7 +89,7 @@ export const ErrorCode = {
   },
   AUTH_SCOPE_MISSING: {
     meaning: "The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran.",
-    next: "Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry.",
+    next: "Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method.",
   },
   AUTH_CLIENT_REQUIRED: {
     meaning: "No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one.",

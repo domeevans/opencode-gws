@@ -1,7 +1,7 @@
 // Example OpenCode config for opencode-gws.
 //
-// The first plugin entry is the minimum: no options, one read-only
-// "default" account (Gmail, Drive, Calendar, Docs, Sheets).
+// The first plugin entry is the minimum: no options, one "default"
+// account with every service at Read and write, and the admin gate on.
 // The second entry is annotated. Both option objects load.
 //
 // Both entries name the published package; use one of them.

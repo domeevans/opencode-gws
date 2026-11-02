@@ -13,7 +13,7 @@ Call `gws_status` before the first Workspace call in a session. It lists account
 
 Omit `account` when `gws_status` shows one account. Pass the alias when it shows more than one. A missing alias is `ACCOUNT_REQUIRED`. An unknown alias is `ACCOUNT_UNKNOWN`.
 
-The default sign-in is read-only. A write, send, share, delete, or export whose scopes were not granted fails with `AUTH_SCOPE_MISSING` before anything runs. Ask the user to sign in again with Read and write, or to add the scope named in the error. Do not invent a scope.
+An account signs in Read-only or Read and write; `gws_status` shows which. The `default` account defaults to Read and write, which covers every method a Google sign-in can run. An operation whose scopes were not granted fails with `AUTH_SCOPE_MISSING` before anything runs: ask the user to sign in again, approve every scope Google lists, and choose Read and write if the error says so. Do not invent a scope. A method that `gws_catalog` or `gws_schema` marks `appOnly` needs a Chat app's or Classroom add-on's own credentials; no sign-in can run it, so use another method.
 
 Not signed in: `AUTH_REQUIRED`. The next step is to run `/connect` and choose Google Workspace, or `opencode auth login gws-<alias>`.
 

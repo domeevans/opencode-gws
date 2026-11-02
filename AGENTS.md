@@ -62,8 +62,13 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 
 ## Security
 
-- Read-only sign-in unless the account opts in to write; the form shows the
-  exact scopes before consent.
+- With no `accounts` option, the `default` account enables every manifest
+  service at Read and write, and that level requests every scope a person's
+  sign-in can use (never an app-only scope), under Google's 64-scope cap. The
+  form still offers Read-only, shows the exact scopes before consent, and
+  write needs the acknowledgment. A user's own `accounts` apply exactly.
+- The admin gate is on by default; admin plans still need an allowed
+  service, a reason, the ask and `gws_admin`.
 - Every change is a `gws --dry-run` plan, committed only by its category's
   commit tool with `{ planId }`. The RPC, TUI and commands never approve or
   commit.

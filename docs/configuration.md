@@ -2,7 +2,7 @@
 
 Unofficial plugin. Not affiliated with Google.
 
-Options are the plugin `options` object in `opencode.json` or `opencode.jsonc`. Unknown keys are rejected. Omit `options` and the plugin creates one read-only interactive account, `default`, with `gmail`, `drive`, `calendar`, `docs`, and `sheets`.
+Options are the plugin `options` object in `opencode.json` or `opencode.jsonc`. Unknown keys are rejected. Omit `options` (or `accounts`) and the plugin creates one interactive account, `default`, with every manifest service at `access: "write"`: one consent grants every scope a Google sign-in can use. Set `accounts` to narrow it; your accounts then apply exactly as written, and an account without `access` is read-only.
 
 An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
@@ -20,12 +20,12 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `enabledServices` | the five everyday services, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
-| `access` | `"read"` | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
+| `enabledServices` | every manifest service, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
+| `access` | `"read"`; `"write"` on the implicit `default` account | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
 | `scopes` | none | Extra scope URLs or short names, always shown at sign-in. Interactive accounts only. |
 | `oauthClient` | none | `{ "clientId", "clientSecret" }` for this account. Overrides the plugin client. Interactive accounts only. |
 
-An account whose config sets `access` to read, with no write service, does not offer write on the sign-in form. With no explicit `access`, the form defaults to read and write needs the acknowledgment.
+An account whose config sets `access` to read, with no write service, does not offer write on the sign-in form. With no explicit `access`, the form defaults to read and still offers write, which needs the acknowledgment. The implicit `default` account defaults to write and still offers Read-only.
 
 `account` on a tool call is optional when exactly one account is configured.
 
@@ -41,7 +41,7 @@ An account whose config sets `access` to read, with no write service, does not o
 | `execution` | see below | Timeouts, page caps, and file roots. |
 | `audit` | JSONL in the state directory | Audit sink. |
 | `skills` | all three skills enabled | `enabled`, `include`, `exclude`. Ids are `opencode-gws`, `opencode-gws-recipes`, and `opencode-gws-admin`. |
-| `admin` | disabled | The admin gate. See [admin.md](admin.md). |
+| `admin` | enabled, every admin service, reason required | The admin gate. See [admin.md](admin.md). |
 
 ## Policy
 
@@ -107,7 +107,7 @@ Every permission rule in this document includes `resource`. A rule without it is
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `admin.enabled` | `false` | Master switch for admin planning. |
+| `admin.enabled` | `true` | Master switch for admin planning. Set `false` to refuse every admin plan. |
 | `admin.requireReason` | `true` | Require a non-empty `reason` on admin plans. |
 | `admin.allowedServices` | every service with an admin-class manifest entry | Allowlist. An explicit empty array denies every admin operation. |
 
@@ -191,7 +191,7 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create the script's session with an agent, for example POST /api/session with {"agent":"build"}. |
 | `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. | Run the script as a session whose agent allows the action, or add an allow rule for that action to the agent. |
 | `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
-| `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. |
+| `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
 | `AUTH_CLIENT_REQUIRED` | No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one. | Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
 | `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, or a value in the wrong format. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
 | `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |

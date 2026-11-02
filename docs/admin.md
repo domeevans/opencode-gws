@@ -2,13 +2,13 @@
 
 Unofficial plugin. Not affiliated with Google.
 
-Admin is a separate gate. It is denied by default. Enabling a service on an account does not enable it.
+Admin is a separate gate. It is open by default for every service with an admin-class entry; each admin change is still a plan with a reason, an ask on `gws.admin`, and a commit with `gws_admin`. Set `admin.enabled` to `false`, or `admin.allowedServices` to `[]`, to refuse every admin plan.
 
 ## What the gate requires
 
 An admin-category plan needs all of these:
 
-1. `admin.enabled` is `true`.
+1. `admin.enabled` is `true` (the default).
 2. The service is in `admin.allowedServices`. Omit the list to allow every service that has an admin-class manifest entry. An explicit empty array denies every admin operation.
 3. A non-empty `reason` on the plan, unless `admin.requireReason` is `false`.
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { signInForm } from "../src/auth/form.js"
 import { loadConfig } from "../src/domain/config.js"
+import { loadManifest } from "../src/domain/manifest.js"
 import { FAKE_GWS, TEST_CLIENT, account, testConfig } from "./support/config.js"
 
 const policy = { rules: [{ id: "no-write", effect: "deny" as const, categories: ["write" as const] }] }
@@ -44,12 +45,19 @@ describe("config", () => {
 })
 
 describe("accounts", () => {
-  it("creates one read-only interactive default account when accounts is omitted", () => {
+  it("creates one interactive default account with every service at Read and write when accounts is omitted", () => {
     for (const options of [undefined, {}]) {
       expect(loadConfig(options).accounts).toEqual({
-        default: { mode: "interactive", enabledServices: ["gmail", "drive", "calendar", "docs", "sheets"], access: "read", scopes: [] },
+        default: { mode: "interactive", enabledServices: loadManifest().services.map((service) => service.alias), access: "write", scopes: [] },
       })
     }
+  })
+
+  it("keeps the default sign-in form's Read-only choice, with write as the default", () => {
+    const profile = loadConfig(undefined).accounts.default!
+    const access = signInForm("default", profile, undefined)[2]
+    expect(access.default).toBe("write")
+    expect(access.options.map((option) => option.value)).toEqual(["read", "write"])
   })
 
   it("makes mode default to interactive and access to read", () => {

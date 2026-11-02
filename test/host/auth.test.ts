@@ -1,19 +1,24 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { IDENTITY_SCOPES, requestedScopes } from "../../src/domain/scopes.js"
+import { doctorTarget } from "../../src/auth/doctor.js"
+import { loadManifest } from "../../src/domain/manifest.js"
+import { IDENTITY_SCOPES, MAX_SCOPES, requestedScopes } from "../../src/domain/scopes.js"
 import { TEST_CLIENT, storedSignIn } from "../support/config.js"
 import { request } from "../support/requests.js"
 import { prompt, startHost, type Harness } from "./harness.js"
 
 /**
- * Least-privilege sign-in in the real host, with no `accounts` option: the
- * implicit read-only `default` account, its sign-in form, the OAuth start
- * (cancelled after its URL is checked, so Google is never contacted), and
- * the scope preflight with a read-only credential stored directly in the
- * host's credential store.
+ * Sign-in in the real host, with no `accounts` option: the implicit
+ * `default` account with every service at Read and write, its sign-in form,
+ * the OAuth start (cancelled after its URL is checked, so Google is never
+ * contacted), and the scope preflight with credentials stored directly in
+ * the host's credential store: first a read-only one, then a write one.
  */
 
-const SERVICES = ["gmail", "drive", "calendar", "docs", "sheets"]
+const SERVICES = loadManifest().services.map((service) => service.alias)
 const READ = requestedScopes(SERVICES, "read")
+const WRITE = requestedScopes(SERVICES, "write")
+/** The services /gws-doctor probes; the rest have no read-only check. */
+const PROBED = SERVICES.filter((service) => doctorTarget("default", service).operation !== undefined)
 
 let host: Harness
 let sessionID: string
@@ -58,8 +63,9 @@ describe("the default account's sign-in", () => {
     expect(form[0]).toMatchObject({ type: "string", required: false })
     expect(form[0]).not.toHaveProperty("hidden")
     expect(form[1]).toMatchObject({ type: "string", required: false })
-    expect(form[2]).toMatchObject({ type: "string", required: true, default: "read" })
+    expect(form[2]).toMatchObject({ type: "string", required: true, default: "write" })
     expect((form[2]!["options"] as Array<{ description: string }>)[0]!.description).toBe(`Requests: ${READ.join(" ")}`)
+    expect((form[2]!["options"] as Array<{ description: string }>)[1]!.description).toBe(`Requests: ${WRITE.join(" ")}`)
     expect(form[3]).toMatchObject({ type: "boolean", required: true, when: [{ key: "access", op: "eq", value: "write" }] })
   })
 
@@ -71,6 +77,18 @@ describe("the default account's sign-in", () => {
       expect(authorize.searchParams.get("scope")?.split(" ")).toEqual(READ)
       expect(authorize.searchParams.get("client_id")).toBe(TEST_CLIENT.clientId)
       expect(data.instructions).toContain("redirect_uri_mismatch")
+    } finally {
+      await host.opencode.integration.oauth.cancel({ integrationID: "gws-default", attemptID: data.attemptID, ...at() })
+    }
+  })
+
+  it("starts a Read and write sign-in that requests every scope in one consent, under the cap", async () => {
+    const answer = { clientId: TEST_CLIENT.clientId, clientSecret: TEST_CLIENT.clientSecret, access: "write", confirmWrite: true }
+    const { data } = await host.opencode.integration.oauth.connect({ integrationID: "gws-default", methodID: "google", answer, ...at() })
+    try {
+      const scopes = new URL(data.url).searchParams.get("scope")?.split(" ") ?? []
+      expect(scopes).toEqual(WRITE)
+      expect(scopes.length).toBeLessThanOrEqual(MAX_SCOPES)
     } finally {
       await host.opencode.integration.oauth.cancel({ integrationID: "gws-default", attemptID: data.attemptID, ...at() })
     }
@@ -133,7 +151,26 @@ describe("onboarding commands", () => {
     const before = host.invocations().length
     await host.opencode.sessions.command({ sessionID, name: "gws-doctor", text: "" })
     const event = await host.waitForEvent(posted("gws-doctor"))
-    expect(host.invocations().length).toBe(before + SERVICES.length)
-    for (const service of SERVICES) expect(JSON.stringify(event)).toContain(`- default ${service}: OK`)
+    expect(host.invocations().length).toBe(before + PROBED.length)
+    for (const service of ["gmail", "drive", "calendar", "docs", "sheets"]) expect(JSON.stringify(event)).toContain(`- default ${service}: OK`)
+  })
+})
+
+describe("the default account after a Read and write consent", () => {
+  beforeAll(async () => {
+    await host.opencode.credential.create({ integrationID: "gws-default", value: storedSignIn("write", WRITE) as never, activate: true })
+  })
+
+  it("lists every service at write access with no missing scopes", async () => {
+    const result = await execute(call("status", {}))
+    const [account] = (result["value"] as { accounts: Array<Record<string, unknown>> }).accounts
+    expect(account).toMatchObject({ alias: "default", connected: true, access: "write", missingScopes: [] })
+    expect([...(account!["services"] as string[])].sort()).toEqual([...SERVICES].sort())
+  })
+
+  it("plans a write that a read-only sign-in could not", async () => {
+    const result = await execute(call("plan", request("drive.files.create", { account: "default", body: { name: "host-test" } })))
+    expect(result["error"]).toBeUndefined()
+    expect(result["value"]).toMatchObject({ ok: true, category: "write" })
   })
 })

@@ -176,7 +176,7 @@ function setupSteps(status: GwsStatus): string[] {
     "   - Prefer the Internal user type when the project belongs to your Google Workspace organisation: only your organisation can sign in, and Google does not review the app.",
     `   - An External app left in Testing status gets refresh tokens that expire after 7 days, so you would sign in again every week (${GOOGLE_LINKS.refreshTokenExpiry}). Setting it In production avoids that expiry, at the cost of an unverified-app warning.`,
     `3. Create an OAuth client of type Desktop app at ${GOOGLE_LINKS.clients} (${GOOGLE_LINKS.desktopClientGuide}). A Web client does not work.`,
-    `4. To sign in, ${needs.map((account) => connect(account, several)).join("; ")}. Enter its client ID and secret in the sign-in form and choose Read-only unless agents must change things.`,
+    `4. To sign in, ${needs.map((account) => connect(account, several)).join("; ")}. Enter its client ID and secret in the sign-in form and choose the access; every change still asks before it runs.`,
     "5. Run /gws-doctor to check each service.",
     "The client and tokens are kept with the sign-in in OpenCode's credential store; the plugin writes no credential files.",
   ]

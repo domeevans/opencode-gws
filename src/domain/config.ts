@@ -24,9 +24,14 @@ export const OAuthClientSchema = z.strictObject({
 
 const accessLevel = z.enum(["read", "write"])
 
-/** With no `accounts` option, one read-only interactive account covers the everyday services. */
-const DEFAULT_ACCOUNTS: Readonly<Record<string, { mode: "interactive"; enabledServices: string[]; access: "read" }>> = {
-  default: { mode: "interactive", enabledServices: ["gmail", "drive", "calendar", "docs", "sheets"], access: "read" },
+/**
+ * With no `accounts` option, one interactive account enables every manifest
+ * service at Read and write, so one consent grants every scope the plugin
+ * can use. Every change still needs a plan, the ask, and a commit; the form
+ * still offers Read-only.
+ */
+function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
+  return { default: { mode: "interactive", enabledServices: loadManifest().services.map((service) => service.alias), access: "write" } }
 }
 
 const enabledServices = z.array(z.string().min(1)).min(1)
@@ -151,9 +156,9 @@ export function loadConfig(raw: unknown): PluginConfig {
     throw invalid(`The plugin options are not valid (${issues})`)
   }
   const parsed = result.data
-  const configured: Record<string, z.output<typeof accountProfile>> = parsed.accounts ?? DEFAULT_ACCOUNTS
+  const configured: Record<string, z.output<typeof accountProfile>> = parsed.accounts ?? defaultAccounts()
   if (Object.keys(configured).length === 0) {
-    throw invalid("The accounts option has no account", "Add at least one account alias to accounts, or remove accounts for the read-only default account.")
+    throw invalid("The accounts option has no account", "Add at least one account alias to accounts, or remove accounts for the default account.")
   }
 
   const known = new Set(loadManifest().services.map((service) => service.alias))
@@ -242,7 +247,7 @@ export function loadConfig(raw: unknown): PluginConfig {
       exclude: parsed.skills?.exclude ?? [],
     },
     admin: {
-      enabled: parsed.admin?.enabled ?? false,
+      enabled: parsed.admin?.enabled ?? true,
       requireReason: parsed.admin?.requireReason ?? true,
       allowedServices: parsed.admin?.allowedServices ?? adminServices(),
     },
