@@ -58,3 +58,5 @@ An account entry is `{ alias, mode, services, integrationID?, connected, needsAu
 - `nextStep` is one sentence, absent when nothing is needed.
 
 The RPC cannot approve or commit. A commit happens only when the agent calls a commit tool and the permission prompt allows it.
+
+Scripts call the tools through a separate RPC, `google-workspace.gws.tools`: see [Scripting](scripting.md).

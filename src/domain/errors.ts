@@ -66,6 +66,21 @@ export const ErrorCode = {
     next: "Commit with the tool named by the plan's category.",
   },
 
+  // ── Scripts (the tools RPC) ───────────────────────────────────────────
+  SESSION_UNKNOWN: {
+    meaning: "A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules.",
+    next: "Pass the id of an existing session, or create one for the agent the script should run as.",
+  },
+  SESSION_AGENT_REQUIRED: {
+    meaning: "A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent.",
+    next: 'Create the script\'s session with an agent, for example POST /api/session with {"agent":"build"}.',
+  },
+  PERMISSION_DENIED: {
+    meaning:
+      "The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run.",
+    next: "Run the script as a session whose agent allows the action, or add an allow rule for that action to the agent.",
+  },
+
   // ── Sign-in ───────────────────────────────────────────────────────────
   AUTH_REQUIRED: {
     meaning:

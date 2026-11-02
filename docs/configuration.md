@@ -144,7 +144,7 @@ Requested pagination is clamped to these caps and to any matching policy rule. A
 | `sink` | `"jsonl"` | `"jsonl"` or `"stderr"`. |
 | `path` | `<stateDir>/audit.jsonl` | Absolute path of the JSONL file, when `sink` is `jsonl`. |
 
-The state directory is `$XDG_STATE_HOME/opencode-gws` when that variable is an absolute path, otherwise `~/Library/Application Support/opencode-gws` on macOS and `~/.local/state/opencode-gws` elsewhere. Records contain the operation, account, category, duration, and outcome. They do not contain bodies, tokens, credentials, or file contents.
+The state directory is `$XDG_STATE_HOME/opencode-gws` when that variable is an absolute path, otherwise `~/Library/Application Support/opencode-gws` on macOS and `~/.local/state/opencode-gws` elsewhere. Records contain the operation, account, category, duration, and outcome, and `caller: "rpc"` for a read or plan a script made through the [tools RPC](scripting.md). They do not contain bodies, tokens, credentials, or file contents.
 
 A sink failure does not turn a completed operation into an error. Status keeps `auditDegraded: true` for that process. Do not retry a successful operation to obtain a record.
 
@@ -187,6 +187,9 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `PLAN_EXPIRED` | The plan's time limit passed, or a failed commit expired it. | Check the current state with gws_read, then plan again and show the new preview. |
 | `PLAN_CALLER_MISMATCH` | Another session, agent, or account created the plan. | Plan again from the session and agent that will commit it. |
 | `CATEGORY_MISMATCH` | The commit tool does not match the plan's category. | Commit with the tool named by the plan's category. |
+| `SESSION_UNKNOWN` | A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules. | Pass the id of an existing session, or create one for the agent the script should run as. |
+| `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create the script's session with an agent, for example POST /api/session with {"agent":"build"}. |
+| `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. | Run the script as a session whose agent allows the action, or add an allow rule for that action to the agent. |
 | `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
 | `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. |
 | `AUTH_CLIENT_REQUIRED` | No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one. | Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |

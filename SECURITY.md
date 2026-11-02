@@ -28,7 +28,7 @@ In scope: binary trust bypass; credential or environment isolation failure; a po
 | Local files | Uploads and attachments must be absolute regular files inside every applicable read root, capped at `maxUploadBytes`. Downloads must land inside every applicable write root, capped at `maxDownloadBytes`. A symlink is checked after resolution. |
 | Process | `gws` is spawned with an argv array and `shell: false`. The model does not supply argv. Timeout and cancellation kill the process group. |
 | Output | Separate stdout and stderr caps. Workspace content is untrusted data. |
-| Audit | Operation, account, category, duration, outcome. Never bodies, tokens, credentials, or file contents. |
+| Audit | Operation, account, category, duration, outcome, and `caller: "rpc"` for a script's call. Never bodies, tokens, credentials, or file contents. |
 
 Sign-in uses a Google installed-app (Desktop) client: your own, or one your organisation sets through `oauthClient`. No client ships with the plugin. The platform packages carry the unmodified Apache-2.0 `gws` binary; there is no `PATH` lookup and no download at runtime.
 
@@ -58,3 +58,13 @@ An agent defined only in the user's config does not receive the inserted rules. 
 A plugin deny is absolute. Rules match accounts, services, operations, and categories, and constrain recipients, public sharing, read and write roots, and page and item caps. They do not ask and cannot allow.
 
 Deploy and watch are never committable. Admin needs `admin.enabled`, an allowed service, and a reason when required. The host ask is the human prompt for admin; policy does not add a second one.
+
+## Scripts
+
+The tools RPC (`google-workspace.gws.tools`, see [docs/scripting.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)) runs the plugin's non-commit tools for a script, with no model. It adds no authority:
+
+- A script names a session that names an agent, and runs as them. Every call asserts the same action and resource as the tool, against that agent's rules and the session's own.
+- An ask on a script's call is denied, not prompted: no one is there to answer it. A script needs an allow rule, or no rule, for what it does.
+- Only `status`, `catalog`, `schema`, `read` and `plan` are methods. The six commit tools are never methods, whatever their exposure, so a script can plan but never commit; a plan binds to the session and agent, and only an approved commit tool in that session applies it.
+- The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The session is not a login: it scopes a script to what its agent may do.
+- Audit records of a script's reads and plans carry `caller: "rpc"`.

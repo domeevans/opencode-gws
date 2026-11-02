@@ -34,6 +34,8 @@ export interface CallContext {
   /** Aborting stops the gws child and rejects with `CANCELLED`. */
   signal?: AbortSignal
   progress?: (update: Progress) => void
+  /** Set when a script made the call through the tools RPC rather than a tool call; the audit records it. */
+  caller?: "rpc"
 }
 
 /** An interactive account's current sign-in, from OpenCode's credential store. */

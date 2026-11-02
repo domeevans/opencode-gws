@@ -6,6 +6,7 @@ import { agentLister, registerApprovalRules } from "./host/agents.js"
 import { planSummary, registerCommands } from "./host/commands.js"
 import { integrationAuthReporter, integrationConnection, integrationIds, integrationTokenProvider, registerIntegrations } from "./host/integrations.js"
 import { registerRpc, statusSource } from "./host/rpc.js"
+import { registerScripting } from "./host/scripting.js"
 import { registerSkills } from "./host/skills.js"
 import { registerTools } from "./host/tools.js"
 import { Runtime } from "./runtime/index.js"
@@ -15,8 +16,8 @@ import { Runtime } from "./runtime/index.js"
  *
  * Setup performs local work only: config validation, trusted binary
  * resolution, a no-network version probe, and integration, tool, skill,
- * RPC, and command registration. It never calls a Google API and never
- * fetches Discovery.
+ * RPC (status and tools), and command registration. It never calls a
+ * Google API and never fetches Discovery.
  */
 export default Plugin.define({
   id: PLUGIN_ID,
@@ -46,11 +47,13 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
   })
 
   let stopRpc: (() => Promise<void>) | undefined
+  let stopScripting: (() => Promise<void>) | undefined
   let stopCommands: (() => Promise<void>) | undefined
   const close = async () => {
     const settled = runtime.close()
     try {
       await stopCommands?.()
+      await stopScripting?.()
       await stopRpc?.()
     } finally {
       await settled
@@ -63,6 +66,7 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
     await registerTools(ctx, runtime, status)
     await registerSkills(ctx, config, runtime.visibleServices())
     stopRpc = await registerRpc(ctx, runtime, status)
+    stopScripting = await registerScripting(ctx, runtime, status)
     stopCommands = await registerCommands(ctx, { status, plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary), doctor: runtime }, runtime.signal)
     runtime.audit.emit({ event: "plugin.loaded", outcome: "success" })
   } catch (error) {

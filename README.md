@@ -112,6 +112,7 @@ Then remove each Google Workspace sign-in in `/connect`, or with `opencode auth 
 - [Sign-in and scopes](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md)
 - [Configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md)
 - [Status dialog, commands and RPC](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/ui.md)
+- [Scripting the tools without a model](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)
 - [Admin operations](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/admin.md)
 - [Security policy and model](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/SECURITY.md)
 - [The `gws` binary](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)
