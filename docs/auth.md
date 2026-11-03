@@ -76,7 +76,7 @@ Google matches a non-loopback redirect exactly, character for character, so ever
 
 ## What the default consent asks for
 
-The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 46 scopes in one consent, under Google's limit of 64 per request.
+The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 46 scopes in one consent, under Google's limit of 64 per request. Read-only requests 38 for the same services, only read-only scopes, and runs every read that accepts a read-only scope; the few reads listed below as needing Read and write accept no read-only scope.
 
 - **Granular consent.** Google lists the scopes with a checkbox each. A scope you untick is not granted; `/gws-status` and `gws_status` list it under missing scopes, and the methods that need it fail with `AUTH_SCOPE_MISSING` until you sign in again and approve it.
 - **External client in Testing.** Many of these scopes are sensitive or restricted (Gmail, Drive, and others). An External client shows Google's unverified-app warning for them, only its test users can sign in, and in Testing status Google expires its refresh tokens after 7 days, so you sign in again every week. An Internal client in your own Workspace organisation avoids all three.
@@ -102,12 +102,12 @@ Every interactive sign-in also requests the identity scopes `openid`, `https://w
 | Service | Read-only | Read and write |
 | --- | --- | --- |
 | admin-reports | `https://www.googleapis.com/auth/admin.reports.audit.readonly`<br>`https://www.googleapis.com/auth/admin.reports.usage.readonly` | `https://www.googleapis.com/auth/admin.reports.audit.readonly`<br>`https://www.googleapis.com/auth/admin.reports.usage.readonly` |
-| calendar | `https://www.googleapis.com/auth/calendar.readonly` | `https://www.googleapis.com/auth/calendar` |
-| chat | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings` |
-| classroom | `https://www.googleapis.com/auth/classroom.courses.readonly`<br>`https://www.googleapis.com/auth/classroom.coursework.me.readonly`<br>`https://www.googleapis.com/auth/classroom.announcements.readonly` | `https://www.googleapis.com/auth/classroom.courses`<br>`https://www.googleapis.com/auth/classroom.coursework.me`<br>`https://www.googleapis.com/auth/classroom.announcements`<br>`https://www.googleapis.com/auth/classroom.coursework.students`<br>`https://www.googleapis.com/auth/classroom.courseworkmaterials`<br>`https://www.googleapis.com/auth/classroom.guardianlinks.students`<br>`https://www.googleapis.com/auth/classroom.rosters`<br>`https://www.googleapis.com/auth/classroom.topics` |
+| calendar | `https://www.googleapis.com/auth/calendar.readonly`<br>`https://www.googleapis.com/auth/calendar.acls.readonly` | `https://www.googleapis.com/auth/calendar` |
+| chat | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/chat.customemojis.readonly`<br>`https://www.googleapis.com/auth/chat.users.availability.readonly`<br>`https://www.googleapis.com/auth/chat.users.readstate.readonly`<br>`https://www.googleapis.com/auth/chat.users.sections.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings` |
+| classroom | `https://www.googleapis.com/auth/classroom.courses.readonly`<br>`https://www.googleapis.com/auth/classroom.coursework.me.readonly`<br>`https://www.googleapis.com/auth/classroom.announcements.readonly`<br>`https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly`<br>`https://www.googleapis.com/auth/classroom.guardianlinks.students.readonly`<br>`https://www.googleapis.com/auth/classroom.rosters.readonly`<br>`https://www.googleapis.com/auth/classroom.topics.readonly` | `https://www.googleapis.com/auth/classroom.courses`<br>`https://www.googleapis.com/auth/classroom.coursework.me`<br>`https://www.googleapis.com/auth/classroom.announcements`<br>`https://www.googleapis.com/auth/classroom.coursework.students`<br>`https://www.googleapis.com/auth/classroom.courseworkmaterials`<br>`https://www.googleapis.com/auth/classroom.guardianlinks.students`<br>`https://www.googleapis.com/auth/classroom.rosters`<br>`https://www.googleapis.com/auth/classroom.topics` |
 | docs | `https://www.googleapis.com/auth/documents.readonly` | `https://www.googleapis.com/auth/documents` |
-| drive | `https://www.googleapis.com/auth/drive.readonly` | `https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly` |
-| events | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
+| drive | `https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly` | `https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly` |
+| events | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/chat.customemojis.readonly`<br>`https://www.googleapis.com/auth/chat.users.availability.readonly`<br>`https://www.googleapis.com/auth/chat.users.readstate.readonly`<br>`https://www.googleapis.com/auth/chat.users.sections.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
 | forms | `https://www.googleapis.com/auth/forms.body.readonly`<br>`https://www.googleapis.com/auth/forms.responses.readonly` | `https://www.googleapis.com/auth/forms.body`<br>`https://www.googleapis.com/auth/forms.responses.readonly`<br>`https://www.googleapis.com/auth/drive.file` |
 | gmail | `https://www.googleapis.com/auth/gmail.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/` |
 | keep | `https://www.googleapis.com/auth/keep.readonly` | `https://www.googleapis.com/auth/keep` |
@@ -118,37 +118,11 @@ Every interactive sign-in also requests the identity scopes `openid`, `https://w
 | sheets | `https://www.googleapis.com/auth/spreadsheets.readonly` | `https://www.googleapis.com/auth/spreadsheets` |
 | slides | `https://www.googleapis.com/auth/presentations.readonly` | `https://www.googleapis.com/auth/presentations` |
 | tasks | `https://www.googleapis.com/auth/tasks.readonly` | `https://www.googleapis.com/auth/tasks` |
-| workflow | `https://www.googleapis.com/auth/gmail.readonly`<br>`https://www.googleapis.com/auth/calendar.readonly`<br>`https://www.googleapis.com/auth/tasks.readonly`<br>`https://www.googleapis.com/auth/drive.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/`<br>`https://www.googleapis.com/auth/calendar`<br>`https://www.googleapis.com/auth/tasks`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly` |
+| workflow | `https://www.googleapis.com/auth/gmail.readonly`<br>`https://www.googleapis.com/auth/calendar.readonly`<br>`https://www.googleapis.com/auth/calendar.acls.readonly`<br>`https://www.googleapis.com/auth/tasks.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/`<br>`https://www.googleapis.com/auth/calendar`<br>`https://www.googleapis.com/auth/tasks`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly` |
 
 Read methods that the read-only set does not cover, so they need a Read and write sign-in:
 
-- `calendar.acl.list`
-- `chat.customEmojis.get`
-- `chat.customEmojis.list`
-- `chat.users.availability.get`
-- `chat.users.sections.items.list`
-- `chat.users.sections.list`
-- `chat.users.spaces.getSpaceReadState`
 - `chat.users.spaces.spaceNotificationSetting.get`
-- `chat.users.spaces.threads.getThreadReadState`
-- `classroom.courses.courseWorkMaterials.get`
-- `classroom.courses.courseWorkMaterials.list`
-- `classroom.courses.studentGroups.list`
-- `classroom.courses.studentGroups.studentGroupMembers.list`
-- `classroom.courses.students.get`
-- `classroom.courses.students.list`
-- `classroom.courses.teachers.get`
-- `classroom.courses.teachers.list`
-- `classroom.courses.topics.get`
-- `classroom.courses.topics.list`
-- `classroom.invitations.get`
-- `classroom.invitations.list`
-- `classroom.userProfiles.get`
-- `classroom.userProfiles.guardianInvitations.get`
-- `classroom.userProfiles.guardianInvitations.list`
-- `classroom.userProfiles.guardians.get`
-- `classroom.userProfiles.guardians.list`
-- `drive.apps.list`
 - `drive.files.generateIds`
 - `sheets.spreadsheets.developerMetadata.get`
 - `sheets.spreadsheets.developerMetadata.search`

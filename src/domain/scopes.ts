@@ -6,7 +6,7 @@ import type { AccessLevel } from "./types.js"
  * service, and the form lists these exact scopes before consent.
  *
  * Read-only requests only scopes that cannot change, send, share, or
- * delete. Read and write requests everything the service's methods can use
+ * delete, and every read with a read-only scope runs on it. Read and write requests everything the service's methods can use
  * with a user's sign-in, mail settings, permanent delete and Classroom
  * rosters included, so a granted write sign-in never blocks a method on a
  * scope. Safety rests on plan, ask, and commit, not on the grant.
@@ -32,8 +32,8 @@ interface ServiceScopes {
 const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
   // Write adds mail settings, forwarding and delegation, and permanent delete (only the full-mailbox scope allows it).
   gmail: { read: ["gmail.readonly"], write: ["gmail.modify", "gmail.settings.basic", "gmail.settings.sharing", "https://mail.google.com/"] },
-  drive: { read: ["drive.readonly"], write: ["drive", "drive.apps.readonly"] },
-  calendar: { read: ["calendar.readonly"], write: ["calendar"] },
+  drive: { read: ["drive.readonly", "drive.apps.readonly"], write: ["drive", "drive.apps.readonly"] },
+  calendar: { read: ["calendar.readonly", "calendar.acls.readonly"], write: ["calendar"] },
   docs: { read: ["documents.readonly"], write: ["documents"] },
   sheets: { read: ["spreadsheets.readonly"], write: ["spreadsheets"] },
   slides: { read: ["presentations.readonly"], write: ["presentations"] },
@@ -41,7 +41,15 @@ const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
   // Other contacts and the organisation directory are read-only scopes, so read and write both request them.
   people: { read: ["contacts.readonly", "contacts.other.readonly", "directory.readonly"], write: ["contacts", "contacts.other.readonly", "directory.readonly"] },
   chat: {
-    read: ["chat.spaces.readonly", "chat.messages.readonly", "chat.memberships.readonly"],
+    read: [
+      "chat.spaces.readonly",
+      "chat.messages.readonly",
+      "chat.memberships.readonly",
+      "chat.customemojis.readonly",
+      "chat.users.availability.readonly",
+      "chat.users.readstate.readonly",
+      "chat.users.sections.readonly",
+    ],
     write: [
       "chat.spaces",
       "chat.messages",
@@ -55,7 +63,15 @@ const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
     ],
   },
   classroom: {
-    read: ["classroom.courses.readonly", "classroom.coursework.me.readonly", "classroom.announcements.readonly"],
+    read: [
+      "classroom.courses.readonly",
+      "classroom.coursework.me.readonly",
+      "classroom.announcements.readonly",
+      "classroom.courseworkmaterials.readonly",
+      "classroom.guardianlinks.students.readonly",
+      "classroom.rosters.readonly",
+      "classroom.topics.readonly",
+    ],
     write: [
       "classroom.courses",
       "classroom.coursework.me",
@@ -108,35 +124,9 @@ export const ACCESS_SCOPES: Readonly<Record<string, ServiceScopes>> = Object.fro
   ] as const),
 ])
 
-/** Read methods only the write level covers: they need a Read and write sign-in. */
+/** Read methods only the write level covers, because no read-only scope can run them: they need a Read and write sign-in. */
 export const WRITE_ACCESS_READS: ReadonlySet<string> = new Set([
-  "calendar.acl.list",
-  "chat.customEmojis.get",
-  "chat.customEmojis.list",
-  "chat.users.availability.get",
-  "chat.users.sections.items.list",
-  "chat.users.sections.list",
-  "chat.users.spaces.getSpaceReadState",
   "chat.users.spaces.spaceNotificationSetting.get",
-  "chat.users.spaces.threads.getThreadReadState",
-  "classroom.courses.courseWorkMaterials.get",
-  "classroom.courses.courseWorkMaterials.list",
-  "classroom.courses.studentGroups.list",
-  "classroom.courses.studentGroups.studentGroupMembers.list",
-  "classroom.courses.students.get",
-  "classroom.courses.students.list",
-  "classroom.courses.teachers.get",
-  "classroom.courses.teachers.list",
-  "classroom.courses.topics.get",
-  "classroom.courses.topics.list",
-  "classroom.invitations.get",
-  "classroom.invitations.list",
-  "classroom.userProfiles.get",
-  "classroom.userProfiles.guardianInvitations.get",
-  "classroom.userProfiles.guardianInvitations.list",
-  "classroom.userProfiles.guardians.get",
-  "classroom.userProfiles.guardians.list",
-  "drive.apps.list",
   "drive.files.generateIds",
   "sheets.spreadsheets.developerMetadata.get",
   "sheets.spreadsheets.developerMetadata.search",

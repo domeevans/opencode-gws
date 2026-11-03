@@ -18,6 +18,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- Read-only sign-ins cover every read that accepts a read-only scope. The read sets add `drive.apps.readonly`, `calendar.acls.readonly`, `chat.customemojis.readonly`, `chat.users.availability.readonly`, `chat.users.readstate.readonly`, `chat.users.sections.readonly`, `classroom.courseworkmaterials.readonly`, `classroom.guardianlinks.students.readonly`, `classroom.rosters.readonly` and `classroom.topics.readonly`, so the Drive app list, calendar ACLs, Chat emoji, availability, read-state and section reads, and the Classroom roster, topic, material and guardian reads no longer need Read and write. A Read-only sign-in of every service requests 38 scopes.
 - With no `accounts` option, the `default` account enables every manifest service at Read and write. Read and write now requests every scope a Google sign-in can use, Gmail settings, `https://mail.google.com/` (permanent delete), the Chat user scopes, the Classroom roster and coursework scopes, `drive.apps.readonly` and `cloud-platform` included: 46 scopes in one consent. Read-only is still in the form, and `enabledServices`, `access`, `services` and your own `accounts` narrow it as before.
 - `admin.enabled` defaults to `true`. Admin plans still need an allowed service, a reason, the ask on `gws.admin`, and `gws_admin`; `admin.enabled: false` or `admin.allowedServices: []` refuses them. The Jelly declaration asks for `gws.admin` instead of denying it.
 - The form's Read-only choice is labelled **Read-only**.

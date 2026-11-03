@@ -49,6 +49,16 @@ describe("scope table against the manifest", () => {
     }
   })
 
+  it("puts only read-only scopes in the read sets, never a write or app-only scope", () => {
+    const viewOnly = new Set([`${SCOPE_PREFIX}script.processes`, `${SCOPE_PREFIX}script.metrics`])
+    for (const [service, sets] of Object.entries(ACCESS_SCOPES)) {
+      for (const scope of sets.read) {
+        expect(scope.endsWith(".readonly") || viewOnly.has(scope), `${service}: ${scope}`).toBe(true)
+        expect(APP_ONLY_SCOPES, `${service}: ${scope}`).not.toContain(scope)
+      }
+    }
+  })
+
   it("lists as app-only exactly the methods that can run but accept only app-only scopes", () => {
     const appOnlyScopes = new Set(APP_ONLY_SCOPES)
     const expected = methods()
@@ -77,7 +87,7 @@ describe("scope table against the manifest", () => {
       for (const scope of ACCESS_SCOPES[service]!.read) expect(scope, service).toMatch(/\.readonly$/)
     }
     expect(ACCESS_SCOPES.gmail!.read).toEqual([`${SCOPE_PREFIX}gmail.readonly`])
-    expect(ACCESS_SCOPES.drive!.read).toEqual([`${SCOPE_PREFIX}drive.readonly`])
+    expect(ACCESS_SCOPES.drive!.read).toEqual([`${SCOPE_PREFIX}drive.readonly`, `${SCOPE_PREFIX}drive.apps.readonly`])
   })
 
   it("gives composite services the union of their parts", () => {
@@ -103,6 +113,17 @@ describe("the no-options install", () => {
     expect(requested.length).toBe(46)
     expect(requested).toEqual(expect.arrayContaining([...IDENTITY_SCOPES, "https://mail.google.com/", `${SCOPE_PREFIX}cloud-platform`, `${SCOPE_PREFIX}directory.readonly`]))
     for (const scope of APP_ONLY_SCOPES) expect(requested).not.toContain(scope)
+  })
+
+  it("runs on a Read-only sign-in every read that accepts a read-only scope, apart from the app-only methods", () => {
+    const read = requestedScopes(profile.enabledServices, "read")
+    expect(read.length).toBeLessThanOrEqual(MAX_SCOPES)
+    expect(read.length).toBe(38)
+    const blocked = methods()
+      .filter((method) => method.category === "read" && method.scopes.some((scope) => scope.endsWith(".readonly")) && !appOnly(method.id))
+      .filter((method) => !grants(acceptedScopes(method.id), read))
+      .map((method) => method.id)
+    expect(blocked).toEqual([])
   })
 
   it("reports write access and no missing scopes once Google grants what the form requested", () => {
@@ -145,7 +166,9 @@ describe("requested scopes", () => {
     expect(scopes).toEqual([
       `${SCOPE_PREFIX}gmail.readonly`,
       `${SCOPE_PREFIX}drive.readonly`,
+      `${SCOPE_PREFIX}drive.apps.readonly`,
       `${SCOPE_PREFIX}calendar.readonly`,
+      `${SCOPE_PREFIX}calendar.acls.readonly`,
       `${SCOPE_PREFIX}documents.readonly`,
       `${SCOPE_PREFIX}spreadsheets.readonly`,
       ...IDENTITY_SCOPES,

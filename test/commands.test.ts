@@ -149,7 +149,7 @@ describe("/gws-status", () => {
         "Access: read-only",
         "Client: entered at sign-in",
         "Services: gmail, drive",
-        "Granted scopes: gmail.readonly, openid, userinfo.email, userinfo.profile",
+        "Granted scopes: gmail.readonly, drive.apps.readonly, openid, userinfo.email, userinfo.profile",
         "Scopes not granted: drive.readonly",
       ].join("\n"),
     )

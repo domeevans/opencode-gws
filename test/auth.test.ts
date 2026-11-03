@@ -212,9 +212,9 @@ describe("sign-in form", () => {
     const profile = loadConfig({ accounts: { default: account({ services: ["gmail", "drive"], access: { drive: "write" }, scopes: ["directory.readonly"] }) } }).accounts.default!
     const [, , access, confirm] = integration(profile).method.form
     expect(access.default).toBe("write")
-    expect(access.options[0]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive.readonly"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
+    expect(access.options[0]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive.readonly"), url("drive.apps.readonly"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
     expect(access.options[1]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive"), url("drive.apps.readonly"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
-    expect(confirm.title).toBe("I understand this grants write access to: drive, drive.apps.readonly")
+    expect(confirm.title).toBe("I understand this grants write access to: drive")
   })
 })
 
@@ -506,10 +506,12 @@ describe("scope preflight", () => {
 
   it("names Read and write for a read whose scope only the write level requests", async () => {
     const runtime = await readOnly(["drive"])
-    await expect(runtime.read(request("drive.apps.list", { fields: "items(id)" }), call)).rejects.toThrow(
-      /^AUTH_SCOPE_MISSING: .*one of: drive\.apps\.readonly\)\. Next step: To sign in again, run \/connect and choose Google Workspace, .*and choose Read and write/,
+    await expect(runtime.read(request("drive.files.generateIds", { params: { count: 1 } }), call)).rejects.toThrow(
+      /^AUTH_SCOPE_MISSING: .*drive\.files\.generateIds needs \(one of: drive, .*\)\. Next step: To sign in again, run \/connect and choose Google Workspace, .*and choose Read and write/,
     )
     expect(invocations(runtime)).toEqual([])
+    // drive.apps.readonly is in the read set, so the app list runs on the same Read-only sign-in.
+    await expect(runtime.read(request("drive.apps.list", { fields: "items(id)" }), call)).resolves.toMatchObject({ ok: true })
   })
 
   it("refuses an app-only method with a next step that says no Google sign-in can run it", async () => {
