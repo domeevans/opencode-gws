@@ -210,6 +210,16 @@ describe("helper planning", () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it("refuses invalid helper input with GWS_VALIDATION_ERROR before gws runs", async () => {
+    writeFileSync(log, "")
+    await expect(runtime!.read(requestFor("gmail.read", { input: {} }), call)).rejects.toThrow(
+      /^GWS_VALIDATION_ERROR: 'gmail\.read' input: id: .+ Next step: Fix the input; gws_schema with operation "gmail\.read" shows its flags\.$/,
+    )
+    expect(() => runtime!.inspect(requestFor("gmail.forward", { input: { messageId: "m1" } }), "plan")).toThrow(/^GWS_VALIDATION_ERROR: 'gmail\.forward' input: to: /)
+    await expect(runtime!.plan(requestFor("gmail.send", { input: { to: "alice@example.com", extra: true } }), call)).rejects.toThrow(/^GWS_VALIDATION_ERROR: 'gmail\.send' input: /)
+    expect(readFileSync(log, "utf8")).toBe("")
+  })
+
   it("plans every non-read adapter with --dry-run and stores the commit argv without it", async () => {
     const mutating = adaptedHelpers().filter((id) => helperAdapter(id)!.category !== "read")
     expect(mutating).toEqual(Object.keys(samples).sort())

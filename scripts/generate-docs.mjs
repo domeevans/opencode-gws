@@ -75,12 +75,15 @@ function unique(values) {
   return [...new Set(values)]
 }
 
-function scopeTable(scopesSource) {
+function scopeTable(scopesSource, appOnlySource) {
   const direct = evalSource(extractBraces(scopesSource, "const DIRECT"))
   const composite = evalSource(extractBraces(scopesSource, "const COMPOSITE"))
   const identity = evalSource(extractArray(scopesSource, "export const IDENTITY_SCOPES"), { SCOPE_PREFIX }).map(scopeUrl)
   const writeReads = evalSource(extractArray(scopesSource, "export const WRITE_ACCESS_READS"))
-  const extra = evalSource(extractArray(scopesSource, "export const EXTRA_SCOPE_METHODS"))
+  const appOnlyScopes = evalSource(extractArray(appOnlySource, "export const APP_ONLY_SCOPES")).map(scopeUrl)
+  const unusable = evalSource(extractArray(appOnlySource, "export const APP_ONLY_METHODS"))
+  const delegationScopes = evalSource(extractArray(appOnlySource, "export const DELEGATION_SCOPES")).map(scopeUrl)
+  const delegated = evalSource(extractArray(appOnlySource, "export const DELEGATION_METHODS"))
   const rows = Object.entries(direct).map(([service, sets]) => ({
     service,
     read: sets.read.map(scopeUrl),
@@ -98,7 +101,7 @@ function scopeTable(scopesSource) {
   const lines = [
     begin("scopes"),
     "",
-    "Generated from `src/domain/scopes.ts` by `npm run docs:coverage`. Do not edit this section by hand.",
+    "Generated from `src/domain/scopes.ts` and `src/domain/restricted.ts` by `npm run docs:coverage`. Do not edit this section by hand.",
     "",
     "Every interactive sign-in also requests the identity scopes " +
       identity.map((scope) => `\`${scope}\``).join(", ") +
@@ -112,9 +115,17 @@ function scopeTable(scopesSource) {
     "",
     ...writeReads.map((id) => `- \`${id}\``),
     "",
-    "Methods neither access level covers. Add one of the method's manifest scopes to the account's `scopes`; every sign-in then requests it and shows it:",
+    "Google grants " +
+      appOnlyScopes.map((scope) => `\`${scope}\``).join(", ") +
+      " only to an app's own credentials (a Chat app or a Classroom add-on), so no access level requests them. These methods accept nothing else, so no Google sign-in can run them; `gws_catalog` and `gws_schema` mark them `appOnly` and `restriction: \"app-only\"`:",
     "",
-    ...extra.map((id) => `- \`${id}\``),
+    ...unusable.map((id) => `- \`${id}\``),
+    "",
+    "Google grants " +
+      delegationScopes.map((scope) => `\`${scope}\``).join(", ") +
+      " only through domain-wide delegation, which a Workspace admin sets up, never through a person's own consent: a sign-in that asks for one is refused with `invalid_scope`. No access level requests them, and the default account does not enable Keep. These methods accept nothing else; `gws_catalog` and `gws_schema` mark them `restriction: \"domain-wide-delegation\"`. An account whose admin has set up delegation adds the scopes in `accounts.<alias>.scopes`:",
+    "",
+    ...delegated.map((id) => `- \`${id}\``),
     "",
     end("scopes"),
   ]
@@ -230,5 +241,5 @@ function emit(path, next) {
 const manifest = expandManifest(JSON.parse(read("manifest/generated.json")))
 emit("docs/coverage.md", coverageDoc(manifest, read("src/domain/helpers.ts")))
 emit("docs/configuration.md", replaceMarked(read("docs/configuration.md"), "errors", errorsDoc(read("src/domain/errors.ts"))))
-emit("docs/auth.md", replaceMarked(read("docs/auth.md"), "scopes", scopeTable(read("src/domain/scopes.ts"))))
+emit("docs/auth.md", replaceMarked(read("docs/auth.md"), "scopes", scopeTable(read("src/domain/scopes.ts"), read("src/domain/restricted.ts"))))
 if (process.exitCode) process.exit(process.exitCode)

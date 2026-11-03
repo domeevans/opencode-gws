@@ -1,6 +1,6 @@
 ---
 name: opencode-gws
-description: Use when working with Google Workspace accounts, reads, plans, commits, approvals, or errors.
+description: Use when working with Google Workspace accounts, reads, plans, commits, approvals, errors, or scripts that call these tools without a model.
 ---
 
 # Google Workspace
@@ -13,7 +13,7 @@ Call `gws_status` before the first Workspace call in a session. It lists account
 
 Omit `account` when `gws_status` shows one account. Pass the alias when it shows more than one. A missing alias is `ACCOUNT_REQUIRED`. An unknown alias is `ACCOUNT_UNKNOWN`.
 
-The default sign-in is read-only. A write, send, share, delete, or export whose scopes were not granted fails with `AUTH_SCOPE_MISSING` before anything runs. Ask the user to sign in again with Read and write, or to add the scope named in the error. Do not invent a scope.
+An account signs in Read-only or Read and write; `gws_status` shows which. The `default` account defaults to Read and write, which covers every method a Google sign-in can run. An operation whose scopes were not granted fails with `AUTH_SCOPE_MISSING` before anything runs: ask the user to sign in again, approve every scope Google lists, and choose Read and write if the error says so. Do not invent a scope. A method that `gws_catalog` or `gws_schema` marks `appOnly` (`restriction: "app-only"`) needs a Chat app's or Classroom add-on's own credentials; no sign-in can run it, so use another method. A method marked `restriction: "domain-wide-delegation"` (every Keep method) runs only when a Workspace admin has set up domain-wide delegation and `accounts.<alias>.scopes` adds a Keep scope; otherwise tell the user so.
 
 Not signed in: `AUTH_REQUIRED`. The next step is to run `/connect` and choose Google Workspace, or `opencode auth login gws-<alias>`.
 
@@ -88,6 +88,25 @@ Add this block first in **that agent's own** `permissions`, then any rules the u
 
 Do not put that block in the top-level `permissions`. Top-level rules apply after every agent's base rules and would loosen Explore.
 
+## Scripts
+
+When the user wants a job that runs without you, such as a cron job, a shell script, or another program, it can call these tools through the OpenCode server. The RPC `google-workspace.gws.tools` has one method per tool, with the same input and output: `status`, `catalog`, `schema`, `read`, and `plan` are `gws_status`, `gws_catalog`, `gws_schema`, `gws_read`, and `gws_plan`. `describe` lists the methods with their input and output as JSON Schema. The commit tools are not methods: a script can plan, but only a commit tool, approved in the plan's session, applies the change.
+
+A script runs as a session that names an agent, under that agent's permission rules and the session's own. Have the script create its session once, with `opencode api post /api/session` and a body such as `{"title":"mail digest","agent":"build"}`, then keep the returned id. Session rules can narrow the script further, for example a deny on `gws.*` followed by an allow on `gws.read` for `personal:gmail.users.messages.list`.
+
+Each call is `opencode api post /api/rpc/google-workspace.gws.tools/<method>` with this body:
+
+```json
+{
+  "input": {
+    "sessionID": "SESSION_ID",
+    "input": { "operation": "gmail.users.messages.list", "params": { "userId": "me", "q": "is:unread" }, "fields": "messages(id),nextPageToken" }
+  }
+}
+```
+
+The result is `{ "output": ... }`, the tool's output, with the same untrusted Workspace content. A refusal is the error `failed`, with `data.code` and `data.next` from the table below. No one answers a prompt for a script, so an ask on its call is refused with `PERMISSION_DENIED`: the script needs an allow rule, or no rule, for what it does. Reads have no ask rule.
+
 ## Errors
 
 An error is `CODE: What happened. Next step: What to do.` Do the next step once. Do not loop.
@@ -96,9 +115,13 @@ An error is `CODE: What happened. Next step: What to do.` Do the next step once.
 | --- | --- |
 | `AUTH_REQUIRED` | Ask the user to sign in as the message says, then retry. |
 | `AUTH_SCOPE_MISSING` | Ask the user to sign in again with the access the message names, or to add the scope. Nothing ran. |
+| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid; the account lacks the Workspace admin privilege the API needs. Do not ask the user to sign in again as the same account. Tell them the message's next step. |
 | `API_DISABLED` | Ask the user to enable the API at the URL in the message, wait about a minute, and retry. |
 | `OPERATION_UNKNOWN` | The id is not in the catalog. Search again with `gws_catalog`. |
 | `HELPER_UNSUPPORTED` | The helper cannot run. Use the method `gws_catalog` names as `alternative`. |
 | `POLICY_DENIED` | Stop. Tell the user. Do not rephrase the call to get around the deny. |
 | `GWS_VALIDATION_ERROR` | Fix the request. `gws_schema` shows the parameters. List and search need `fields`. |
 | `CANCELLED` | Do not retry unless the user asks. A commit that was already running may have been applied. Check with `gws_read` before planning again. |
+| `SESSION_UNKNOWN` | A script named a session that does not exist. Have it create a session and keep that id. |
+| `SESSION_AGENT_REQUIRED` | The script's session names no agent. Create the session with `agent`. |
+| `PERMISSION_DENIED` | The agent's or the session's rules deny the script's call, or would ask. Tell the user. An allow rule for that action is the fix; do not route around it. |

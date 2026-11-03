@@ -8,11 +8,11 @@ import { call, codeMode, commits, COMMITS, driver, plan, turn, type Commit, type
 
 /**
  * All eleven tools in the real host, driven by the scripted model against
- * the fake gws. status, catalog, schema, read, and plan run in Code Mode;
- * the six commit tools are direct tools the model calls by name. Each
+ * the fake gws. status, catalog, schema, and plan run in Code Mode; read
+ * and the six commit tools are direct tools the model calls by name. Each
  * commit runs only after its permission prompts are approved, and each
- * category has a path where nothing commits. admin is refused by default
- * and runs with admin.enabled, an allow rule, and a reason (tools-admin.test.ts).
+ * category has a path where nothing commits. admin is refused without a
+ * reason here, and runs with an allow rule and a reason (tools-admin.test.ts).
  * How a plugin error reaches the model is covered in tools-errors.test.ts.
  *
  * This file starts one host. The admin and errors describes are separate
@@ -99,10 +99,10 @@ describe("the eleven tools", () => {
     expect(JSON.parse(again.result)).toMatchObject({ ok: true, category })
   })
 
-  it("refuses an admin plan by default, before gws runs", async () => {
+  it("refuses an admin plan without a reason, before gws runs", async () => {
     const before = d.host.invocations().length
-    const refused = await codeMode(d, call("plan", request("drive.files.generateCseToken", { reason: "host test" })))
-    expect((refused["error"] as { message: string }).message).toMatch(/^POLICY_DENIED: Admin-disabled\. Next step: /)
+    const refused = await codeMode(d, call("plan", request("drive.files.generateCseToken")))
+    expect((refused["error"] as { message: string }).message).toMatch(/^POLICY_DENIED: .*reason.*\. Next step: /i)
     expect(d.host.invocations().length).toBe(before)
   })
 })

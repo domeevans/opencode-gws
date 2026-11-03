@@ -35,13 +35,23 @@ function adminConfig(admin: Record<string, unknown> = { enabled: true }, rules: 
 }
 
 describe("admin surface", () => {
-  it("denies admin by default and stays backward compatible without an admin block", () => {
+  it("opens the admin gate by default, for every admin service, with a reason required", () => {
     const config = configWith()
-    expect(config.admin.enabled).toBe(false)
+    expect(config.admin.enabled).toBe(true)
     expect(config.admin.requireReason).toBe(true)
     expect(config.admin.allowedServices).toEqual(["admin-reports", "drive", "modelarmor"])
+    expect(evaluatePolicy(config, adminEntry(), "admin", adminRequest()).effect).toBe("allow")
+  })
 
-    const decision = evaluatePolicy(config, adminEntry(), "admin", adminRequest())
+  it("denies every admin service when admin.allowedServices is an explicit empty array, gate on by default", () => {
+    const config = configWith({ admin: { allowedServices: [] } })
+    expect(config.admin.enabled).toBe(true)
+    expect(config.admin.allowedServices).toEqual([])
+    expect(evaluatePolicy(config, adminEntry(), "admin", adminRequest()).effect).toBe("deny")
+  })
+
+  it("denies admin when admin.enabled is false", () => {
+    const decision = evaluatePolicy(adminConfig({ enabled: false }), adminEntry(), "admin", adminRequest())
     expect(decision.effect).toBe("deny")
     expect(decision.violations).toContain("admin-disabled")
   })

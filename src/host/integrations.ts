@@ -17,7 +17,8 @@ import type { ConnectionView } from "../auth/status.js"
 import { AuthStateTracker, type AuthState } from "../domain/auth-state.js"
 import { GwsError } from "../domain/errors.js"
 import { Lifecycle } from "../domain/lifecycle.js"
-import type { AccountProfile, OAuthClient, PluginConfig } from "../domain/types.js"
+import { resolveRedirect } from "../domain/redirect.js"
+import type { AccountProfile, OAuthClient, PluginConfig, RedirectConfig } from "../domain/types.js"
 import type { AccountCredential } from "../runtime/accounts.js"
 import type { IntegrationDraft, PluginContext } from "./context.js"
 
@@ -45,6 +46,8 @@ export interface GoogleIntegrationOptions {
   name?: string
   /** The plugin-level `oauthClient`. */
   pluginClient?: OAuthClient
+  /** The plugin-level `redirectUri` and `callbackPort`: the form's defaults. */
+  redirect?: RedirectConfig
   /** The client of the account's current sign-in, so a re-sign-in can reuse a pasted one. */
   previous?: () => Promise<ClientChoice | undefined>
   auth?: GoogleAuthOptions
@@ -71,10 +74,15 @@ export function googleIntegration(
       id: GOOGLE_METHOD_ID,
       type: "oauth",
       label: "Sign in with Google",
-      form: signInForm(alias, profile, resolveClient(configured)),
+      form: signInForm(alias, profile, resolveClient(configured), options.redirect),
     },
     authorize: async (answer) => {
-      const { pasted, access } = readAnswer(answer)
+      const { pasted, access, redirect: entered } = readAnswer(answer)
+      // Each field the host filled in wins over its option, which is only the field's default.
+      const redirect = resolveRedirect({
+        redirectUri: entered.redirectUri ?? options.redirect?.redirectUri,
+        callbackPort: entered.callbackPort ?? options.redirect?.callbackPort,
+      })
       const previous = pasted ? undefined : await options.previous?.()
       const client = resolveClient({ ...configured, pasted, previous })
       if (!client) {
@@ -82,7 +90,7 @@ export function googleIntegration(
           `AUTH_CLIENT_REQUIRED: No OAuth client is configured for ${alias}. Next step: Run /connect and choose ${name}, then enter your Desktop OAuth client ID and secret, or ask your administrator.`,
         )
       }
-      return authorizeGoogle({ alias, client, access, scopes: signInScopes(profile, access), options: options.auth })
+      return authorizeGoogle({ alias, client, access, scopes: signInScopes(profile, access), redirect, options: options.auth })
     },
     refresh: (credential) => refreshGoogle({ alias, name, credential, options: options.auth }),
     label: () => alias,
@@ -118,6 +126,7 @@ export async function registerIntegrations(
       return googleIntegration(alias, profile, integrationID, {
         name: names.get(alias),
         pluginClient: config.oauthClient,
+        redirect: config.redirect,
         previous: async () => {
           const signIn = readSignIn((await resolve(integrationID))?.metadata)
           return signIn ? signInClient(signIn) : undefined

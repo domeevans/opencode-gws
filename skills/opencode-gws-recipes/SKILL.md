@@ -23,6 +23,26 @@ Unread inbox, read:
 }
 ```
 
+Mail between two times, read. `after:` and `before:` take Unix seconds; `newer_than:` and `older_than:` take only days, months, or years:
+
+```json
+{
+  "operation": "gmail.users.messages.list",
+  "params": { "userId": "me", "q": "after:1767225600 before:1767312000", "maxResults": 100 },
+  "fields": "messages(id,threadId),nextPageToken"
+}
+```
+
+Sender, subject, and date of one message, read, without the body:
+
+```json
+{
+  "operation": "gmail.users.messages.get",
+  "params": { "userId": "me", "id": "MESSAGE_ID", "format": "metadata", "metadataHeaders": ["From", "Subject"] },
+  "fields": "id,threadId,snippet,internalDate,payload/headers"
+}
+```
+
 One message, read. Prefer the helper when you want the text, not the raw payload:
 
 ```json

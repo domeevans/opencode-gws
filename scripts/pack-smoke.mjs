@@ -398,9 +398,9 @@ function hasAskRules(rules) {
 }
 
 /**
- * What /connect lists and renders: one entry per account named "Google Workspace (<alias>)", and the
+ * What /connect lists and renders: one entry per account named "Google Workspace (<alias>)", the
  * client ID and secret fields visible where no option sets a client, hidden with the option's values
- * as their default where one does.
+ * as their default where one does, and the three host-filled fields always hidden.
  */
 async function checkSignIn(version, api) {
   const listed = (await api("GET", "/api/integration")).data.filter((entry) => entry.id.startsWith("gws-"))
@@ -412,7 +412,20 @@ async function checkSignIn(version, api) {
   const form = async (id) => (await api("GET", `/api/integration/${id}`)).data.methods.find((method) => method.type === "oauth")?.form ?? []
   const client = (fields) => fields.filter((field) => field.key === "clientId" || field.key === "clientSecret").map(({ key, hidden, default: value }) => ({ key, hidden, default: value }))
   const own = await form("gws-default")
-  equal(own.map((field) => field.key), ["clientId", "clientSecret", "access", "confirmWrite"], `opencode ${version}: gws-default form fields`)
+  equal(
+    own.map((field) => field.key),
+    ["clientId", "clientSecret", "access", "confirmWrite", "clientJson", "redirectUri", "callbackPort"],
+    `opencode ${version}: gws-default form fields`,
+  )
+  equal(
+    own.slice(4).map(({ key, type, hidden }) => ({ key, type, hidden })),
+    [
+      { key: "clientJson", type: "string", hidden: true },
+      { key: "redirectUri", type: "string", hidden: true },
+      { key: "callbackPort", type: "integer", hidden: true },
+    ],
+    `opencode ${version}: the host-filled fields are hidden`,
+  )
   equal(client(own), [{ key: "clientId" }, { key: "clientSecret" }], `opencode ${version}: gws-default client fields are visible`)
   equal(
     client(await form("gws-work")),

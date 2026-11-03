@@ -16,7 +16,7 @@ import {
   type OAuthCredential,
 } from "../src/auth/google.js"
 import { loadConfig } from "../src/domain/config.js"
-import { IDENTITY_SCOPES, SCOPE_PREFIX, requestedScopes } from "../src/domain/scopes.js"
+import { IDENTITY_SCOPES, SCOPE_PREFIX, requestedScopes, shortScope } from "../src/domain/scopes.js"
 import type { AccountProfile } from "../src/domain/types.js"
 import {
   googleIntegration,
@@ -45,11 +45,11 @@ afterEach(async () => {
 })
 
 const url = (scope: string) => `${SCOPE_PREFIX}${scope}`
-const READ_DEFAULT = ["gmail.readonly", "drive.readonly", "calendar.readonly", "documents.readonly", "spreadsheets.readonly"].map(url)
-const WRITE_DEFAULT = ["gmail.modify", "drive", "calendar", "documents", "spreadsheets"].map(url)
-
-/** The account with no plugin options at all. */
+/** The account with no plugin options at all: every service, Read and write by default. */
 const defaultProfile = (): AccountProfile => loadConfig({}).accounts.default!
+const withoutIdentity = (scopes: readonly string[]) => scopes.filter((scope) => !IDENTITY_SCOPES.includes(scope))
+const READ_DEFAULT = withoutIdentity(requestedScopes(defaultProfile().enabledServices, "read"))
+const WRITE_DEFAULT = withoutIdentity(requestedScopes(defaultProfile().enabledServices, "write"))
 const pasted = (client = TEST_CLIENT) => ({ clientId: client.clientId, clientSecret: client.clientSecret })
 
 interface MockTokenServer {
@@ -153,8 +153,8 @@ describe("integration identity", () => {
       { id: "gws-work", name: "Google Workspace (work)" },
     ])
     expect(methods.map((method) => [method.integrationID, method.label?.(), method.method.form.length])).toEqual([
-      ["gws-personal", "personal", 4],
-      ["gws-work", "work", 4],
+      ["gws-personal", "personal", 7],
+      ["gws-work", "work", 7],
     ])
   })
 })
@@ -163,9 +163,9 @@ describe("sign-in form", () => {
   it("has the client ID and secret, access, and write acknowledgment fields, and lists each option's exact scopes", () => {
     const [clientId, clientSecret, access, confirm] = integration().method.form
     expect([clientId.key, clientSecret.key, access.key, confirm.key]).toEqual(["clientId", "clientSecret", "access", "confirmWrite"])
-    expect(access).toMatchObject({ type: "string", required: true, default: "read" })
+    expect(access).toMatchObject({ type: "string", required: true, default: "write" })
     expect(access.options.map((option) => [option.value, option.label])).toEqual([
-      ["read", "Read-only (recommended)"],
+      ["read", "Read-only"],
       ["write", "Read and write"],
     ])
     expect(access.options[0]!.description).toBe(`Requests: ${[...READ_DEFAULT, ...IDENTITY_SCOPES].join(" ")}`)
@@ -175,7 +175,7 @@ describe("sign-in form", () => {
       required: true,
       default: false,
       when: [{ key: "access", op: "eq", value: "write" }],
-      title: "I understand this grants write access to: gmail.modify, drive, calendar, documents, spreadsheets",
+      title: `I understand this grants write access to: ${WRITE_DEFAULT.filter((scope) => !READ_DEFAULT.includes(scope)).map(shortScope).join(", ")}`,
     })
   })
 
@@ -212,8 +212,8 @@ describe("sign-in form", () => {
     const profile = loadConfig({ accounts: { default: account({ services: ["gmail", "drive"], access: { drive: "write" }, scopes: ["directory.readonly"] }) } }).accounts.default!
     const [, , access, confirm] = integration(profile).method.form
     expect(access.default).toBe("write")
-    expect(access.options[0]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive.readonly"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
-    expect(access.options[1]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
+    expect(access.options[0]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive.readonly"), url("drive.apps.readonly"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
+    expect(access.options[1]!.description).toBe(`Requests: ${[url("gmail.readonly"), url("drive"), url("drive.apps.readonly"), url("directory.readonly"), ...IDENTITY_SCOPES].join(" ")}`)
     expect(confirm.title).toBe("I understand this grants write access to: drive")
   })
 })
@@ -504,10 +504,38 @@ describe("scope preflight", () => {
     expect(invocations(runtime)).toHaveLength(1)
   })
 
-  it("names an extra scope for operations outside both access levels", async () => {
-    const runtime = await readOnly(["people"])
-    await expect(runtime.read(request("people.people.listDirectoryPeople", { params: { readMask: "names", sources: ["DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE"] } }), call)).rejects.toThrow(
-      /^AUTH_SCOPE_MISSING: .*one of: directory\.readonly\)\. Next step: Add one of them to accounts\.personal\.scopes; then, to sign in again, run \/connect and choose Google Workspace/,
+  it("names Read and write for a read whose scope only the write level requests", async () => {
+    const runtime = await readOnly(["drive"])
+    await expect(runtime.read(request("drive.files.generateIds", { params: { count: 1 } }), call)).rejects.toThrow(
+      /^AUTH_SCOPE_MISSING: .*drive\.files\.generateIds needs \(one of: drive, .*\)\. Next step: To sign in again, run \/connect and choose Google Workspace, .*and choose Read and write/,
+    )
+    expect(invocations(runtime)).toEqual([])
+    // drive.apps.readonly is in the read set, so the app list runs on the same Read-only sign-in.
+    await expect(runtime.read(request("drive.apps.list", { fields: "items(id)" }), call)).resolves.toMatchObject({ ok: true })
+  })
+
+  it("refuses an app-only method with a next step that says no Google sign-in can run it", async () => {
+    const services = ["chat"]
+    const runtime = await testRuntime(
+      { accounts: { personal: account({ services, access: "write" }) } },
+      { tokenProvider: fakeTokens("ya29.write", requestedScopes(services, "write")) },
+    )
+    runtimes.push(runtime)
+    await expect(runtime.read(request("chat.spaces.messages.attachments.get", { params: { name: "spaces/s/messages/m/attachments/a" } }), call)).rejects.toThrow(
+      /^AUTH_SCOPE_MISSING: chat\.spaces\.messages\.attachments\.get needs a scope Google grants only to an app's own credentials .* Next step: Tell the user this method cannot run with a Google sign-in, and use another method\.$/,
+    )
+    expect(invocations(runtime)).toEqual([])
+  })
+
+  it("refuses a Keep method with a next step that says it needs domain-wide delegation", async () => {
+    const services = ["gmail", "keep"]
+    const runtime = await testRuntime(
+      { accounts: { personal: account({ services, access: "write" }) } },
+      { tokenProvider: fakeTokens("ya29.write", requestedScopes(services, "write")) },
+    )
+    runtimes.push(runtime)
+    await expect(runtime.read(request("keep.notes.list", { fields: "notes(name)" }), call)).rejects.toThrow(
+      /^AUTH_SCOPE_MISSING: keep\.notes\.list needs keep or keep\.readonly, which Google grants only through domain-wide delegation that a Workspace admin sets up, and the sign-in for 'personal' has not granted it\. Next step: Tell the user this method needs domain-wide delegation; once their admin has set it up, they add keep or keep\.readonly to accounts\.personal\.scopes and sign in again\.$/,
     )
     expect(invocations(runtime)).toEqual([])
   })

@@ -27,7 +27,7 @@ Each command posts a message and does not start a model turn.
 | Command | What it posts |
 | --- | --- |
 | `/gws-status` | The status model: each account's mode, access, client source, granted and missing scopes, and next step; the Google Cloud steps for accounts that have no OAuth client yet; this session's pending plans, redacted (category, operation, account, preview, expiry; never argv, a body, or a token); agents that missed the ask rules, with the block to add in each agent's own permissions; and one next step. |
-| `/gws-doctor` | One small read per enabled service per account. Reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `API_DISABLED` (with the enable URL), or a denied `gws.read`. |
+| `/gws-doctor` | One small read per enabled service per account. Reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `ADMIN_PRIVILEGE_REQUIRED` (a valid sign-in without the admin privilege the service needs, with the next step), `API_DISABLED` (with the enable URL), `SKIPPED` (with the reason), or a denied `gws.read`. The summary counts every status but `OK` and `SKIPPED` as needing attention. |
 
 `/gws-doctor` asks for `gws.read` on `<account>:<operation>` before each probe, the same way `gws_read` does. A refusal stops the run.
 
@@ -49,7 +49,7 @@ Contract: `src/rpc.ts`, id `google-workspace.gws`, method `status` only. It is i
 | `permissionsBlock` | The JSON block to add first in each of those agents' own `permissions`. Present when `unguardedAgents` is not empty. |
 | `nextStep` | The one thing to do next: an account's sign-in step, then the unguarded agents. Absent when nothing is needed. |
 
-An account entry is `{ alias, mode, services, integrationID?, connected, needsAuth?, access?, clientSource?, grantedScopes?, missingScopes?, nextStep? }`.
+An account entry is `{ alias, mode, services, integrationID?, connected, needsAuth?, access?, clientSource?, grantedScopes?, missingScopes?, delegationRequired?, nextStep? }`. `delegationRequired` names the enabled services that need domain-wide delegation (Keep) when the interactive account's scopes do not add them; the dialog and `/gws-status` show it as **Needs domain-wide delegation**.
 
 - `connected` is true when an interactive account is signed in and usable, or when a headless account's environment variable is set. `/gws-doctor` checks the headless credential itself.
 - `needsAuth` is `true` or absent.
@@ -58,3 +58,5 @@ An account entry is `{ alias, mode, services, integrationID?, connected, needsAu
 - `nextStep` is one sentence, absent when nothing is needed.
 
 The RPC cannot approve or commit. A commit happens only when the agent calls a commit tool and the permission prompt allows it.
+
+Scripts call the tools through a separate RPC, `google-workspace.gws.tools`: see [Scripting](scripting.md).

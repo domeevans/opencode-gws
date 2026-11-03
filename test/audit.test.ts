@@ -71,6 +71,16 @@ describe("audit sink", () => {
     expect(readFileSync(path, "utf8")).not.toContain("PRIVATE_")
   })
 
+  it("records caller rpc and drops any other caller value", async () => {
+    const { sink, path } = audit()
+    sink.emit({ event: "operation.read", outcome: "success", caller: "rpc" })
+    sink.emit({ event: "operation.read", outcome: "success", caller: "PRIVATE_CALLER" } as never)
+    await vi.waitFor(() => expect(readFileSync(path, "utf8").trim().split("\n")).toHaveLength(2), { timeout: 5000 })
+    const [rpc, other] = readFileSync(path, "utf8").trim().split("\n").map((line) => JSON.parse(line))
+    expect(rpc.caller).toBe("rpc")
+    expect(other).not.toHaveProperty("caller")
+  })
+
   it("makes a failed sink observably degraded without throwing into successful work", async () => {
     const { sink } = audit(async () => { throw new Error("PRIVATE_FAILURE") })
     expect(() => sink.emit({ event: "plugin.loaded", outcome: "success" })).not.toThrow()

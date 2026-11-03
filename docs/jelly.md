@@ -14,11 +14,10 @@ writes each declared `ask` or `deny` as that tool's default instead (the person'
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
 changes nothing in Jelly.
 
-- Ask: `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete`.
-- Off: `gws.admin`.
+- Ask: `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete`, `gws.admin`.
 - Everything else runs, as the plugin's own rules let it.
 
-`gws.admin` is declared `deny`: the plugin's own admin gate is off unless configured, and Jelly sets up no admin account.
+`gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
 
 A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
 default. Keep `jelly.tools` in step with the known-tool list; `test/views.test.ts` checks
@@ -44,7 +43,7 @@ skill ids collide with another plugin's or the agent's own.
 
 ## Signing in
 
-`jelly.signIns` declares one sign-in, `google`, for OpenCode's integration `gws-*`: every account (`gws-<alias>`) folds into it, so the card waits while any account waits. Each account signs in with OAuth through a Desktop app client. Jelly holds the person's Desktop client and fills in `clientId` and `clientSecret`, so its form shows only Access (starting on `default`, read-only) and the write acknowledgement while it applies, and no `oauthClient` option is needed. Jelly writes only `{ mode: "interactive", enabledServices }` for each account.
+`jelly.signIns` declares one sign-in, `google`, for OpenCode's integration `gws-*`: every account (`gws-<alias>`) folds into it, so the card waits while any account waits. Each account signs in with OAuth through a Desktop app client. Jelly holds the person's Desktop client and fills in `clientId` and `clientSecret`, so its form shows only Access (starting on `default`, read-only) and the write acknowledgement while it applies, and no `oauthClient` option is needed. Jelly writes only `{ mode: "interactive", enabledServices }` for each account. When the engine runs on another machine than the person's browser, a host can also fill the form's hidden `redirectUri`, `callbackPort` and `clientJson` fields (a Web application client that lists the redirect), so Google's redirect comes back through the host to the engine's listener; see [docs/auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine).
 
 Jelly folds the declared sign-ins into this plugin's one card, which shows each as Connected, Not signed in or Sign in again (expired or revoked), and starts, renews and signs out of each. An agent's `jelly_connection_request`, or a tool result that names this plugin's "Run /connect and choose …" next step, opens the same card. The plugin still signs in through OpenCode, as it does without Jelly; the declaration only tells Jelly which of the engine's integrations and servers are this plugin's.
 

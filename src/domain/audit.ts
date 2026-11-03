@@ -22,6 +22,8 @@ interface AuditEvent {
   operation?: string
   durationMs?: number
   errorCode?: string
+  /** `rpc` for a read or plan a script made through the tools RPC; absent for a tool call. */
+  caller?: "rpc"
 }
 
 type Writer = (line: string, signal: AbortSignal) => Promise<void>
@@ -67,6 +69,7 @@ export class Audit {
       operation: event.operation && (index.methods.has(event.operation) || index.helpers.has(event.operation)) ? event.operation : undefined,
       durationMs: Number.isFinite(event.durationMs) && event.durationMs! >= 0 ? Math.round(event.durationMs!) : undefined,
       errorCode: event.errorCode === undefined ? undefined : isErrorCode(event.errorCode) ? event.errorCode : UNKNOWN_ERROR,
+      caller: event.caller === "rpc" ? "rpc" : undefined,
     })}\n`)
     this.pump()
   }

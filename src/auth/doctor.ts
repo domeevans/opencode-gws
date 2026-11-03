@@ -1,6 +1,6 @@
 import { canonicalJson } from "../domain/digest.js"
 import { commandIndex } from "../domain/manifest.js"
-import { authProblem, parseResult } from "../domain/result.js"
+import { authProblem, parseResult, privilegeRefused } from "../domain/result.js"
 import type { ProcessResult } from "../domain/types.js"
 import { enableApisUrl } from "./setup.js"
 
@@ -40,12 +40,22 @@ const PROBES: Readonly<Record<string, Probe>> = {
 export interface DoctorTarget {
   account: string
   service: string
-  /** The probe's operation id; absent when the service has no read-only check (events, workflow, modelarmor). */
+  /**
+   * The probe's operation id; absent when the service has no read-only
+   * check (events, workflow, modelarmor) or needs domain-wide delegation the
+   * account's scopes do not add.
+   */
   operation?: string
+  /** The service needs domain-wide delegation (Keep) and the account's scopes add none of its scopes, so no probe runs. */
+  needsDelegation?: true
 }
 
-/** DENIED: OpenCode refused the gws.read permission, so the probe did not run. */
-export type DoctorStatus = "OK" | "AUTH_REQUIRED" | "AUTH_SCOPE_MISSING" | "API_DISABLED" | "ERROR" | "SKIPPED" | "DENIED"
+/**
+ * DENIED: OpenCode refused the gws.read permission, so the probe did not
+ * run. ADMIN_PRIVILEGE_REQUIRED: Google accepted the sign-in but the
+ * account lacks the admin privilege the service needs.
+ */
+export type DoctorStatus = "OK" | "AUTH_REQUIRED" | "AUTH_SCOPE_MISSING" | "ADMIN_PRIVILEGE_REQUIRED" | "API_DISABLED" | "ERROR" | "SKIPPED" | "DENIED"
 
 export interface DoctorOutcome extends DoctorTarget {
   status: DoctorStatus
@@ -55,10 +65,19 @@ export interface DoctorOutcome extends DoctorTarget {
   enableUrl?: string
 }
 
-/** The probe target for one account's service. */
-export function doctorTarget(account: string, service: string): DoctorTarget {
+/** The probe target for one account's service; `needsDelegation` skips the probe, because no sign-in without delegation can pass it. */
+export function doctorTarget(account: string, service: string, needsDelegation = false): DoctorTarget {
+  if (needsDelegation) return { account, service, needsDelegation: true }
   const probe = PROBES[service]
   return probe ? { account, service, operation: probe.operation } : { account, service }
+}
+
+/** Why a target without a probe is SKIPPED. */
+export function skipDetail(target: DoctorTarget): string {
+  if (target.needsDelegation) {
+    return `${target.service} needs domain-wide delegation, which a Workspace admin sets up; with it, add ${target.service} or ${target.service}.readonly to accounts.${target.account}.scopes and sign in again`
+  }
+  return "no read-only check exists for this service"
 }
 
 /** The gws argv for a target's probe. */
@@ -75,6 +94,9 @@ const DISABLED = /accessNotConfigured|SERVICE_DISABLED|has not been used in proj
 export function probeOutcome(target: DoctorTarget, result: ProcessResult): DoctorOutcome {
   const parsed = parseResult(result, { maxInlineBytes: 64 * 1024 })
   if (parsed.ok) return { ...target, status: "OK" }
+  if (privilegeRefused(result, parsed)) {
+    return { ...target, status: "ADMIN_PRIVILEGE_REQUIRED", detail: "Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs" }
+  }
   const problem = authProblem(result, parsed)
   if (problem === "AUTH_REQUIRED") return { ...target, status: problem, detail: "Google rejected the sign-in" }
   if (problem === "AUTH_SCOPE_MISSING") return { ...target, status: problem, detail: "Google says the sign-in lacks a scope for this service" }

@@ -14,7 +14,7 @@ Search with `gws_catalog` and check `gws_schema` before you call. If `executable
 
 An operation whose category is `admin` needs all of these before `gws_plan` will accept it:
 
-1. `admin.enabled` is true.
+1. `admin.enabled` is true, which is the default.
 2. The service is in `admin.allowedServices` (the default list is the services that have an admin-class entry).
 3. The plan includes a non-empty `reason` when `admin.requireReason` is true, which is the default.
 
@@ -26,7 +26,7 @@ Plugin policy cannot allow an admin call. A policy rule can only deny.
 
 ## Admin reports
 
-Read-only at both access levels. The sign-in still needs the admin report scopes from the auth doc.
+Read-only at both access levels. The sign-in still needs the admin report scopes from the auth doc, and the account must be a Workspace admin with the Reports privilege: otherwise every call fails with `ADMIN_PRIVILEGE_REQUIRED`, which signing in again as the same account does not fix.
 
 Activity list, read. `fields` is required because this is a list:
 
@@ -76,7 +76,7 @@ Most subscription methods never run. A status read can:
 
 ## Model Armor
 
-No access level requests Model Armor scopes. The account needs `https://www.googleapis.com/auth/cloud-platform` in `scopes`, and the user must sign in again so the grant is on the token. The Model Armor helpers cannot run. Do not invent a call. Tell the user, and use `gws_catalog` if they still want a Discovery method.
+Read and write requests `https://www.googleapis.com/auth/cloud-platform` for Model Armor; Read-only requests nothing for it. The Model Armor helpers cannot run. Do not invent a call. Tell the user, and use `gws_catalog` if they still want a Discovery method.
 
 ## Workflow
 

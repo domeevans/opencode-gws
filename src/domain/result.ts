@@ -183,16 +183,55 @@ function stderrText(result: ProcessResult): string {
     .trim()
 }
 
+/** gws exit codes other than 1, Google's API errors (`gws --help`, EXIT CODES). */
+const EXIT = { auth: 2, validation: 3, discovery: 4, internal: 5 } as const
+
 const SCOPE_REASONS = new Set(["ACCESS_TOKEN_SCOPE_INSUFFICIENT", "insufficientPermissions"])
+
+/**
+ * The Admin SDK's answers to a valid sign-in whose account lacks an admin
+ * privilege: Reports' "Access denied. You are not authorized to read
+ * activity records.", the Directory's "Not Authorized to access this
+ * resource/api", and their kin. Google sends some as 401 with reason
+ * authError, the same code and reason as a bad token; only the message
+ * tells them apart.
+ */
+const PRIVILEGE_REFUSALS = /\bnot authori[sz]ed to (?:read|access|view|list|use|manage|perform)\b|\bcaller does not have access to the customers? reporting data\b/i
+
+/**
+ * True when Google authenticated the sign-in but refused the call because
+ * the account lacks an admin privilege (`ADMIN_PRIVILEGE_REQUIRED`). Not a
+ * sign-in problem: signing in again as the same account cannot help, so
+ * the account is never marked as needing sign-in. A gws auth error (exit
+ * 2) and invalid_grant are token failures, never a refusal.
+ */
+export function privilegeRefused(result: ProcessResult, parsed?: ParsedResult): boolean {
+  if (result.timedOut || result.outputCapped || result.exitCode === 0 || result.exitCode === EXIT.auth) return false
+  const error = apiErrorOf(result, parsed)
+  if (error?.code !== undefined && error.code !== 401 && error.code !== 403) return false
+  const text = [error?.message, stderrText(result)].filter(Boolean).join("\n")
+  return !/invalid_grant/i.test(text) && PRIVILEGE_REFUSALS.test(text)
+}
+
+/** The Workspace admin privilege a service's API needs, as the Admin console names it. */
+const ADMIN_PRIVILEGES: Readonly<Record<string, string>> = { "admin-reports": "Reports" }
+
+/** "the Reports privilege" for admin-reports; "the admin privilege it needs" otherwise. */
+export function privilegeName(service?: string): string {
+  const name = service ? ADMIN_PRIVILEGES[service] : undefined
+  return name ? `the ${name} privilege` : "the admin privilege it needs"
+}
 
 /**
  * Classify a failed gws process as a sign-in problem. `AUTH_REQUIRED`: the
  * credential is missing, expired, or revoked (401, UNAUTHENTICATED,
  * invalid_grant). `AUTH_SCOPE_MISSING`: the credential works but lacks a
  * scope (403 insufficientPermissions / ACCESS_TOKEN_SCOPE_INSUFFICIENT).
+ * An admin privilege refusal (`privilegeRefused`) is neither.
  */
 export function authProblem(result: ProcessResult, parsed?: ParsedResult): AuthProblemCode | undefined {
   if (result.timedOut || result.outputCapped) return undefined
+  if (privilegeRefused(result, parsed)) return undefined
   const error = apiErrorOf(result, parsed)
   if (result.exitCode === 0 && !error) return undefined
   const reasons = [error?.reason, ...(error?.errors ?? []).map((item) => item?.reason), ...(error?.details ?? []).map((item) => item?.reason)]
@@ -215,15 +254,15 @@ export function authProblem(result: ProcessResult, parsed?: ParsedResult): AuthP
 export interface AuthRemediation {
   signIn: string
   consent: string
+  /** For ADMIN_PRIVILEGE_REQUIRED: sign in as an admin with the privilege, or stop enabling the service. */
+  privilege: string
 }
 
 const GENERIC_REMEDIATION: AuthRemediation = {
   signIn: "sign in to the account again",
   consent: "sign in again and grant the scope this operation needs",
+  privilege: "sign in with a Workspace admin account that has the admin privilege this operation needs, or remove the service from enabledServices",
 }
-
-/** gws exit codes other than 1, Google's API errors (`gws --help`, EXIT CODES). */
-const EXIT = { auth: 2, validation: 3, discovery: 4, internal: 5 } as const
 
 const DISABLED_REASONS = new Set(["accessNotConfigured", "SERVICE_DISABLED"])
 const CONSOLE_URL = /https:\/\/console\.(?:developers|cloud)\.google\.com\/[^\s"'<>)]+/
@@ -250,7 +289,7 @@ export function disabledApi(result: ProcessResult, parsed?: ParsedResult): Disab
 
 /**
  * Classify a failed gws process. Timeouts and output caps come first, then
- * sign-in problems named by Google's error payload (which gws reports as
+ * an admin privilege refusal, then sign-in problems named by Google's error payload (which gws reports as
  * exit 1 or 2), a disabled API, and then gws's own exit code: 2 auth,
  * 3 validation, 4 Discovery, 5 internal. Anything else is Google's error.
  */
@@ -260,6 +299,13 @@ export function processError(result: ProcessResult, parsed: ParsedResult, remedi
   const stderr = stderrText(result)
   const payload = apiErrorOf(result, parsed)
   const message = payload?.message || stderr || "gws command failed"
+  if (privilegeRefused(result, parsed)) {
+    return new GwsError(
+      "ADMIN_PRIVILEGE_REQUIRED",
+      `Google accepted the sign-in but refused the call, because the account lacks a Workspace admin privilege; signing in again as the same account cannot help (gws: ${message.slice(0, 300)})`,
+      { next: `${remediation.privilege.charAt(0).toUpperCase()}${remediation.privilege.slice(1)}.` },
+    )
+  }
   const problem = authProblem(result, parsed) ?? (result.exitCode === EXIT.auth ? "AUTH_REQUIRED" : undefined)
   if (problem === "AUTH_SCOPE_MISSING") {
     return new GwsError("AUTH_SCOPE_MISSING", `the credential lacks a scope for this operation; ${remediation.consent} (gws: ${message.slice(0, 300)})`)

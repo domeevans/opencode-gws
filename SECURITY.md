@@ -23,14 +23,16 @@ In scope: binary trust bypass; credential or environment isolation failure; a po
 | Packaged binary | Resolved from the platform package, not from `PATH`. Regular file, owner read and execute, no permission bits outside `0755`, SHA-256 from [native/provenance.json](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/native/provenance.json), exact `gws 0.22.5`. |
 | `binary.path` | Absolute path, `realpath`, regular executable, not group- or world-writable, outside the project, no world-writable ancestor, no ancestor writable by a foreign group. Exact version. No hash option. |
 | Child environment | Google credential variables are cleared, then the plugin sets only the token or credentials file for this call. `HOME` and XDG paths are a private directory. Ambient gcloud application-default credentials are not a fallback. |
-| Sign-in | Loopback redirect to `127.0.0.1`, PKCE S256, random state. Tokens and the client used at sign-in stay in OpenCode's credential store. The plugin writes no credential file. |
+| Sign-in | Loopback redirect to `127.0.0.1`, PKCE S256, random state, single use. A host-supplied `redirectUri` changes only where Google sends the browser: the listener still binds `127.0.0.1:<callbackPort>`, accepts only the redirect's path, and checks state and PKCE. A Desktop client with a non-loopback redirect, and a Web client that does not list the redirect, are refused before the browser opens. Tokens and the client used at sign-in stay in OpenCode's credential store. The plugin writes no credential file. |
+| Default grant | With no `accounts` option, the `default` account's Read and write consent asks for every scope a Google sign-in can use, including the full mailbox (`https://mail.google.com/`), Gmail settings and delegation, and `cloud-platform`. The grant does not stop a change: every change is a plan, an ask, and a commit. Set `accounts`, `access: "read"`, or choose Read-only to grant less. App-only scopes and the Keep scopes, which Google grants only through domain-wide delegation, are never requested by an access level. |
 | OAuth client secret | A Google installed-app (Desktop) secret is non-confidential in Google's terms, so it may ship. Security rests on PKCE, the loopback redirect, and the user's consent, not on hiding that secret. |
+| Web client secret | A Web application client's secret is confidential. It lives only in OpenCode's credential store with the sign-in, or in `oauthClient`. It is never in the sign-in form, a status, a tool result, an RPC result, an error, or the audit, and token errors redact it. Agent tools must not be able to read it: give it to the sign-in through the host-filled form field rather than a config file an agent can open. |
 | Local files | Uploads and attachments must be absolute regular files inside every applicable read root, capped at `maxUploadBytes`. Downloads must land inside every applicable write root, capped at `maxDownloadBytes`. A symlink is checked after resolution. |
 | Process | `gws` is spawned with an argv array and `shell: false`. The model does not supply argv. Timeout and cancellation kill the process group. |
 | Output | Separate stdout and stderr caps. Workspace content is untrusted data. |
-| Audit | Operation, account, category, duration, outcome. Never bodies, tokens, credentials, or file contents. |
+| Audit | Operation, account, category, duration, outcome, and `caller: "rpc"` for a script's call. Never bodies, tokens, credentials, or file contents. |
 
-Sign-in uses a Google installed-app (Desktop) client: your own, or one your organisation sets through `oauthClient`. No client ships with the plugin. The platform packages carry the unmodified Apache-2.0 `gws` binary; there is no `PATH` lookup and no download at runtime.
+Sign-in uses a Google installed-app (Desktop) client, or a Web application client when the host supplies the redirect: your own, or one your organisation sets through `oauthClient`. No client ships with the plugin. The platform packages carry the unmodified Apache-2.0 `gws` binary; there is no `PATH` lookup and no download at runtime.
 
 A cancellation after `gws` has started a mutation does not prove Google applied nothing. Read the current state before planning again.
 
@@ -58,3 +60,13 @@ An agent defined only in the user's config does not receive the inserted rules. 
 A plugin deny is absolute. Rules match accounts, services, operations, and categories, and constrain recipients, public sharing, read and write roots, and page and item caps. They do not ask and cannot allow.
 
 Deploy and watch are never committable. Admin needs `admin.enabled`, an allowed service, and a reason when required. The host ask is the human prompt for admin; policy does not add a second one.
+
+## Scripts
+
+The tools RPC (`google-workspace.gws.tools`, see [docs/scripting.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)) runs the plugin's non-commit tools for a script, with no model. It adds no authority:
+
+- A script names a session that names an agent, and runs as them. Every call asserts the same action and resource as the tool, against that agent's rules and the session's own.
+- An ask on a script's call is denied, not prompted: no one is there to answer it. A script needs an allow rule, or no rule, for what it does.
+- Only `status`, `catalog`, `schema`, `read` and `plan` are methods. The six commit tools are never methods, whatever their exposure, so a script can plan but never commit; a plan binds to the session and agent, and only an approved commit tool in that session applies it.
+- The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The session is not a login: it scopes a script to what its agent may do.
+- Audit records of a script's reads and plans carry `caller: "rpc"`.

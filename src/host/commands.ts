@@ -1,9 +1,10 @@
-import { BLOCK_PLACEMENT, NOTHING_TO_DO, connectionLabel, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
+import { BLOCK_PLACEMENT, DELEGATION_LABEL, NOTHING_TO_DO, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
 import type { PluginContext } from "./context.js"
 import type { DoctorOutcome, DoctorTarget } from "../auth/doctor.js"
 import { GOOGLE_LINKS, enableApisUrl } from "../auth/setup.js"
 import { Lifecycle } from "../domain/lifecycle.js"
 import { redactedPreview, type RedactedPreview } from "../domain/plans.js"
+import { privilegeName } from "../domain/result.js"
 import { shortScope } from "../domain/scopes.js"
 import type { CommitCategory, Plan } from "../domain/types.js"
 
@@ -104,6 +105,7 @@ function accountLines(account: GwsAccount): string[] {
   lines.push(`Services: ${account.services.join(", ") || "none"}`)
   if (account.grantedScopes) lines.push(`Granted scopes: ${scopeList(account.grantedScopes)}`)
   if (account.missingScopes?.length) lines.push(`Scopes not granted: ${scopeList(account.missingScopes)}`)
+  if (account.delegationRequired?.length) lines.push(`${DELEGATION_LABEL}: ${delegationText(account)}`)
   return lines
 }
 
@@ -175,8 +177,8 @@ function setupSteps(status: GwsStatus): string[] {
     `2. Configure the OAuth consent screen: ${GOOGLE_LINKS.branding} and ${GOOGLE_LINKS.audience}.`,
     "   - Prefer the Internal user type when the project belongs to your Google Workspace organisation: only your organisation can sign in, and Google does not review the app.",
     `   - An External app left in Testing status gets refresh tokens that expire after 7 days, so you would sign in again every week (${GOOGLE_LINKS.refreshTokenExpiry}). Setting it In production avoids that expiry, at the cost of an unverified-app warning.`,
-    `3. Create an OAuth client of type Desktop app at ${GOOGLE_LINKS.clients} (${GOOGLE_LINKS.desktopClientGuide}). A Web client does not work.`,
-    `4. To sign in, ${needs.map((account) => connect(account, several)).join("; ")}. Enter its client ID and secret in the sign-in form and choose Read-only unless agents must change things.`,
+    `3. Create an OAuth client of type Desktop app at ${GOOGLE_LINKS.clients} (${GOOGLE_LINKS.desktopClientGuide}). A Web client works only with a redirectUri registered on it, for OpenCode on another machine.`,
+    `4. To sign in, ${needs.map((account) => connect(account, several)).join("; ")}. Enter its client ID and secret in the sign-in form and choose the access; every change still asks before it runs.`,
     "5. Run /gws-doctor to check each service.",
     "The client and tokens are kept with the sign-in in OpenCode's credential store; the plugin writes no credential files.",
   ]
@@ -188,6 +190,8 @@ function nextFor(outcome: DoctorOutcome): string | undefined {
       return `enable it at ${outcome.enableUrl}, wait about a minute, and run /gws-doctor again`
     case "DENIED":
       return "allow gws.read for this account in your permissions, or skip the check"
+    case "ADMIN_PRIVILEGE_REQUIRED":
+      return `sign in with a Workspace admin account that has ${privilegeName(outcome.service)}, or remove ${outcome.service} from accounts.${outcome.account}.enabledServices`
     default:
       return undefined
   }

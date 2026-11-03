@@ -1,4 +1,5 @@
 import { auditErrorCode, type Audit } from "../domain/audit.js"
+import { restrictionMarks } from "../domain/restricted.js"
 import { effectiveCategory, isCommittable } from "../domain/classify.js"
 import { buildCommand, itemCap, wantsPages } from "../domain/command.js"
 import type { CommitOutput, PlanOutput, ReadOutput, RequestInput, SchemaOutput } from "../domain/contract.js"
@@ -117,6 +118,14 @@ export class Operations {
       })
     }
     this.visible(helper.service)
+    // Check the flags here, so bad input is a GWS_VALIDATION_ERROR before any assert or spawn, not a ZodError from build.
+    const flags = adapter.inputSchema.safeParse(request.input ?? {})
+    if (!flags.success) {
+      const issues = flags.error.issues.map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`).join("; ")
+      throw new GwsError("GWS_VALIDATION_ERROR", `'${helper.id}' input: ${issues}`, {
+        next: `Fix the input; gws_schema with operation "${helper.id}" shows its flags.`,
+      })
+    }
     return { request, entry: helperAsEntry(helper), helper: adapter }
   }
 
@@ -198,7 +207,7 @@ export class Operations {
     report(ctx, { status: "running", operation: entry.id })
     const schema = await this.runtime.schema.resolve(entry.service, [...entry.path, entry.method], ctx.signal)
     this.runtime.assertActive(ctx.signal)
-    return { ok: true, account: target.account, schema }
+    return { ok: true, account: target.account, schema, ...restrictionMarks(entry.id) }
   }
 
   /** Validate a commit against its stored plan without consuming it. */
@@ -229,7 +238,7 @@ export class Operations {
       // Text helpers (+triage, +read in text mode) are valid output, not
       // JSON parse failures; a helper fails only on exit code or API error.
       const failed = helper ? result.exitCode !== 0 || isApiError(parsed.data) : !parsed.ok
-      if (failed) throw processError(result, parsed, this.accounts.remediation(request.account, entry.scopes))
+      if (failed) throw processError(result, parsed, this.accounts.remediation(request.account, entry.scopes, entry.service))
       const pages = paged ? capPageItems(parsed.data, itemCap(request, limits)) : undefined
       const cap = inlineCap(this.runtime.config.execution.maxInlineBytes, request.response?.mode, request.response?.maxInlineBytes)
       const truncated = pages ? Buffer.byteLength(JSON.stringify(pages.data)) > cap : parsed.truncated
@@ -240,6 +249,7 @@ export class Operations {
         category: "read",
         operation: entry.id,
         durationMs: Date.now() - started,
+        caller: ctx.caller,
       })
       return {
         ok: true,
@@ -252,7 +262,7 @@ export class Operations {
         trust: { workspaceContent: "untrusted" },
       }
     } catch (error) {
-      this.runtime.audit.emit({ event: "operation.read", outcome: "error", account: request.account, operation: entry.id, durationMs: Date.now() - started, errorCode: auditErrorCode(error) })
+      this.runtime.audit.emit({ event: "operation.read", outcome: "error", account: request.account, operation: entry.id, durationMs: Date.now() - started, errorCode: auditErrorCode(error), caller: ctx.caller })
       throw error
     }
   }
@@ -297,7 +307,7 @@ export class Operations {
       const dry = await this.accounts.run(dryRunArgv, request.account, entry.id, ctx, { scopes: entry.scopes, dryRun: true, cwd: stage?.dir })
       report(ctx, { status: "parsing", operation: entry.id })
       parsed = parseResult(dry, { maxInlineBytes: this.runtime.config.execution.maxInlineBytes })
-      if (dry.exitCode !== 0 || !parsed.ok) throw processError(dry, parsed, this.accounts.remediation(request.account, entry.scopes))
+      if (dry.exitCode !== 0 || !parsed.ok) throw processError(dry, parsed, this.accounts.remediation(request.account, entry.scopes, entry.service))
     } finally {
       await stage?.dispose()
     }
@@ -328,6 +338,7 @@ export class Operations {
       category,
       operation: entry.id,
       durationMs: Date.now() - started,
+      caller: ctx.caller,
     })
     return {
       ok: true,
@@ -363,11 +374,12 @@ export class Operations {
         refuseChanged(plan.files.inputs, staged)
         if (plan.files.output) await stage.prepareOutput(plan.files.output)
       }
-      const scopes = commandIndex().methods.get(plan.operation)?.scopes
+      const method = commandIndex().methods.get(plan.operation)
+      const scopes = method?.scopes
       const result = await this.accounts.run(plan.argv, plan.account, plan.operation, ctx, { scopes, cwd: stage?.dir })
       report(ctx, { status: "parsing", operation: plan.operation })
       const parsed = parseResult(result, { maxInlineBytes: this.runtime.config.execution.maxInlineBytes })
-      if (!parsed.ok) throw processError(result, parsed, this.accounts.remediation(plan.account, scopes))
+      if (!parsed.ok) throw processError(result, parsed, this.accounts.remediation(plan.account, scopes, method?.service))
       // The change is applied once gws succeeds; a delivery failure after
       // that is reported but cannot be retried with the same plan.
       const delivered = stage && plan.files?.output ? await stage.deliver(plan.files.output, plan.files.limits) : undefined

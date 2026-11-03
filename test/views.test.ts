@@ -75,9 +75,9 @@ describe("the Gmail thread view", () => {
 })
 
 describe("the jelly declaration", () => {
-  it("asks for every commit the plugin asks for, denies admin, and lets the reads run", () => {
+  it("asks for every commit the plugin asks for, admin included, and lets the reads run", () => {
     const effect = new Map(manifest.jelly.tools.map((tool) => [tool.permission, tool.effect]))
-    for (const rule of ASK_RULES) expect(effect.get(rule.action), rule.action).toBe(rule.action === "gws.admin" ? "deny" : "ask")
+    for (const rule of ASK_RULES) expect(effect.get(rule.action), rule.action).toBe("ask")
     for (const read of ["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan"]) expect(effect.get(read)).toBe("allow")
     expect(manifest.jelly.tools.filter((tool) => tool.readOnly).map((tool) => tool.permission).sort()).toEqual(
       ["gws.catalog", "gws.plan", "gws.read", "gws.schema", "gws.status"],

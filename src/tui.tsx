@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin/tui"
 import { type RGBA, TextAttributes } from "@opentui/core"
 import { For, Show, createSignal } from "solid-js"
-import { BLOCK_PLACEMENT, Gws, NOTHING_TO_DO, connectionLabel, isStatus, openCodeLabel, type GwsAccount, type GwsStatus } from "./rpc.js"
+import { BLOCK_PLACEMENT, DELEGATION_LABEL, Gws, NOTHING_TO_DO, connectionLabel, delegationText, isStatus, openCodeLabel, type GwsAccount, type GwsStatus } from "./rpc.js"
 
 /**
  * The TUI part: one palette command, "Google Workspace: Status" (slash
@@ -102,6 +102,9 @@ function AccountStatus(props: { readonly account: GwsAccount; readonly colors: C
       </Show>
       <Show when={props.account.missingScopes?.length ? props.account.missingScopes : undefined}>
         {(scopes) => <Row label="Scopes not granted" value={scopeList(scopes())} fg={tone("warning")} muted={muted()} />}
+      </Show>
+      <Show when={props.account.delegationRequired?.length ? props.account : undefined}>
+        {(account) => <Row label={DELEGATION_LABEL} value={delegationText(account())} fg={muted()} muted={muted()} />}
       </Show>
     </box>
   )

@@ -117,6 +117,7 @@ describe("rpc contract", () => {
   it("accepts only the status shape in isStatus", () => {
     const valid = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
     expect(isStatus(valid)).toBe(true)
+    expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: ["keep"] }] })).toBe(true)
     for (const broken of [
       null,
       { ...valid, unguardedAgents: undefined },
@@ -124,6 +125,7 @@ describe("rpc contract", () => {
       { ...valid, accounts: [{ ...valid.accounts[0], mode: "other" }] },
       { ...valid, accounts: [{ ...valid.accounts[0], needsAuth: false }] },
       { ...valid, hostWarning: 3 },
+      { ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: "keep" }] },
     ]) expect(isStatus(broken), JSON.stringify(broken)).toBe(false)
   })
 })
@@ -167,6 +169,20 @@ describe("status", () => {
     ])
     const text = JSON.stringify(output)
     for (const secret of [STORED_TOKEN, STORED_REFRESH, TEST_CLIENT.clientSecret, "cred_"]) expect(text).not.toContain(secret)
+  })
+
+  it("names Keep as needing domain-wide delegation for an interactive account whose scopes do not add it", async () => {
+    const h = await setup({
+      accounts: {
+        notes: account({ services: ["gmail", "keep"], oauthClient: TEST_CLIENT }),
+        delegated: account({ services: ["keep"], scopes: ["keep"], oauthClient: TEST_CLIENT }),
+        ci: { mode: "credentials_file", enabledServices: ["keep"], credentialsFileEnv: "GWS_TEST_CREDENTIALS" },
+      },
+    })
+    const [notes, delegated, ci] = (await status(h)).accounts
+    expect(notes).toMatchObject({ alias: "notes", delegationRequired: ["keep"] })
+    expect(delegated).not.toHaveProperty("delegationRequired")
+    expect(ci).not.toHaveProperty("delegationRequired")
   })
 
   it("gives the sign-in step to accounts without a connection, and the setup step when no client is available", async () => {

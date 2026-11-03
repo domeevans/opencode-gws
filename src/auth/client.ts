@@ -7,7 +7,9 @@ import type { OAuthClient } from "../domain/types.js"
  * app's client secret as non-confidential
  * (https://developers.google.com/identity/protocols/oauth2#installed);
  * security rests on PKCE (S256), the loopback redirect to 127.0.0.1, and
- * the user's consent on Google's own screen, not on the secret.
+ * the user's consent on Google's own screen, not on the secret. A Web
+ * application client, for a host-supplied redirect, has a confidential
+ * secret: it stays in the credential store and is never shown.
  */
 
 /** Where a sign-in's client came from: account option, plugin option, or the sign-in form. */

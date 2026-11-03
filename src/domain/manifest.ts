@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import * as z from "zod"
+import { restrictionMarks } from "./restricted.js"
 import type { CatalogEntry, CatalogInput, CatalogOutput } from "./contract.js"
 import { helperAdapter } from "./helpers.js"
 import type { Category, HelperEntry, Manifest, MethodEntry } from "./types.js"
@@ -239,6 +240,7 @@ export function catalog(input: CatalogInput = {}, services?: ReadonlySet<string>
         ...(method.pathTemplate ? { path: method.pathTemplate } : {}),
         executable: methodExecutable(method),
         ...(tool && methodExecutable(method) ? { commitTool: tool } : {}),
+        ...restrictionMarks(method.id),
       })
     }
   }

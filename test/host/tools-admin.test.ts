@@ -3,9 +3,10 @@ import { request } from "../support/requests.js"
 import { commits, driver, plan, turn, type Driver } from "./tools-driver.js"
 
 /**
- * admin is refused by default (tools.test.ts) and runs here with
- * admin.enabled, an allow rule, and a reason. Its own file so its host is
- * a separate process from the other tool hosts. See tools-driver.ts.
+ * admin runs here with the default gate (admin.enabled defaults to true),
+ * an approved ask, and a reason; without a reason it is refused
+ * (tools.test.ts). Its own file so its host is a separate process from the
+ * other tool hosts. See tools-driver.ts.
  */
 
 describe("admin", () => {
@@ -13,7 +14,6 @@ describe("admin", () => {
   beforeAll(async () => {
     d = await driver({
       policy: { rules: [] },
-      options: { admin: { enabled: true } },
     })
   })
   afterAll(async () => {

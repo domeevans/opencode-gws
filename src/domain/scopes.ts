@@ -2,15 +2,21 @@ import { commandIndex } from "./manifest.js"
 import type { AccessLevel } from "./types.js"
 
 /**
- * Least-privilege OAuth scopes: the one table of what each access level
- * requests per service. A sign-in is read-only unless the user chooses
- * write, and the form lists these exact scopes before consent.
+ * OAuth scopes: the one table of what each access level requests per
+ * service, and the form lists these exact scopes before consent.
+ *
+ * Read-only requests only scopes that cannot change, send, share, or
+ * delete, and every read with a read-only scope runs on it. Read and write requests everything the service's methods can use
+ * with a user's sign-in, mail settings, permanent delete and Classroom
+ * rosters included, so a granted write sign-in never blocks a method on a
+ * scope. Safety rests on plan, ask, and commit, not on the grant.
  *
  * `test/scopes.test.ts` checks the table against the manifest: every read
- * method is covered by its service's read set and every change by its write
- * set, except the methods listed below, which stay outside both levels on
- * purpose (sensitive or narrow scopes such as mail settings, delegation,
- * permanent delete, Classroom rosters and add-ons, or the directory).
+ * method is covered by its service's read set (except WRITE_ACCESS_READS)
+ * and every method that can run by its write set, except the methods an
+ * ordinary sign-in cannot run (restricted.ts): app-only methods and those
+ * that need domain-wide delegation. No set holds an app-only or a
+ * delegation scope.
  */
 
 export const SCOPE_PREFIX = "https://www.googleapis.com/auth/"
@@ -26,27 +32,65 @@ interface ServiceScopes {
 }
 
 const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
-  gmail: { read: ["gmail.readonly"], write: ["gmail.modify"] },
-  drive: { read: ["drive.readonly"], write: ["drive"] },
-  calendar: { read: ["calendar.readonly"], write: ["calendar"] },
+  // Write adds mail settings, forwarding and delegation, and permanent delete (only the full-mailbox scope allows it).
+  gmail: { read: ["gmail.readonly"], write: ["gmail.modify", "gmail.settings.basic", "gmail.settings.sharing", "https://mail.google.com/"] },
+  drive: { read: ["drive.readonly", "drive.apps.readonly"], write: ["drive", "drive.apps.readonly"] },
+  calendar: { read: ["calendar.readonly", "calendar.acls.readonly"], write: ["calendar"] },
   docs: { read: ["documents.readonly"], write: ["documents"] },
   sheets: { read: ["spreadsheets.readonly"], write: ["spreadsheets"] },
   slides: { read: ["presentations.readonly"], write: ["presentations"] },
   tasks: { read: ["tasks.readonly"], write: ["tasks"] },
-  people: { read: ["contacts.readonly"], write: ["contacts"] },
+  // Other contacts and the organisation directory are read-only scopes, so read and write both request them.
+  people: { read: ["contacts.readonly", "contacts.other.readonly", "directory.readonly"], write: ["contacts", "contacts.other.readonly", "directory.readonly"] },
   chat: {
-    read: ["chat.spaces.readonly", "chat.messages.readonly", "chat.memberships.readonly"],
-    write: ["chat.spaces", "chat.messages", "chat.memberships"],
+    read: [
+      "chat.spaces.readonly",
+      "chat.messages.readonly",
+      "chat.memberships.readonly",
+      "chat.customemojis.readonly",
+      "chat.users.availability.readonly",
+      "chat.users.readstate.readonly",
+      "chat.users.sections.readonly",
+    ],
+    write: [
+      "chat.spaces",
+      "chat.messages",
+      "chat.memberships",
+      "chat.delete",
+      "chat.customemojis",
+      "chat.users.availability",
+      "chat.users.readstate",
+      "chat.users.sections",
+      "chat.users.spacesettings",
+    ],
   },
   classroom: {
-    read: ["classroom.courses.readonly", "classroom.coursework.me.readonly", "classroom.announcements.readonly"],
-    write: ["classroom.courses", "classroom.coursework.me", "classroom.announcements"],
+    read: [
+      "classroom.courses.readonly",
+      "classroom.coursework.me.readonly",
+      "classroom.announcements.readonly",
+      "classroom.courseworkmaterials.readonly",
+      "classroom.guardianlinks.students.readonly",
+      "classroom.rosters.readonly",
+      "classroom.topics.readonly",
+    ],
+    write: [
+      "classroom.courses",
+      "classroom.coursework.me",
+      "classroom.announcements",
+      "classroom.coursework.students",
+      "classroom.courseworkmaterials",
+      "classroom.guardianlinks.students",
+      "classroom.rosters",
+      "classroom.topics",
+    ],
   },
   // Form responses have no write scope; write keeps reading them.
   forms: { read: ["forms.body.readonly", "forms.responses.readonly"], write: ["forms.body", "forms.responses.readonly", "drive.file"] },
   // meetings.space.created reaches only spaces this client created; write keeps reading the others.
   meet: { read: ["meetings.space.readonly"], write: ["meetings.space.created", "meetings.space.readonly"] },
-  keep: { read: ["keep.readonly"], write: ["keep"] },
+  // Google grants Keep's scopes only through domain-wide delegation (restricted.ts), so neither level requests them.
+  keep: { read: [], write: [] },
   // Reports are read-only at both levels.
   "admin-reports": {
     read: ["admin.reports.audit.readonly", "admin.reports.usage.readonly"],
@@ -54,8 +98,8 @@ const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
   },
   // script.processes and script.metrics only view; deployments are never requested.
   script: { read: ["script.projects.readonly", "script.processes", "script.metrics"], write: ["script.projects", "script.processes", "script.metrics"] },
-  // Model Armor needs cloud-platform, which no access level requests: add it to the account's `scopes`.
-  modelarmor: { read: [], write: [] },
+  // Model Armor has no read-only scope; write requests cloud-platform.
+  modelarmor: { read: [], write: ["cloud-platform"] },
 }
 
 /** Services whose operations call other services get the union of those services' sets. */
@@ -69,7 +113,7 @@ function unique(values: Iterable<string>): string[] {
 }
 
 function expand(names: readonly string[]): string[] {
-  return names.map((name) => `${SCOPE_PREFIX}${name}`)
+  return names.map((name) => (name.startsWith("https://") ? name : `${SCOPE_PREFIX}${name}`))
 }
 
 export const ACCESS_SCOPES: Readonly<Record<string, ServiceScopes>> = Object.fromEntries([
@@ -83,77 +127,14 @@ export const ACCESS_SCOPES: Readonly<Record<string, ServiceScopes>> = Object.fro
   ] as const),
 ])
 
-/** Read methods only the write level covers: they need a Read and write sign-in. */
+/** Read methods only the write level covers, because no read-only scope can run them: they need a Read and write sign-in. */
 export const WRITE_ACCESS_READS: ReadonlySet<string> = new Set([
-  "calendar.acl.list",
+  "chat.users.spaces.spaceNotificationSetting.get",
   "drive.files.generateIds",
   "sheets.spreadsheets.developerMetadata.get",
   "sheets.spreadsheets.developerMetadata.search",
   "sheets.spreadsheets.getByDataFilter",
   "sheets.spreadsheets.values.batchGetByDataFilter",
-])
-
-/**
- * Methods neither access level covers. Each needs one of its manifest scopes
- * in the account's `scopes`, which every sign-in then requests and shows.
- */
-export const EXTRA_SCOPE_METHODS: ReadonlySet<string> = new Set([
-  // chat
-  "chat.customEmojis.create", "chat.customEmojis.delete", "chat.customEmojis.get", "chat.customEmojis.list", "chat.spaces.completeImport",
-  "chat.spaces.delete", "chat.spaces.messages.attachments.get", "chat.spaces.messages.replaceCards", "chat.users.availability.get",
-  "chat.users.availability.markAsActive", "chat.users.availability.markAsAway", "chat.users.availability.markAsDoNotDisturb",
-  "chat.users.availability.patch", "chat.users.sections.create", "chat.users.sections.delete", "chat.users.sections.items.list",
-  "chat.users.sections.items.move", "chat.users.sections.list", "chat.users.sections.patch", "chat.users.sections.position",
-  "chat.users.spaces.getSpaceReadState", "chat.users.spaces.spaceNotificationSetting.get",
-  "chat.users.spaces.spaceNotificationSetting.patch", "chat.users.spaces.threads.getThreadReadState",
-  "chat.users.spaces.updateSpaceReadState",
-  // classroom
-  "classroom.courses.announcements.addOnAttachments.create", "classroom.courses.announcements.addOnAttachments.delete",
-  "classroom.courses.announcements.addOnAttachments.get", "classroom.courses.announcements.addOnAttachments.list",
-  "classroom.courses.announcements.addOnAttachments.patch", "classroom.courses.announcements.getAddOnContext",
-  "classroom.courses.courseWork.addOnAttachments.create", "classroom.courses.courseWork.addOnAttachments.delete",
-  "classroom.courses.courseWork.addOnAttachments.get", "classroom.courses.courseWork.addOnAttachments.list",
-  "classroom.courses.courseWork.addOnAttachments.patch", "classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch",
-  "classroom.courses.courseWork.create", "classroom.courses.courseWork.delete", "classroom.courses.courseWork.getAddOnContext",
-  "classroom.courses.courseWork.modifyAssignees", "classroom.courses.courseWork.patch", "classroom.courses.courseWork.rubrics.create",
-  "classroom.courses.courseWork.rubrics.delete", "classroom.courses.courseWork.rubrics.patch",
-  "classroom.courses.courseWork.studentSubmissions.return", "classroom.courses.courseWork.updateRubric",
-  "classroom.courses.courseWorkMaterials.addOnAttachments.create", "classroom.courses.courseWorkMaterials.addOnAttachments.delete",
-  "classroom.courses.courseWorkMaterials.addOnAttachments.get", "classroom.courses.courseWorkMaterials.addOnAttachments.list",
-  "classroom.courses.courseWorkMaterials.addOnAttachments.patch", "classroom.courses.courseWorkMaterials.create",
-  "classroom.courses.courseWorkMaterials.delete", "classroom.courses.courseWorkMaterials.get",
-  "classroom.courses.courseWorkMaterials.getAddOnContext", "classroom.courses.courseWorkMaterials.list",
-  "classroom.courses.courseWorkMaterials.patch", "classroom.courses.posts.addOnAttachments.create",
-  "classroom.courses.posts.addOnAttachments.delete", "classroom.courses.posts.addOnAttachments.get",
-  "classroom.courses.posts.addOnAttachments.list", "classroom.courses.posts.addOnAttachments.patch",
-  "classroom.courses.posts.addOnAttachments.studentSubmissions.patch", "classroom.courses.posts.getAddOnContext",
-  "classroom.courses.studentGroups.create", "classroom.courses.studentGroups.delete", "classroom.courses.studentGroups.list",
-  "classroom.courses.studentGroups.patch", "classroom.courses.studentGroups.studentGroupMembers.create",
-  "classroom.courses.studentGroups.studentGroupMembers.delete", "classroom.courses.studentGroups.studentGroupMembers.list",
-  "classroom.courses.students.create", "classroom.courses.students.delete", "classroom.courses.students.get",
-  "classroom.courses.students.list", "classroom.courses.teachers.create", "classroom.courses.teachers.delete",
-  "classroom.courses.teachers.get", "classroom.courses.teachers.list", "classroom.courses.topics.create",
-  "classroom.courses.topics.delete", "classroom.courses.topics.get", "classroom.courses.topics.list", "classroom.courses.topics.patch",
-  "classroom.invitations.accept", "classroom.invitations.create", "classroom.invitations.delete", "classroom.invitations.get",
-  "classroom.invitations.list", "classroom.userProfiles.get", "classroom.userProfiles.guardianInvitations.create",
-  "classroom.userProfiles.guardianInvitations.get", "classroom.userProfiles.guardianInvitations.list",
-  "classroom.userProfiles.guardianInvitations.patch", "classroom.userProfiles.guardians.delete", "classroom.userProfiles.guardians.get",
-  "classroom.userProfiles.guardians.list",
-  // drive
-  "drive.apps.list",
-  // gmail: permanent delete, settings, forwarding, and delegation
-  "gmail.users.messages.batchDelete", "gmail.users.messages.delete", "gmail.users.settings.cse.identities.create",
-  "gmail.users.settings.cse.identities.delete", "gmail.users.settings.cse.identities.patch", "gmail.users.settings.cse.keypairs.create",
-  "gmail.users.settings.cse.keypairs.disable", "gmail.users.settings.cse.keypairs.enable", "gmail.users.settings.cse.keypairs.obliterate",
-  "gmail.users.settings.delegates.create", "gmail.users.settings.delegates.delete", "gmail.users.settings.filters.create",
-  "gmail.users.settings.filters.delete", "gmail.users.settings.forwardingAddresses.create",
-  "gmail.users.settings.forwardingAddresses.delete", "gmail.users.settings.sendAs.create", "gmail.users.settings.sendAs.delete",
-  "gmail.users.settings.sendAs.patch", "gmail.users.settings.sendAs.smimeInfo.delete", "gmail.users.settings.sendAs.smimeInfo.insert",
-  "gmail.users.settings.sendAs.smimeInfo.setDefault", "gmail.users.settings.sendAs.update", "gmail.users.settings.sendAs.verify",
-  "gmail.users.settings.updateAutoForwarding", "gmail.users.settings.updateImap", "gmail.users.settings.updateLanguage",
-  "gmail.users.settings.updatePop", "gmail.users.settings.updateVacation", "gmail.users.threads.delete",
-  // people: other contacts and the organisation directory
-  "people.otherContacts.list", "people.otherContacts.search", "people.people.listDirectoryPeople", "people.people.searchDirectoryPeople",
 ])
 
 /** A service's scope sets; a service outside the table requests nothing. */
@@ -180,7 +161,7 @@ export function accessFor(access: AccessLevel | Readonly<Record<string, AccessLe
 }
 
 /** Google accepts at most this many scopes in one authorization request. */
-const MAX_SCOPES = 64
+export const MAX_SCOPES = 64
 
 /**
  * The scopes one sign-in requests: each service's set for its access, the

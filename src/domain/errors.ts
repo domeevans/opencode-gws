@@ -66,6 +66,21 @@ export const ErrorCode = {
     next: "Commit with the tool named by the plan's category.",
   },
 
+  // ── Scripts (the tools RPC) ───────────────────────────────────────────
+  SESSION_UNKNOWN: {
+    meaning: "A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules.",
+    next: "Pass the id of an existing session, or create one for the agent the script should run as.",
+  },
+  SESSION_AGENT_REQUIRED: {
+    meaning: "A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent.",
+    next: 'Create the script\'s session with an agent, for example POST /api/session with {"agent":"build"}.',
+  },
+  PERMISSION_DENIED: {
+    meaning:
+      "The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run.",
+    next: "Run the script as a session whose agent allows the action, or add an allow rule for that action to the agent.",
+  },
+
   // ── Sign-in ───────────────────────────────────────────────────────────
   AUTH_REQUIRED: {
     meaning:
@@ -74,15 +89,29 @@ export const ErrorCode = {
   },
   AUTH_SCOPE_MISSING: {
     meaning: "The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran.",
-    next: "Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry.",
+    next: "Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method.",
+  },
+  ADMIN_PRIVILEGE_REQUIRED: {
+    meaning:
+      "The sign-in is valid, but Google refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports for admin-reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal.",
+    next: "Ask the user to sign in with a Workspace admin account that has the needed privilege (Reports for admin-reports), or to remove the service from enabledServices.",
   },
   AUTH_CLIENT_REQUIRED: {
     meaning: "No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one.",
     next: "Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator.",
   },
   AUTH_CLIENT_INVALID: {
-    meaning: "The sign-in form has only one of the client ID and secret, or a value in the wrong format.",
+    meaning: "The sign-in form has only one of the client ID and secret, a value in the wrong format, or a client JSON that is not Google's downloaded client JSON.",
     next: "Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps.",
+  },
+  AUTH_REDIRECT_INVALID: {
+    meaning: "The sign-in's redirectUri is not an absolute https (or loopback http) URL, or callbackPort is missing or not a port.",
+    next: "Set redirectUri to an absolute https URL and callbackPort to a port from 1 to 65535, or leave both unset for a loopback redirect.",
+  },
+  AUTH_REDIRECT_MISMATCH: {
+    meaning:
+      "Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser.",
+    next: "Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client.",
   },
   AUTH_WRITE_UNCONFIRMED: {
     meaning: "Read and write access was chosen in the sign-in form without confirming the write scopes.",

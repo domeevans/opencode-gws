@@ -4,7 +4,7 @@ Unofficial plugin. Not affiliated with Google.
 
 An interactive account signs in through OpenCode: run `/connect` and choose **Google Workspace**, or run `opencode auth login gws-<alias>`. With more than one interactive account, each entry is named **Google Workspace (`<alias>`)**. With no `accounts` option the alias is `default`.
 
-In the TUI, `/connect` shows the sign-in link: press `o` or Enter to open it in your browser. The CLI, `opencode auth login gws-<alias>`, opens the browser automatically. The default access is read-only. Read and write is an explicit choice, and the form lists the exact scopes before Google's consent screen.
+In the TUI, `/connect` shows the sign-in link: press `o` or Enter to open it in your browser. The CLI, `opencode auth login gws-<alias>`, opens the browser automatically. With no `accounts` option, the `default` account enables every service the plugin covers except Keep, and the form starts on Read and write, which needs the acknowledgment; Read-only is the other choice. An account you configure without `access` starts on Read-only. The form lists the exact scopes before Google's consent screen.
 
 Headless accounts do not use this flow. `credentials_file` reads a credentials file from the environment variable named by `credentialsFileEnv`. `access_token` reads a token from `tokenEnv`. Neither is a fallback. `/gws-doctor` is what checks them.
 
@@ -17,14 +17,17 @@ The form renders before authentication starts.
 | Field | When it shows | What it does |
 | --- | --- | --- |
 | OAuth client ID, OAuth client secret | When no `oauthClient` option sets a client. | The ID and secret of your Desktop app client. Leave both blank to reuse the client from this account's previous sign-in. When `oauthClient` is set (for example by organisation config), both fields are hidden and submit the option's values. The host refuses a malformed ID or secret before any network call. |
-| Access | Always | **Read-only (recommended)** or **Read and write**. Each option's description lists the scope URLs it will request. An account whose config sets `access` to read, with no write service, does not offer write. |
+| Access | Always | **Read-only** or **Read and write**. It starts on the account's configured access: Read and write for the implicit `default` account, Read-only for an account without `access`. Each option's description lists the scope URLs it will request. An account whose config sets `access` to read, with no write service, does not offer write. |
 | I understand this grants write access | Required when Access is Read and write | The acknowledgment. Without it the sign-in stops with `AUTH_WRITE_UNCONFIRMED`. |
+| OAuth client JSON, OAuth redirect URI, OAuth callback port | Never: a host fills them | Google's downloaded client JSON (it replaces the client ID and secret), and the `redirectUri` and `callbackPort` of [a sign-in from another machine](#sign-in-when-opencode-runs-on-another-machine). The redirect fields default to the plugin options of the same names. |
 
-If Google shows `redirect_uri_mismatch`, the client is not a Desktop app.
+If Google shows `redirect_uri_mismatch` with the default loopback redirect, the client is not a Desktop app. With a `redirectUri`, the Web application client does not list it exactly; the sign-in instructions name the redirect.
 
 ## OAuth client
 
 No Google OAuth client ships with the plugin. Each sign-in uses your own Desktop app client, or the one your organisation sets through `oauthClient`. Google treats a Desktop client's secret as non-confidential. Security does not rest on the secret. It rests on PKCE (S256), the loopback redirect to `127.0.0.1`, and the user's consent on Google's screen.
+
+`oauthClient` is `{ "clientId", "clientSecret" }` for a Desktop app client, or the JSON Google Cloud console downloads for a client: `{ "installed": … }` for a Desktop app, `{ "web": … }` for a Web application, which keeps its `redirect_uris`. A Web client works only with a host-supplied redirect (below), and its secret is confidential.
 
 Precedence, first match wins:
 
@@ -45,81 +48,102 @@ Set `oauthClient` in user, project, or system config. An organisation client of 
 2. **Enable the APIs.** Enable the API of each service the account uses. `/gws-status` gives one link per account, built from `enabledServices`.
 3. **Set up the consent screen.** Open [Google Auth platform → Branding](https://console.developers.google.com/auth/branding) and fill in the app name and your email. Under [Audience](https://console.developers.google.com/auth/audience), choose **Internal** if the project belongs to your Workspace organisation. For **External**, add yourself as a test user; in **Testing** status Google expires refresh tokens after 7 days. Setting the app **In production** avoids that expiry, at the cost of an unverified-app warning on the consent screen.
 4. **Create a Desktop client.** Under [Clients](https://console.developers.google.com/auth/clients), create a client of type **Desktop app**. A Web client does not work with the loopback redirect.
-5. **Copy its ID and secret.** Copy the client ID (`….apps.googleusercontent.com`) and the client secret, then run `/connect`, choose Google Workspace, and enter them. Choose Read-only unless agents must change Workspace data.
+5. **Copy its ID and secret.** Copy the client ID (`….apps.googleusercontent.com`) and the client secret, then run `/connect`, choose Google Workspace, and enter them. Choose the access: every change still needs a plan and your approval.
 
-Then run `/gws-doctor`. It makes one small read per enabled service and reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, or `API_DISABLED` with the enable URL.
+Then run `/gws-doctor`. It makes one small read per enabled service and reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `ADMIN_PRIVILEGE_REQUIRED` (a valid sign-in of an account without the admin privilege, such as Reports for `admin-reports`), or `API_DISABLED` with the enable URL. A service it cannot check, such as Keep without delegation, is `SKIPPED` with the reason.
+
+## Sign in when OpenCode runs on another machine
+
+By default Google sends the browser back to `http://127.0.0.1:<random port>`, where the sign-in listens. That works only when the browser and OpenCode are on the same computer. When OpenCode runs on a server and the person signs in from a browser elsewhere, the host that serves OpenCode supplies the redirect:
+
+- `redirectUri`: the absolute URL Google redirects to, for example `https://host.example/oauth/return`. It must be `https`, unless it points at `127.0.0.1`, `[::1]` or `localhost`.
+- `callbackPort`: the port on `127.0.0.1` where the sign-in listens. The host forwards Google's redirect, path and query unchanged, to `http://127.0.0.1:<callbackPort><path of redirectUri>`.
+
+Set them as plugin options, or let the host fill the hidden form fields of the same names for one sign-in; a filled field wins over its option. `redirectUri` needs `callbackPort`. `callbackPort` alone keeps a loopback redirect, on that fixed port.
+
+The authorize URL and the token exchange then carry `redirectUri`. The listener accepts only the redirect's path, with the same state and PKCE checks, and only once. Without either setting, nothing changes.
+
+Google accepts only loopback redirects for a Desktop app client, so a public redirect needs a **Web application** client:
+
+1. Under [Clients](https://console.developers.google.com/auth/clients), create a client of type **Web application**, and add the exact `redirectUri` under **Authorised redirect URIs**.
+2. Download its JSON and give it to the sign-in: in the form's hidden **OAuth client JSON** field, filled by the host, or as `oauthClient`.
+
+Before the browser opens, the sign-in refuses with `AUTH_REDIRECT_MISMATCH` a Desktop client with a non-loopback redirect, and a Web client whose `redirect_uris` do not include `redirectUri`. A malformed redirect or port is `AUTH_REDIRECT_INVALID`.
+
+A Web client's secret is confidential. The plugin keeps it with the sign-in in OpenCode's credential store, never puts it in the form, a status, a tool result or an error, and redacts it from token errors. Prefer the form field to `oauthClient`: a config file is a file an agent's tools may read.
+
+Google matches a non-loopback redirect exactly, character for character, so every public address must be registered on the Web client. A deployment with many hosts registers each one, or uses one relay address that forwards each callback to the right host.
+
+## What the default consent asks for
+
+The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 45 scopes in one consent, under Google's limit of 64 per request. Read-only requests 37 for the same services, only read-only scopes, and runs every read that accepts a read-only scope; the few reads listed below as needing Read and write accept no read-only scope.
+
+- **Granular consent.** Google lists the scopes with a checkbox each. A scope you untick is not granted; `/gws-status` and `gws_status` list it under missing scopes, and the methods that need it fail with `AUTH_SCOPE_MISSING` until you sign in again and approve it.
+- **External client in Testing.** Many of these scopes are sensitive or restricted (Gmail, Drive, and others). An External client shows Google's unverified-app warning for them, only its test users can sign in, and in Testing status Google expires its refresh tokens after 7 days, so you sign in again every week. An Internal client in your own Workspace organisation avoids all three.
+- **APIs to enable** in the client's Cloud project, one per service: Gmail (`gmail.googleapis.com`), Drive (`drive.googleapis.com`), Calendar (`calendar-json.googleapis.com`), Docs (`docs.googleapis.com`), Sheets (`sheets.googleapis.com`), Slides (`slides.googleapis.com`), Tasks (`tasks.googleapis.com`), People (`people.googleapis.com`), Chat (`chat.googleapis.com`), Classroom (`classroom.googleapis.com`), Forms (`forms.googleapis.com`), Meet (`meet.googleapis.com`), Admin reports (`admin.googleapis.com`), Apps Script (`script.googleapis.com`), Workspace Events (`workspaceevents.googleapis.com`) and Model Armor (`modelarmor.googleapis.com`). `/gws-status` gives one link that enables them all for the account's services. A service whose API is off fails with `API_DISABLED`; the others still work.
+- **Account requirements.** Chat needs a Google Workspace account. Admin reports need a Workspace admin with the Reports privilege; any other account's sign-in is valid but its Reports calls fail with `ADMIN_PRIVILEGE_REQUIRED`, which never marks the sign-in as needing renewal. Model Armor needs a Cloud project with the Model Armor API. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
+
+To ask for less, set `accounts` with only the services you use, or `access: "read"`, or choose Read-only in the form.
+
+### Keep needs domain-wide delegation
+
+Google grants the Keep API's scopes, `keep` and `keep.readonly`, only through [domain-wide delegation](https://developers.google.com/workspace/keep/api/guides), which a Workspace admin sets up. A person's own consent cannot grant them, and a sign-in that asks for one is refused as a whole with `Error 400: invalid_scope`. So:
+
+- no access level requests a Keep scope, and the `default` account does not enable Keep;
+- `gws_catalog` and `gws_schema` mark every Keep method `restriction: "domain-wide-delegation"`, and the scope check refuses one with a next step that says so;
+- an account that enables `keep` shows **Needs domain-wide delegation: keep** in `/gws-status`, the TUI dialog and `gws_status`, its sign-in form says so, and `/gws-doctor` reports Keep `SKIPPED` with the reason.
+
+If your admin has set up domain-wide delegation, enable `keep` (and the Keep API, `keep.googleapis.com`) and add the scopes yourself: `"scopes": ["keep"]`, or `["keep.readonly"]`, in `accounts.<alias>.scopes`. The doctor then probes Keep like any other service.
 
 ## What a sign-in requests
 
-`access` is `"read"` (the default), `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Extra scopes on `accounts.<alias>.scopes` are always requested and always shown. Short names are accepted: `gmail.readonly` is stored as the scope URL.
+`access` is `"read"` (the default for an account you configure), `"write"` (the implicit `default` account), or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Extra scopes on `accounts.<alias>.scopes` are always requested and always shown. Short names are accepted: `gmail.readonly` is stored as the scope URL.
 
-Before a read or a plan, the plugin compares the operation's manifest scopes with the scopes Google granted. A miss fails with `AUTH_SCOPE_MISSING` and does not start `gws`. The next step is to sign in again with Read and write, or to add the scope to `accounts.<alias>.scopes`.
+Before a read or a plan, the plugin compares the operation's manifest scopes with the scopes Google granted. A miss fails with `AUTH_SCOPE_MISSING` and does not start `gws`. The next step is to sign in again and approve every scope Google lists, choosing Read and write when only that level requests the scope. A method only an app's own credentials can run, or one that needs domain-wide delegation (both listed below), fails with a next step that says why.
 
-Model Armor is not in either access level. Add `https://www.googleapis.com/auth/cloud-platform` to that account's `scopes` if you enable the service. The helpers still cannot run; `gws_catalog` marks them and names no alternative.
+Model Armor has no read-only scope: Read and write requests `https://www.googleapis.com/auth/cloud-platform`, which grants access to the whole Cloud project, and Read-only requests nothing for it. The Model Armor helpers still cannot run; `gws_catalog` marks them and names no alternative.
 
 <!-- generated:scopes -->
 
-Generated from `src/domain/scopes.ts` by `npm run docs:coverage`. Do not edit this section by hand.
+Generated from `src/domain/scopes.ts` and `src/domain/restricted.ts` by `npm run docs:coverage`. Do not edit this section by hand.
 
 Every interactive sign-in also requests the identity scopes `openid`, `https://www.googleapis.com/auth/userinfo.email`, `https://www.googleapis.com/auth/userinfo.profile`. A short name such as `gmail.readonly` is the same scope as `https://www.googleapis.com/auth/gmail.readonly`.
 
 | Service | Read-only | Read and write |
 | --- | --- | --- |
 | admin-reports | `https://www.googleapis.com/auth/admin.reports.audit.readonly`<br>`https://www.googleapis.com/auth/admin.reports.usage.readonly` | `https://www.googleapis.com/auth/admin.reports.audit.readonly`<br>`https://www.googleapis.com/auth/admin.reports.usage.readonly` |
-| calendar | `https://www.googleapis.com/auth/calendar.readonly` | `https://www.googleapis.com/auth/calendar` |
-| chat | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships` |
-| classroom | `https://www.googleapis.com/auth/classroom.courses.readonly`<br>`https://www.googleapis.com/auth/classroom.coursework.me.readonly`<br>`https://www.googleapis.com/auth/classroom.announcements.readonly` | `https://www.googleapis.com/auth/classroom.courses`<br>`https://www.googleapis.com/auth/classroom.coursework.me`<br>`https://www.googleapis.com/auth/classroom.announcements` |
+| calendar | `https://www.googleapis.com/auth/calendar.readonly`<br>`https://www.googleapis.com/auth/calendar.acls.readonly` | `https://www.googleapis.com/auth/calendar` |
+| chat | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/chat.customemojis.readonly`<br>`https://www.googleapis.com/auth/chat.users.availability.readonly`<br>`https://www.googleapis.com/auth/chat.users.readstate.readonly`<br>`https://www.googleapis.com/auth/chat.users.sections.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings` |
+| classroom | `https://www.googleapis.com/auth/classroom.courses.readonly`<br>`https://www.googleapis.com/auth/classroom.coursework.me.readonly`<br>`https://www.googleapis.com/auth/classroom.announcements.readonly`<br>`https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly`<br>`https://www.googleapis.com/auth/classroom.guardianlinks.students.readonly`<br>`https://www.googleapis.com/auth/classroom.rosters.readonly`<br>`https://www.googleapis.com/auth/classroom.topics.readonly` | `https://www.googleapis.com/auth/classroom.courses`<br>`https://www.googleapis.com/auth/classroom.coursework.me`<br>`https://www.googleapis.com/auth/classroom.announcements`<br>`https://www.googleapis.com/auth/classroom.coursework.students`<br>`https://www.googleapis.com/auth/classroom.courseworkmaterials`<br>`https://www.googleapis.com/auth/classroom.guardianlinks.students`<br>`https://www.googleapis.com/auth/classroom.rosters`<br>`https://www.googleapis.com/auth/classroom.topics` |
 | docs | `https://www.googleapis.com/auth/documents.readonly` | `https://www.googleapis.com/auth/documents` |
-| drive | `https://www.googleapis.com/auth/drive.readonly` | `https://www.googleapis.com/auth/drive` |
-| events | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
+| drive | `https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly` | `https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly` |
+| events | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/chat.customemojis.readonly`<br>`https://www.googleapis.com/auth/chat.users.availability.readonly`<br>`https://www.googleapis.com/auth/chat.users.readstate.readonly`<br>`https://www.googleapis.com/auth/chat.users.sections.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
 | forms | `https://www.googleapis.com/auth/forms.body.readonly`<br>`https://www.googleapis.com/auth/forms.responses.readonly` | `https://www.googleapis.com/auth/forms.body`<br>`https://www.googleapis.com/auth/forms.responses.readonly`<br>`https://www.googleapis.com/auth/drive.file` |
-| gmail | `https://www.googleapis.com/auth/gmail.readonly` | `https://www.googleapis.com/auth/gmail.modify` |
-| keep | `https://www.googleapis.com/auth/keep.readonly` | `https://www.googleapis.com/auth/keep` |
+| gmail | `https://www.googleapis.com/auth/gmail.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/` |
+| keep | _(none)_ | _(none)_ |
 | meet | `https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
-| modelarmor | _(none)_ | _(none)_ |
-| people | `https://www.googleapis.com/auth/contacts.readonly` | `https://www.googleapis.com/auth/contacts` |
+| modelarmor | _(none)_ | `https://www.googleapis.com/auth/cloud-platform` |
+| people | `https://www.googleapis.com/auth/contacts.readonly`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` | `https://www.googleapis.com/auth/contacts`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` |
 | script | `https://www.googleapis.com/auth/script.projects.readonly`<br>`https://www.googleapis.com/auth/script.processes`<br>`https://www.googleapis.com/auth/script.metrics` | `https://www.googleapis.com/auth/script.projects`<br>`https://www.googleapis.com/auth/script.processes`<br>`https://www.googleapis.com/auth/script.metrics` |
 | sheets | `https://www.googleapis.com/auth/spreadsheets.readonly` | `https://www.googleapis.com/auth/spreadsheets` |
 | slides | `https://www.googleapis.com/auth/presentations.readonly` | `https://www.googleapis.com/auth/presentations` |
 | tasks | `https://www.googleapis.com/auth/tasks.readonly` | `https://www.googleapis.com/auth/tasks` |
-| workflow | `https://www.googleapis.com/auth/gmail.readonly`<br>`https://www.googleapis.com/auth/calendar.readonly`<br>`https://www.googleapis.com/auth/tasks.readonly`<br>`https://www.googleapis.com/auth/drive.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/calendar`<br>`https://www.googleapis.com/auth/tasks`<br>`https://www.googleapis.com/auth/drive` |
+| workflow | `https://www.googleapis.com/auth/gmail.readonly`<br>`https://www.googleapis.com/auth/calendar.readonly`<br>`https://www.googleapis.com/auth/calendar.acls.readonly`<br>`https://www.googleapis.com/auth/tasks.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/`<br>`https://www.googleapis.com/auth/calendar`<br>`https://www.googleapis.com/auth/tasks`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly` |
 
 Read methods that the read-only set does not cover, so they need a Read and write sign-in:
 
-- `calendar.acl.list`
+- `chat.users.spaces.spaceNotificationSetting.get`
 - `drive.files.generateIds`
 - `sheets.spreadsheets.developerMetadata.get`
 - `sheets.spreadsheets.developerMetadata.search`
 - `sheets.spreadsheets.getByDataFilter`
 - `sheets.spreadsheets.values.batchGetByDataFilter`
 
-Methods neither access level covers. Add one of the method's manifest scopes to the account's `scopes`; every sign-in then requests it and shows it:
+Google grants `https://www.googleapis.com/auth/chat.bot`, `https://www.googleapis.com/auth/chat.import`, `https://www.googleapis.com/auth/classroom.addons.student`, `https://www.googleapis.com/auth/classroom.addons.teacher` only to an app's own credentials (a Chat app or a Classroom add-on), so no access level requests them. These methods accept nothing else, so no Google sign-in can run them; `gws_catalog` and `gws_schema` mark them `appOnly` and `restriction: "app-only"`:
 
-- `chat.customEmojis.create`
-- `chat.customEmojis.delete`
-- `chat.customEmojis.get`
-- `chat.customEmojis.list`
 - `chat.spaces.completeImport`
-- `chat.spaces.delete`
 - `chat.spaces.messages.attachments.get`
 - `chat.spaces.messages.replaceCards`
-- `chat.users.availability.get`
-- `chat.users.availability.markAsActive`
-- `chat.users.availability.markAsAway`
-- `chat.users.availability.markAsDoNotDisturb`
-- `chat.users.availability.patch`
-- `chat.users.sections.create`
-- `chat.users.sections.delete`
-- `chat.users.sections.items.list`
-- `chat.users.sections.items.move`
-- `chat.users.sections.list`
-- `chat.users.sections.patch`
-- `chat.users.sections.position`
-- `chat.users.spaces.getSpaceReadState`
-- `chat.users.spaces.spaceNotificationSetting.get`
-- `chat.users.spaces.spaceNotificationSetting.patch`
-- `chat.users.spaces.threads.getThreadReadState`
-- `chat.users.spaces.updateSpaceReadState`
 - `classroom.courses.announcements.addOnAttachments.create`
 - `classroom.courses.announcements.addOnAttachments.delete`
 - `classroom.courses.announcements.addOnAttachments.get`
@@ -132,27 +156,13 @@ Methods neither access level covers. Add one of the method's manifest scopes to 
 - `classroom.courses.courseWork.addOnAttachments.list`
 - `classroom.courses.courseWork.addOnAttachments.patch`
 - `classroom.courses.courseWork.addOnAttachments.studentSubmissions.patch`
-- `classroom.courses.courseWork.create`
-- `classroom.courses.courseWork.delete`
 - `classroom.courses.courseWork.getAddOnContext`
-- `classroom.courses.courseWork.modifyAssignees`
-- `classroom.courses.courseWork.patch`
-- `classroom.courses.courseWork.rubrics.create`
-- `classroom.courses.courseWork.rubrics.delete`
-- `classroom.courses.courseWork.rubrics.patch`
-- `classroom.courses.courseWork.studentSubmissions.return`
-- `classroom.courses.courseWork.updateRubric`
 - `classroom.courses.courseWorkMaterials.addOnAttachments.create`
 - `classroom.courses.courseWorkMaterials.addOnAttachments.delete`
 - `classroom.courses.courseWorkMaterials.addOnAttachments.get`
 - `classroom.courses.courseWorkMaterials.addOnAttachments.list`
 - `classroom.courses.courseWorkMaterials.addOnAttachments.patch`
-- `classroom.courses.courseWorkMaterials.create`
-- `classroom.courses.courseWorkMaterials.delete`
-- `classroom.courses.courseWorkMaterials.get`
 - `classroom.courses.courseWorkMaterials.getAddOnContext`
-- `classroom.courses.courseWorkMaterials.list`
-- `classroom.courses.courseWorkMaterials.patch`
 - `classroom.courses.posts.addOnAttachments.create`
 - `classroom.courses.posts.addOnAttachments.delete`
 - `classroom.courses.posts.addOnAttachments.get`
@@ -160,73 +170,16 @@ Methods neither access level covers. Add one of the method's manifest scopes to 
 - `classroom.courses.posts.addOnAttachments.patch`
 - `classroom.courses.posts.addOnAttachments.studentSubmissions.patch`
 - `classroom.courses.posts.getAddOnContext`
-- `classroom.courses.studentGroups.create`
-- `classroom.courses.studentGroups.delete`
-- `classroom.courses.studentGroups.list`
-- `classroom.courses.studentGroups.patch`
-- `classroom.courses.studentGroups.studentGroupMembers.create`
-- `classroom.courses.studentGroups.studentGroupMembers.delete`
-- `classroom.courses.studentGroups.studentGroupMembers.list`
-- `classroom.courses.students.create`
-- `classroom.courses.students.delete`
-- `classroom.courses.students.get`
-- `classroom.courses.students.list`
-- `classroom.courses.teachers.create`
-- `classroom.courses.teachers.delete`
-- `classroom.courses.teachers.get`
-- `classroom.courses.teachers.list`
-- `classroom.courses.topics.create`
-- `classroom.courses.topics.delete`
-- `classroom.courses.topics.get`
-- `classroom.courses.topics.list`
-- `classroom.courses.topics.patch`
-- `classroom.invitations.accept`
-- `classroom.invitations.create`
-- `classroom.invitations.delete`
-- `classroom.invitations.get`
-- `classroom.invitations.list`
-- `classroom.userProfiles.get`
-- `classroom.userProfiles.guardianInvitations.create`
-- `classroom.userProfiles.guardianInvitations.get`
-- `classroom.userProfiles.guardianInvitations.list`
-- `classroom.userProfiles.guardianInvitations.patch`
-- `classroom.userProfiles.guardians.delete`
-- `classroom.userProfiles.guardians.get`
-- `classroom.userProfiles.guardians.list`
-- `drive.apps.list`
-- `gmail.users.messages.batchDelete`
-- `gmail.users.messages.delete`
-- `gmail.users.settings.cse.identities.create`
-- `gmail.users.settings.cse.identities.delete`
-- `gmail.users.settings.cse.identities.patch`
-- `gmail.users.settings.cse.keypairs.create`
-- `gmail.users.settings.cse.keypairs.disable`
-- `gmail.users.settings.cse.keypairs.enable`
-- `gmail.users.settings.cse.keypairs.obliterate`
-- `gmail.users.settings.delegates.create`
-- `gmail.users.settings.delegates.delete`
-- `gmail.users.settings.filters.create`
-- `gmail.users.settings.filters.delete`
-- `gmail.users.settings.forwardingAddresses.create`
-- `gmail.users.settings.forwardingAddresses.delete`
-- `gmail.users.settings.sendAs.create`
-- `gmail.users.settings.sendAs.delete`
-- `gmail.users.settings.sendAs.patch`
-- `gmail.users.settings.sendAs.smimeInfo.delete`
-- `gmail.users.settings.sendAs.smimeInfo.insert`
-- `gmail.users.settings.sendAs.smimeInfo.setDefault`
-- `gmail.users.settings.sendAs.update`
-- `gmail.users.settings.sendAs.verify`
-- `gmail.users.settings.updateAutoForwarding`
-- `gmail.users.settings.updateImap`
-- `gmail.users.settings.updateLanguage`
-- `gmail.users.settings.updatePop`
-- `gmail.users.settings.updateVacation`
-- `gmail.users.threads.delete`
-- `people.otherContacts.list`
-- `people.otherContacts.search`
-- `people.people.listDirectoryPeople`
-- `people.people.searchDirectoryPeople`
+
+Google grants `https://www.googleapis.com/auth/keep`, `https://www.googleapis.com/auth/keep.readonly` only through domain-wide delegation, which a Workspace admin sets up, never through a person's own consent: a sign-in that asks for one is refused with `invalid_scope`. No access level requests them, and the default account does not enable Keep. These methods accept nothing else; `gws_catalog` and `gws_schema` mark them `restriction: "domain-wide-delegation"`. An account whose admin has set up delegation adds the scopes in `accounts.<alias>.scopes`:
+
+- `keep.media.download`
+- `keep.notes.create`
+- `keep.notes.delete`
+- `keep.notes.get`
+- `keep.notes.list`
+- `keep.notes.permissions.batchCreate`
+- `keep.notes.permissions.batchDelete`
 
 <!-- /generated:scopes -->
 

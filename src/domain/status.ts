@@ -19,6 +19,10 @@ const AccountStatus = z.object({
   clientSource: z.enum(["account", "plugin", "pasted"]).optional().describe("Where the sign-in's OAuth client comes from"),
   grantedScopes: z.array(z.string()).optional().describe("Scopes Google granted to the current sign-in"),
   missingScopes: z.array(z.string()).optional().describe("Scopes the enabled services need at this access level that were not granted"),
+  delegationRequired: z
+    .array(z.string())
+    .optional()
+    .describe("Enabled services that need domain-wide delegation, which a Workspace admin sets up; the sign-in requests none of their scopes unless accounts.<alias>.scopes adds them"),
   nextStep: z.string().optional().describe("What to do next; absent when nothing is needed"),
 })
 

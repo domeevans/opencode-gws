@@ -185,6 +185,9 @@ describe("tool registration", () => {
     })
     // The host reserves `execute` for Code Mode, so no direct tool may take that name.
     expect(h.tools.has("execute")).toBe(false)
+    // The Code Mode namespace text names gws_read as the direct tool it is, never as a Code Mode call.
+    expect(NAMESPACE.description).toContain("the direct tool gws_read")
+    expect(NAMESPACE.description).not.toMatch(/\bwith read\b/)
   })
 
   it("describes what each tool does without internal jargon, and names the direct commit tools", async () => {
@@ -550,6 +553,8 @@ describe("errors the model sees", () => {
     [4, "GWS_DISCOVERY_ERROR", { error: { code: 0, message: "could not fetch the Discovery document", reason: "discoveryError" } }],
     [5, "GWS_INTERNAL_ERROR", { error: { code: 0, message: "unexpected failure" } }],
     [1, "GWS_API_ERROR", { error: { code: 404, message: "Requested entity was not found." } }],
+    [1, "ADMIN_PRIVILEGE_REQUIRED", { error: { code: 401, message: "Access denied. You are not authorized to read activity records.", reason: "authError" } }],
+    [1, "AUTH_REQUIRED", { error: { code: 401, message: "Request had invalid authentication credentials.", reason: "authError" } }],
   ])("reads gws exit %s as %s", async (exit, code, payload) => {
     writeFileSync(failurePath, `${JSON.stringify(payload)}\n${exit}\n`)
     const h = await setup({}, undefined, { binary: failing })
@@ -602,6 +607,17 @@ describe("helpers", () => {
     expect(helper.id).toBe("gmail.triage")
     expect(helper.input?.type).toBe("object")
     expect(Object.keys(helper.input?.properties ?? {})).toContain("max")
+  })
+
+  it("marks in gws_schema why an ordinary sign-in cannot run a method: app-only, or domain-wide delegation", async () => {
+    const h = await setup({}, undefined, { accounts: { personal: account({ services: ["chat", "keep", "gmail"] }) } })
+    const keep = await tool(h, "schema").execute({ operation: "keep.notes.list" }, context())
+    expect(keep.output).toMatchObject({ restriction: "domain-wide-delegation" })
+    expect(keep.output).not.toHaveProperty("appOnly")
+    const chat = await tool(h, "schema").execute({ operation: "chat.spaces.messages.attachments.get" }, context())
+    expect(chat.output).toMatchObject({ appOnly: true, restriction: "app-only" })
+    const gmail = await tool(h, "schema").execute({ operation: "gmail.users.getProfile" }, context())
+    expect(gmail.output).not.toHaveProperty("restriction")
   })
 
   it("names the method to use for a helper that cannot run", async () => {

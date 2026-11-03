@@ -1,12 +1,13 @@
 import { join } from "node:path"
-import { doctorTarget, probeArgv, probeOutcome, type DoctorOutcome, type DoctorTarget } from "../auth/doctor.js"
+import { doctorTarget, probeArgv, probeOutcome, skipDetail, type DoctorOutcome, type DoctorTarget } from "../auth/doctor.js"
 import { signInScopes } from "../auth/form.js"
 import { integrationIdFor, integrationIds, integrationNames } from "../auth/google.js"
 import { accountSignInStatus, connectStep, type ConnectionView } from "../auth/status.js"
 import type { Audit } from "../domain/audit.js"
 import type { AuthProblemCode, AuthState } from "../domain/auth-state.js"
 import { throwIfCancelled } from "../domain/errors.js"
-import { authProblem, type AuthRemediation } from "../domain/result.js"
+import { authProblem, privilegeName, type AuthRemediation } from "../domain/result.js"
+import { delegationRequired, restriction } from "../domain/restricted.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
 import type { AccountProfile, PluginConfig, ProcessResult } from "../domain/types.js"
@@ -34,6 +35,8 @@ export interface CallContext {
   /** Aborting stops the gws child and rejects with `CANCELLED`. */
   signal?: AbortSignal
   progress?: (update: Progress) => void
+  /** Set when a script made the call through the tools RPC rather than a tool call; the audit records it. */
+  caller?: "rpc"
 }
 
 /** An interactive account's current sign-in, from OpenCode's credential store. */
@@ -115,6 +118,7 @@ export class Accounts {
           mode: profile.mode,
           services: profile.enabledServices,
           ...(profile.mode === "interactive" ? { integrationID } : {}),
+          ...delegationField(profile),
           ...signIn,
         }
       }),
@@ -187,16 +191,27 @@ export class Accounts {
   }
 
   private scopeMissing(account: string, profile: AccountProfile, operation: string, accepted: readonly string[]): string {
+    const reason = restriction(operation)
+    if (reason === "app-only") {
+      return (
+        `AUTH_SCOPE_MISSING: ${operation} needs a scope Google grants only to an app's own credentials (a Chat app or a Classroom add-on), never to a person's sign-in, so '${account}' cannot run it. ` +
+        "Next step: Tell the user this method cannot run with a Google sign-in, and use another method."
+      )
+    }
+    if (reason === "domain-wide-delegation") {
+      const named = accepted.map(shortScope).join(" or ")
+      return (
+        `AUTH_SCOPE_MISSING: ${operation} needs ${named}, which Google grants only through domain-wide delegation that a Workspace admin sets up, and the sign-in for '${account}' has not granted it. ` +
+        `Next step: Tell the user this method needs domain-wide delegation; once their admin has set it up, they add ${named} to accounts.${account}.scopes and sign in again.`
+      )
+    }
     const read = signInScopes(profile, "read")
-    const write = signInScopes(profile, "write")
     const named = accepted.slice(0, 5).map(shortScope).join(", ")
-    const extra = `add one of them to accounts.${account}.scopes`
     const connect = this.connect(account)
+    // The write set covers every method a person's sign-in can run (test/scopes.test.ts), so a miss is a re-consent or write.
     const next = accepted.some((scope) => read.includes(scope))
       ? `to sign in again, ${connect}, and approve every scope Google lists.`
-      : accepted.some((scope) => write.includes(scope))
-        ? `to sign in again, ${connect}, and choose Read and write; or ${extra}.`
-        : `${extra}; then, to sign in again, ${connect}.`
+      : `to sign in again, ${connect}, and choose Read and write; or add one of them to accounts.${account}.scopes.`
     return `AUTH_SCOPE_MISSING: The sign-in for '${account}' has not granted a scope ${operation} needs (one of: ${named}). Next step: ${capitalize(next)}`
   }
 
@@ -213,24 +228,27 @@ export class Accounts {
     return ownedDir(join(this.runtime.paths.cacheDir, "accounts", this.integrationId(account).replace(/^gws-/, "")))
   }
 
-  /** Remediation text for an account's sign-in and consent problems, by credential mode. */
-  remediation(account: string, scopes?: readonly string[]): AuthRemediation {
+  /** Remediation text for an account's sign-in, consent and admin privilege problems, by credential mode. */
+  remediation(account: string, scopes?: readonly string[], service?: string): AuthRemediation {
     const profile = this.runtime.config.accounts[account]
     const named = scopes && scopes.length > 0 ? scopes.slice(0, 5).map(shortScope).join(", ") : undefined
     const grant = named ? `include one of: ${named}` : "include the scope this operation needs"
+    const admin = `a Workspace admin account that has ${privilegeName(service)}`
+    const remove = `remove ${service ?? "the service"} from accounts.${account}.enabledServices`
     if (profile?.mode === "credentials_file") {
       const source = profile.credentialsFileEnv ? `the credentials file named by ${profile.credentialsFileEnv}` : "the credentials file"
-      return { signIn: `replace ${source}`, consent: `replace ${source} with one whose grant can ${grant}` }
+      return { signIn: `replace ${source}`, consent: `replace ${source} with one whose grant can ${grant}`, privilege: `replace ${source} with one for ${admin}, or ${remove}` }
     }
     if (profile?.mode === "access_token") {
       const source = profile.tokenEnv ? `the access token in ${profile.tokenEnv}` : "the access token"
-      return { signIn: `refresh ${source}`, consent: `mint ${source} with scopes that ${grant}` }
+      return { signIn: `refresh ${source}`, consent: `mint ${source} with scopes that ${grant}`, privilege: `mint ${source} for ${admin}, or ${remove}` }
     }
     const connect = this.connect(account)
     const extra = named ? `, or add one of ${named} to accounts.${account}.scopes` : ""
     return {
       signIn: `to sign in again, ${connect}`,
       consent: `to grant the scope, ${connect}, sign in again, and approve every scope, choosing Read and write for a change${extra}`,
+      privilege: `sign in with ${admin} (${connect}), or ${remove}`,
     }
   }
 
@@ -253,12 +271,14 @@ export class Accounts {
   /** Every account and enabled service /gws-doctor checks, in config order. */
   doctorTargets(): DoctorTarget[] {
     this.runtime.assertActive()
-    return Object.entries(this.runtime.config.accounts).flatMap(([alias, profile]) => profile.enabledServices.map((service) => doctorTarget(alias, service)))
+    return Object.entries(this.runtime.config.accounts).flatMap(([alias, profile]) =>
+      profile.enabledServices.map((service) => doctorTarget(alias, service, profile.mode === "interactive" && delegationRequired([service], profile.scopes).length > 0)),
+    )
   }
 
   /** Run one /gws-doctor probe as the account. A failure becomes an outcome, never a throw, except cancellation. */
   async probe(target: DoctorTarget, ctx: CallContext): Promise<DoctorOutcome> {
-    if (!target.operation) return { ...target, status: "SKIPPED", detail: "no read-only check exists for this service" }
+    if (!target.operation) return { ...target, status: "SKIPPED", detail: skipDetail(target) }
     const started = Date.now()
     try {
       const result = await this.run(probeArgv(target), target.account, target.operation, ctx)
@@ -304,6 +324,14 @@ export function report(ctx: Pick<CallContext, "progress">, update: Progress): vo
   } catch {
     /* ignore */
   }
+}
+
+/** Services this account enables that need domain-wide delegation its scopes do not add; omitted when none. */
+function delegationField(profile: AccountProfile): { delegationRequired?: string[] } {
+  // A headless credential's grant is not ours to know: the doctor checks it.
+  if (profile.mode !== "interactive") return {}
+  const services = delegationRequired(profile.enabledServices, profile.scopes)
+  return services.length > 0 ? { delegationRequired: services } : {}
 }
 
 function capitalize(text: string): string {

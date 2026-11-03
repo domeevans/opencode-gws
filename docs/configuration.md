@@ -2,7 +2,7 @@
 
 Unofficial plugin. Not affiliated with Google.
 
-Options are the plugin `options` object in `opencode.json` or `opencode.jsonc`. Unknown keys are rejected. Omit `options` and the plugin creates one read-only interactive account, `default`, with `gmail`, `drive`, `calendar`, `docs`, and `sheets`.
+Options are the plugin `options` object in `opencode.json` or `opencode.jsonc`. Unknown keys are rejected. Omit `options` (or `accounts`) and the plugin creates one interactive account, `default`, with every manifest service except Keep at `access: "write"`: one consent grants every scope a Google sign-in can use. Keep needs domain-wide delegation ([Keep](auth.md#keep-needs-domain-wide-delegation)), so no default sign-in requests its scopes. Set `accounts` to narrow it; your accounts then apply exactly as written, and an account without `access` is read-only.
 
 An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
@@ -20,12 +20,12 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `enabledServices` | the five everyday services, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
-| `access` | `"read"` | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
+| `enabledServices` | every manifest service except `keep`, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
+| `access` | `"read"`; `"write"` on the implicit `default` account | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
 | `scopes` | none | Extra scope URLs or short names, always shown at sign-in. Interactive accounts only. |
-| `oauthClient` | none | `{ "clientId", "clientSecret" }` for this account. Overrides the plugin client. Interactive accounts only. |
+| `oauthClient` | none | `{ "clientId", "clientSecret" }` of a Desktop app client, or Google's downloaded client JSON (`{ "installed": … }` or `{ "web": … }`), for this account. Overrides the plugin client. Interactive accounts only. |
 
-An account whose config sets `access` to read, with no write service, does not offer write on the sign-in form. With no explicit `access`, the form defaults to read and write needs the acknowledgment.
+An account whose config sets `access` to read, with no write service, does not offer write on the sign-in form. With no explicit `access`, the form defaults to read and still offers write, which needs the acknowledgment. The implicit `default` account defaults to write and still offers Read-only.
 
 `account` on a tool call is optional when exactly one account is configured.
 
@@ -34,14 +34,16 @@ An account whose config sets `access` to read, with no write service, does not o
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `services` | the union of every account's `enabledServices` | Limits what catalog, schema, read, and plan accept. A service here must be enabled by at least one account. It does not add tools. |
-| `oauthClient` | none | `{ clientId, clientSecret }` of a Desktop app client, usually set by organisation config. When set, the sign-in form hides its client fields and uses these values. An account `oauthClient` overrides it. See [auth.md](auth.md). |
+| `oauthClient` | none | `{ clientId, clientSecret }` of a Desktop app client, or Google's downloaded client JSON, usually set by organisation config. When set, the sign-in form hides its client fields and uses this client; a Web client's secret is never put in the form. An account `oauthClient` overrides it. See [auth.md](auth.md). |
+| `redirectUri` | none: a loopback redirect | The absolute URL Google redirects to after consent, when the browser is not on the machine OpenCode runs on, such as `https://host.example/oauth/return`. `https`, unless it is loopback. Needs `callbackPort` and a Web application client that lists it exactly. See [auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine). |
+| `callbackPort` | none: a random port | The port on `127.0.0.1` where the sign-in listens and the redirect is forwarded. Alone, a loopback redirect on that port. |
 | `binary.path` | the platform package | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
 | `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0` and show a warning in status. 2.2.2, 2.3.0, 3.0.0, prereleases, and dev builds are untested. |
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
 | `execution` | see below | Timeouts, page caps, and file roots. |
 | `audit` | JSONL in the state directory | Audit sink. |
 | `skills` | all three skills enabled | `enabled`, `include`, `exclude`. Ids are `opencode-gws`, `opencode-gws-recipes`, and `opencode-gws-admin`. |
-| `admin` | disabled | The admin gate. See [admin.md](admin.md). |
+| `admin` | enabled, every admin service, reason required | The admin gate. See [admin.md](admin.md). |
 
 ## Policy
 
@@ -107,7 +109,7 @@ Every permission rule in this document includes `resource`. A rule without it is
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `admin.enabled` | `false` | Master switch for admin planning. |
+| `admin.enabled` | `true` | Master switch for admin planning. Set `false` to refuse every admin plan. |
 | `admin.requireReason` | `true` | Require a non-empty `reason` on admin plans. |
 | `admin.allowedServices` | every service with an admin-class manifest entry | Allowlist. An explicit empty array denies every admin operation. |
 
@@ -144,7 +146,7 @@ Requested pagination is clamped to these caps and to any matching policy rule. A
 | `sink` | `"jsonl"` | `"jsonl"` or `"stderr"`. |
 | `path` | `<stateDir>/audit.jsonl` | Absolute path of the JSONL file, when `sink` is `jsonl`. |
 
-The state directory is `$XDG_STATE_HOME/opencode-gws` when that variable is an absolute path, otherwise `~/Library/Application Support/opencode-gws` on macOS and `~/.local/state/opencode-gws` elsewhere. Records contain the operation, account, category, duration, and outcome. They do not contain bodies, tokens, credentials, or file contents.
+The state directory is `$XDG_STATE_HOME/opencode-gws` when that variable is an absolute path, otherwise `~/Library/Application Support/opencode-gws` on macOS and `~/.local/state/opencode-gws` elsewhere. Records contain the operation, account, category, duration, and outcome, and `caller: "rpc"` for a read or plan a script made through the [tools RPC](scripting.md). They do not contain bodies, tokens, credentials, or file contents.
 
 A sink failure does not turn a completed operation into an error. Status keeps `auditDegraded: true` for that process. Do not retry a successful operation to obtain a record.
 
@@ -187,10 +189,16 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `PLAN_EXPIRED` | The plan's time limit passed, or a failed commit expired it. | Check the current state with gws_read, then plan again and show the new preview. |
 | `PLAN_CALLER_MISMATCH` | Another session, agent, or account created the plan. | Plan again from the session and agent that will commit it. |
 | `CATEGORY_MISMATCH` | The commit tool does not match the plan's category. | Commit with the tool named by the plan's category. |
+| `SESSION_UNKNOWN` | A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules. | Pass the id of an existing session, or create one for the agent the script should run as. |
+| `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create the script's session with an agent, for example POST /api/session with {"agent":"build"}. |
+| `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. | Run the script as a session whose agent allows the action, or add an allow rule for that action to the agent. |
 | `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
-| `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. |
+| `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
+| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but Google refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports for admin-reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. | Ask the user to sign in with a Workspace admin account that has the needed privilege (Reports for admin-reports), or to remove the service from enabledServices. |
 | `AUTH_CLIENT_REQUIRED` | No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one. | Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
-| `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, or a value in the wrong format. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
+| `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, a value in the wrong format, or a client JSON that is not Google's downloaded client JSON. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
+| `AUTH_REDIRECT_INVALID` | The sign-in's redirectUri is not an absolute https (or loopback http) URL, or callbackPort is missing or not a port. | Set redirectUri to an absolute https URL and callbackPort to a port from 1 to 65535, or leave both unset for a loopback redirect. |
+| `AUTH_REDIRECT_MISMATCH` | Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser. | Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client. |
 | `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |
 | `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
 | `GWS_API_ERROR` | Google returned an error; the message carries Google's text. | Fix the ids or parameters once from the message; if it fails again, report it. |
