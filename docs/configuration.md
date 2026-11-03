@@ -2,7 +2,7 @@
 
 Unofficial plugin. Not affiliated with Google.
 
-Options are the plugin `options` object in `opencode.json` or `opencode.jsonc`. Unknown keys are rejected. Omit `options` (or `accounts`) and the plugin creates one interactive account, `default`, with every manifest service at `access: "write"`: one consent grants every scope a Google sign-in can use. Set `accounts` to narrow it; your accounts then apply exactly as written, and an account without `access` is read-only.
+Options are the plugin `options` object in `opencode.json` or `opencode.jsonc`. Unknown keys are rejected. Omit `options` (or `accounts`) and the plugin creates one interactive account, `default`, with every manifest service except Keep at `access: "write"`: one consent grants every scope a Google sign-in can use. Keep needs domain-wide delegation ([Keep](auth.md#keep-needs-domain-wide-delegation)), so no default sign-in requests its scopes. Set `accounts` to narrow it; your accounts then apply exactly as written, and an account without `access` is read-only.
 
 An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
@@ -20,7 +20,7 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `enabledServices` | every manifest service, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
+| `enabledServices` | every manifest service except `keep`, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
 | `access` | `"read"`; `"write"` on the implicit `default` account | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
 | `scopes` | none | Extra scope URLs or short names, always shown at sign-in. Interactive accounts only. |
 | `oauthClient` | none | `{ "clientId", "clientSecret" }` of a Desktop app client, or Google's downloaded client JSON (`{ "installed": … }` or `{ "web": … }`), for this account. Overrides the plugin client. Interactive accounts only. |

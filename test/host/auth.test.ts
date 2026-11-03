@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { doctorTarget } from "../../src/auth/doctor.js"
 import { loadManifest } from "../../src/domain/manifest.js"
+import { DELEGATION_SERVICES } from "../../src/domain/restricted.js"
 import { IDENTITY_SCOPES, MAX_SCOPES, requestedScopes } from "../../src/domain/scopes.js"
 import { TEST_CLIENT, storedSignIn } from "../support/config.js"
 import { request } from "../support/requests.js"
@@ -14,7 +15,10 @@ import { prompt, startHost, type Harness } from "./harness.js"
  * the host's credential store: first a read-only one, then a write one.
  */
 
-const SERVICES = loadManifest().services.map((service) => service.alias)
+// The default account: every manifest service except those that need domain-wide delegation (Keep).
+const SERVICES = loadManifest()
+  .services.map((service) => service.alias)
+  .filter((service) => !DELEGATION_SERVICES.includes(service))
 const READ = requestedScopes(SERVICES, "read")
 const WRITE = requestedScopes(SERVICES, "write")
 /** The services /gws-doctor probes; the rest have no read-only check. */
@@ -167,6 +171,8 @@ describe("the default account after a Read and write consent", () => {
     const [account] = (result["value"] as { accounts: Array<Record<string, unknown>> }).accounts
     expect(account).toMatchObject({ alias: "default", connected: true, access: "write", missingScopes: [] })
     expect([...(account!["services"] as string[])].sort()).toEqual([...SERVICES].sort())
+    expect(account!["services"]).not.toContain("keep")
+    expect(account).not.toHaveProperty("delegationRequired")
   })
 
   it("plans a write that a read-only sign-in could not", async () => {

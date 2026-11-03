@@ -150,6 +150,12 @@ const FileInfo = z
   .object({ path: z.string(), bytes: z.number(), sha256: z.string() })
   .describe("A local file the plugin delivered")
 
+const Restriction = z
+  .enum(["app-only", "domain-wide-delegation"])
+  .describe(
+    "Why an ordinary Google sign-in cannot run this method: app-only needs a Chat app's or Classroom add-on's own credentials; domain-wide-delegation needs scopes a Workspace admin grants only through domain-wide delegation",
+  )
+
 const CatalogEntry = z.object({
   kind: z.enum(["service", "method", "helper"]),
   id: z.string().describe("Pass a method or helper id as operation"),
@@ -162,6 +168,7 @@ const CatalogEntry = z.object({
   commitTool: z.string().optional().describe('The tool that commits its plan, e.g. "gws_send"; absent for reads'),
   alternative: z.string().optional().describe("For a helper that cannot run: the method id that does the same job"),
   appOnly: z.literal(true).optional().describe("Only an app's own credentials (a Chat app or a Classroom add-on) can run it; a Google sign-in cannot"),
+  restriction: Restriction.optional(),
 })
 
 export const CatalogOutput = z.object({
@@ -193,6 +200,7 @@ export const SchemaOutput = z.object({
   account: z.string(),
   schema: ResolvedSchema.optional().describe("Present for a method"),
   appOnly: z.literal(true).optional().describe("Only an app's own credentials (a Chat app or a Classroom add-on) can run this method; a Google sign-in cannot"),
+  restriction: Restriction.optional(),
   helper: HelperEntry.extend({
     input: z.unknown().optional().describe("JSON Schema of the helper's input flags; absent when the helper cannot run"),
   })

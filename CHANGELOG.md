@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The default sign-in no longer requests the Keep scopes, which Google grants only through domain-wide delegation, so Google no longer refuses the whole consent with `invalid_scope`. No access level requests `keep` or `keep.readonly`, and the `default` account no longer enables Keep: Read and write now requests 45 scopes and Read-only 37. `gws_catalog` and `gws_schema` mark the 7 Keep methods `restriction: "domain-wide-delegation"` (app-only methods keep `appOnly` and gain `restriction: "app-only"`), and the scope check refuses them with that reason. For an interactive account that enables `keep` without adding a Keep scope in `accounts.<alias>.scopes`, status carries `delegationRequired`, the sign-in form says Keep needs delegation, and `/gws-doctor` reports Keep `SKIPPED` with the reason. (#8)
+
 ## [0.0.1] - 2026-11-03
 
 ### Added

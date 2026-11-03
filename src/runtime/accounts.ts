@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { doctorTarget, probeArgv, probeOutcome, type DoctorOutcome, type DoctorTarget } from "../auth/doctor.js"
+import { doctorTarget, probeArgv, probeOutcome, skipDetail, type DoctorOutcome, type DoctorTarget } from "../auth/doctor.js"
 import { signInScopes } from "../auth/form.js"
 import { integrationIdFor, integrationIds, integrationNames } from "../auth/google.js"
 import { accountSignInStatus, connectStep, type ConnectionView } from "../auth/status.js"
@@ -7,7 +7,7 @@ import type { Audit } from "../domain/audit.js"
 import type { AuthProblemCode, AuthState } from "../domain/auth-state.js"
 import { throwIfCancelled } from "../domain/errors.js"
 import { authProblem, type AuthRemediation } from "../domain/result.js"
-import { appOnly } from "../domain/app-only.js"
+import { delegationRequired, restriction } from "../domain/restricted.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
 import type { AccountProfile, PluginConfig, ProcessResult } from "../domain/types.js"
@@ -118,6 +118,7 @@ export class Accounts {
           mode: profile.mode,
           services: profile.enabledServices,
           ...(profile.mode === "interactive" ? { integrationID } : {}),
+          ...delegationField(profile),
           ...signIn,
         }
       }),
@@ -190,10 +191,18 @@ export class Accounts {
   }
 
   private scopeMissing(account: string, profile: AccountProfile, operation: string, accepted: readonly string[]): string {
-    if (appOnly(operation)) {
+    const reason = restriction(operation)
+    if (reason === "app-only") {
       return (
         `AUTH_SCOPE_MISSING: ${operation} needs a scope Google grants only to an app's own credentials (a Chat app or a Classroom add-on), never to a person's sign-in, so '${account}' cannot run it. ` +
         "Next step: Tell the user this method cannot run with a Google sign-in, and use another method."
+      )
+    }
+    if (reason === "domain-wide-delegation") {
+      const named = accepted.map(shortScope).join(" or ")
+      return (
+        `AUTH_SCOPE_MISSING: ${operation} needs ${named}, which Google grants only through domain-wide delegation that a Workspace admin sets up, and the sign-in for '${account}' has not granted it. ` +
+        `Next step: Tell the user this method needs domain-wide delegation; once their admin has set it up, they add ${named} to accounts.${account}.scopes and sign in again.`
       )
     }
     const read = signInScopes(profile, "read")
@@ -259,12 +268,14 @@ export class Accounts {
   /** Every account and enabled service /gws-doctor checks, in config order. */
   doctorTargets(): DoctorTarget[] {
     this.runtime.assertActive()
-    return Object.entries(this.runtime.config.accounts).flatMap(([alias, profile]) => profile.enabledServices.map((service) => doctorTarget(alias, service)))
+    return Object.entries(this.runtime.config.accounts).flatMap(([alias, profile]) =>
+      profile.enabledServices.map((service) => doctorTarget(alias, service, profile.mode === "interactive" && delegationRequired([service], profile.scopes).length > 0)),
+    )
   }
 
   /** Run one /gws-doctor probe as the account. A failure becomes an outcome, never a throw, except cancellation. */
   async probe(target: DoctorTarget, ctx: CallContext): Promise<DoctorOutcome> {
-    if (!target.operation) return { ...target, status: "SKIPPED", detail: "no read-only check exists for this service" }
+    if (!target.operation) return { ...target, status: "SKIPPED", detail: skipDetail(target) }
     const started = Date.now()
     try {
       const result = await this.run(probeArgv(target), target.account, target.operation, ctx)
@@ -310,6 +321,14 @@ export function report(ctx: Pick<CallContext, "progress">, update: Progress): vo
   } catch {
     /* ignore */
   }
+}
+
+/** Services this account enables that need domain-wide delegation its scopes do not add; omitted when none. */
+function delegationField(profile: AccountProfile): { delegationRequired?: string[] } {
+  // A headless credential's grant is not ours to know: the doctor checks it.
+  if (profile.mode !== "interactive") return {}
+  const services = delegationRequired(profile.enabledServices, profile.scopes)
+  return services.length > 0 ? { delegationRequired: services } : {}
 }
 
 function capitalize(text: string): string {

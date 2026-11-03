@@ -179,6 +179,12 @@ describe("/gws-status", () => {
     expect(summarizeStatus({ ...base, accounts: [ready, { alias: "ci", mode: "credentials_file", services: [], connected: false }] })).toBe("Google Workspace: not configured: ci")
   })
 
+  it("shows the services that need domain-wide delegation, and how to add their scopes", () => {
+    const notes = { alias: "notes", mode: "interactive" as const, services: ["keep"], integrationID: "gws-notes", connected: true, missingScopes: [], delegationRequired: ["keep"] }
+    const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [notes], unguardedAgents: [] }
+    expect(formatStatus(status)).toContain("Services: keep\nNeeds domain-wide delegation: keep (a Workspace admin sets it up; then add the scopes to accounts.notes.scopes)")
+  })
+
   it("shows a headless account as connected or not configured, never as signed in", () => {
     const headless = { alias: "ci", mode: "credentials_file" as const, services: ["drive"], connected: false }
     const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [headless], unguardedAgents: [] }

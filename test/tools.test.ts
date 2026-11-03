@@ -607,6 +607,17 @@ describe("helpers", () => {
     expect(Object.keys(helper.input?.properties ?? {})).toContain("max")
   })
 
+  it("marks in gws_schema why an ordinary sign-in cannot run a method: app-only, or domain-wide delegation", async () => {
+    const h = await setup({}, undefined, { accounts: { personal: account({ services: ["chat", "keep", "gmail"] }) } })
+    const keep = await tool(h, "schema").execute({ operation: "keep.notes.list" }, context())
+    expect(keep.output).toMatchObject({ restriction: "domain-wide-delegation" })
+    expect(keep.output).not.toHaveProperty("appOnly")
+    const chat = await tool(h, "schema").execute({ operation: "chat.spaces.messages.attachments.get" }, context())
+    expect(chat.output).toMatchObject({ appOnly: true, restriction: "app-only" })
+    const gmail = await tool(h, "schema").execute({ operation: "gmail.users.getProfile" }, context())
+    expect(gmail.output).not.toHaveProperty("restriction")
+  })
+
   it("names the method to use for a helper that cannot run", async () => {
     const h = await setup({}, undefined, { accounts: { personal: account({ services: ["gmail", "calendar"] }) } })
     await expect(tool(h, "plan").execute(request("calendar.insert", { input: { summary: "x" } }), context())).rejects.toThrow(

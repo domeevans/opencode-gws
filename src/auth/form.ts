@@ -1,3 +1,4 @@
+import { delegationRequired } from "../domain/restricted.js"
 import { accessFor, requestedScopes, serviceScopes, shortScope } from "../domain/scopes.js"
 import type { AccessLevel, AccountProfile, OAuthClient, RedirectConfig } from "../domain/types.js"
 import { CLIENT_ID_PATTERN, CLIENT_SECRET_PATTERN, ClientJsonSchema, DesktopClientSchema } from "../domain/config.js"
@@ -102,6 +103,13 @@ function accessOptions(profile: AccountProfile): AccessField["options"] {
   return [read, { value: "write", label: "Read and write", description: `Requests: ${signInScopes(profile, "write").join(" ")}` }]
 }
 
+/** Says which enabled services need domain-wide delegation, so the form requests none of their scopes. */
+function delegationNote(alias: string, profile: AccountProfile): string {
+  const services = delegationRequired(profile.enabledServices, profile.scopes)
+  if (services.length === 0) return ""
+  return ` ${services.join(", ")} needs domain-wide delegation, which a Workspace admin sets up, so this sign-in requests none of its scopes; with delegation, add them to accounts.${alias}.scopes.`
+}
+
 /** The account's configured default choice: write when it names write for any service. */
 export function defaultAccess(profile: AccountProfile): AccessLevel {
   const access = profile.access
@@ -202,7 +210,7 @@ export function signInForm(alias: string, profile: AccountProfile, configured: C
       key: "access",
       type: "string",
       title: "Access",
-      description: `What ${alias} may do in Google Workspace. Read-only cannot change, send, share, or delete anything.`,
+      description: `What ${alias} may do in Google Workspace. Read-only cannot change, send, share, or delete anything.${delegationNote(alias, profile)}`,
       required: true,
       default: defaultAccess(profile),
       options: accessOptions(profile),

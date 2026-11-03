@@ -45,12 +45,25 @@ describe("config", () => {
 })
 
 describe("accounts", () => {
-  it("creates one interactive default account with every service at Read and write when accounts is omitted", () => {
+  it("creates one interactive default account with every service but Keep at Read and write when accounts is omitted", () => {
+    const services = loadManifest()
+      .services.map((service) => service.alias)
+      .filter((service) => service !== "keep")
     for (const options of [undefined, {}]) {
       expect(loadConfig(options).accounts).toEqual({
-        default: { mode: "interactive", enabledServices: loadManifest().services.map((service) => service.alias), access: "write", scopes: [] },
+        default: { mode: "interactive", enabledServices: services, access: "write", scopes: [] },
       })
     }
+  })
+
+  it("says in the default form nothing about Keep, and in a Keep account's form that Keep needs domain-wide delegation", () => {
+    expect(signInForm("default", loadConfig(undefined).accounts.default!, undefined)[2].description).not.toMatch(/delegation/)
+    const notes = loadConfig({ accounts: { notes: { enabledServices: ["keep"], access: "write" } } }).accounts.notes!
+    const access = signInForm("notes", notes, undefined)[2]
+    expect(access.description).toContain("keep needs domain-wide delegation, which a Workspace admin sets up, so this sign-in requests none of its scopes; with delegation, add them to accounts.notes.scopes.")
+    for (const option of access.options) expect(option.description).not.toMatch(/auth\/keep/)
+    const delegated = loadConfig({ accounts: { notes: { enabledServices: ["keep"], access: "write", scopes: ["keep"] } } }).accounts.notes!
+    expect(signInForm("notes", delegated, undefined)[2].description).not.toMatch(/delegation/)
   })
 
   it("keeps the default sign-in form's Read-only choice, with write as the default", () => {

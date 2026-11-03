@@ -63,8 +63,11 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 ## Security
 
 - With no `accounts` option, the `default` account enables every manifest
-  service at Read and write, and that level requests every scope a person's
-  sign-in can use (never an app-only scope), under Google's 64-scope cap. The
+  service at Read and write except the domain-wide-delegation services
+  (Keep), and that level requests every scope a person's sign-in can use,
+  under Google's 64-scope cap. No access level ever requests an app-only or
+  a delegation scope (`src/domain/restricted.ts`): Google refuses the whole
+  consent for a delegation scope. The
   form still offers Read-only, shows the exact scopes before consent, and
   write needs the acknowledgment. A user's own `accounts` apply exactly.
 - The admin gate is on by default; admin plans still need an allowed

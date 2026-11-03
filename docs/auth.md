@@ -4,7 +4,7 @@ Unofficial plugin. Not affiliated with Google.
 
 An interactive account signs in through OpenCode: run `/connect` and choose **Google Workspace**, or run `opencode auth login gws-<alias>`. With more than one interactive account, each entry is named **Google Workspace (`<alias>`)**. With no `accounts` option the alias is `default`.
 
-In the TUI, `/connect` shows the sign-in link: press `o` or Enter to open it in your browser. The CLI, `opencode auth login gws-<alias>`, opens the browser automatically. With no `accounts` option, the `default` account enables every service the plugin covers and the form starts on Read and write, which needs the acknowledgment; Read-only is the other choice. An account you configure without `access` starts on Read-only. The form lists the exact scopes before Google's consent screen.
+In the TUI, `/connect` shows the sign-in link: press `o` or Enter to open it in your browser. The CLI, `opencode auth login gws-<alias>`, opens the browser automatically. With no `accounts` option, the `default` account enables every service the plugin covers except Keep, and the form starts on Read and write, which needs the acknowledgment; Read-only is the other choice. An account you configure without `access` starts on Read-only. The form lists the exact scopes before Google's consent screen.
 
 Headless accounts do not use this flow. `credentials_file` reads a credentials file from the environment variable named by `credentialsFileEnv`. `access_token` reads a token from `tokenEnv`. Neither is a fallback. `/gws-doctor` is what checks them.
 
@@ -76,26 +76,36 @@ Google matches a non-loopback redirect exactly, character for character, so ever
 
 ## What the default consent asks for
 
-The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 46 scopes in one consent, under Google's limit of 64 per request. Read-only requests 38 for the same services, only read-only scopes, and runs every read that accepts a read-only scope; the few reads listed below as needing Read and write accept no read-only scope.
+The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 45 scopes in one consent, under Google's limit of 64 per request. Read-only requests 37 for the same services, only read-only scopes, and runs every read that accepts a read-only scope; the few reads listed below as needing Read and write accept no read-only scope.
 
 - **Granular consent.** Google lists the scopes with a checkbox each. A scope you untick is not granted; `/gws-status` and `gws_status` list it under missing scopes, and the methods that need it fail with `AUTH_SCOPE_MISSING` until you sign in again and approve it.
 - **External client in Testing.** Many of these scopes are sensitive or restricted (Gmail, Drive, and others). An External client shows Google's unverified-app warning for them, only its test users can sign in, and in Testing status Google expires its refresh tokens after 7 days, so you sign in again every week. An Internal client in your own Workspace organisation avoids all three.
-- **APIs to enable** in the client's Cloud project, one per service: Gmail (`gmail.googleapis.com`), Drive (`drive.googleapis.com`), Calendar (`calendar-json.googleapis.com`), Docs (`docs.googleapis.com`), Sheets (`sheets.googleapis.com`), Slides (`slides.googleapis.com`), Tasks (`tasks.googleapis.com`), People (`people.googleapis.com`), Chat (`chat.googleapis.com`), Classroom (`classroom.googleapis.com`), Forms (`forms.googleapis.com`), Meet (`meet.googleapis.com`), Keep (`keep.googleapis.com`), Admin reports (`admin.googleapis.com`), Apps Script (`script.googleapis.com`), Workspace Events (`workspaceevents.googleapis.com`) and Model Armor (`modelarmor.googleapis.com`). `/gws-status` gives one link that enables them all for the account's services. A service whose API is off fails with `API_DISABLED`; the others still work.
-- **Account requirements.** Keep and Chat need a Google Workspace account. Admin reports need a Workspace admin. Model Armor needs a Cloud project with the Model Armor API. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
+- **APIs to enable** in the client's Cloud project, one per service: Gmail (`gmail.googleapis.com`), Drive (`drive.googleapis.com`), Calendar (`calendar-json.googleapis.com`), Docs (`docs.googleapis.com`), Sheets (`sheets.googleapis.com`), Slides (`slides.googleapis.com`), Tasks (`tasks.googleapis.com`), People (`people.googleapis.com`), Chat (`chat.googleapis.com`), Classroom (`classroom.googleapis.com`), Forms (`forms.googleapis.com`), Meet (`meet.googleapis.com`), Admin reports (`admin.googleapis.com`), Apps Script (`script.googleapis.com`), Workspace Events (`workspaceevents.googleapis.com`) and Model Armor (`modelarmor.googleapis.com`). `/gws-status` gives one link that enables them all for the account's services. A service whose API is off fails with `API_DISABLED`; the others still work.
+- **Account requirements.** Chat needs a Google Workspace account. Admin reports need a Workspace admin. Model Armor needs a Cloud project with the Model Armor API. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
 
 To ask for less, set `accounts` with only the services you use, or `access: "read"`, or choose Read-only in the form.
+
+### Keep needs domain-wide delegation
+
+Google grants the Keep API's scopes, `keep` and `keep.readonly`, only through [domain-wide delegation](https://developers.google.com/workspace/keep/api/guides), which a Workspace admin sets up. A person's own consent cannot grant them, and a sign-in that asks for one is refused as a whole with `Error 400: invalid_scope`. So:
+
+- no access level requests a Keep scope, and the `default` account does not enable Keep;
+- `gws_catalog` and `gws_schema` mark every Keep method `restriction: "domain-wide-delegation"`, and the scope check refuses one with a next step that says so;
+- an account that enables `keep` shows **Needs domain-wide delegation: keep** in `/gws-status`, the TUI dialog and `gws_status`, its sign-in form says so, and `/gws-doctor` reports Keep `SKIPPED` with the reason.
+
+If your admin has set up domain-wide delegation, enable `keep` (and the Keep API, `keep.googleapis.com`) and add the scopes yourself: `"scopes": ["keep"]`, or `["keep.readonly"]`, in `accounts.<alias>.scopes`. The doctor then probes Keep like any other service.
 
 ## What a sign-in requests
 
 `access` is `"read"` (the default for an account you configure), `"write"` (the implicit `default` account), or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Extra scopes on `accounts.<alias>.scopes` are always requested and always shown. Short names are accepted: `gmail.readonly` is stored as the scope URL.
 
-Before a read or a plan, the plugin compares the operation's manifest scopes with the scopes Google granted. A miss fails with `AUTH_SCOPE_MISSING` and does not start `gws`. The next step is to sign in again and approve every scope Google lists, choosing Read and write when only that level requests the scope. A method only an app's own credentials can run (listed below) fails with a next step that says no sign-in can run it.
+Before a read or a plan, the plugin compares the operation's manifest scopes with the scopes Google granted. A miss fails with `AUTH_SCOPE_MISSING` and does not start `gws`. The next step is to sign in again and approve every scope Google lists, choosing Read and write when only that level requests the scope. A method only an app's own credentials can run, or one that needs domain-wide delegation (both listed below), fails with a next step that says why.
 
 Model Armor has no read-only scope: Read and write requests `https://www.googleapis.com/auth/cloud-platform`, which grants access to the whole Cloud project, and Read-only requests nothing for it. The Model Armor helpers still cannot run; `gws_catalog` marks them and names no alternative.
 
 <!-- generated:scopes -->
 
-Generated from `src/domain/scopes.ts` and `src/domain/app-only.ts` by `npm run docs:coverage`. Do not edit this section by hand.
+Generated from `src/domain/scopes.ts` and `src/domain/restricted.ts` by `npm run docs:coverage`. Do not edit this section by hand.
 
 Every interactive sign-in also requests the identity scopes `openid`, `https://www.googleapis.com/auth/userinfo.email`, `https://www.googleapis.com/auth/userinfo.profile`. A short name such as `gmail.readonly` is the same scope as `https://www.googleapis.com/auth/gmail.readonly`.
 
@@ -110,7 +120,7 @@ Every interactive sign-in also requests the identity scopes `openid`, `https://w
 | events | `https://www.googleapis.com/auth/chat.spaces.readonly`<br>`https://www.googleapis.com/auth/chat.messages.readonly`<br>`https://www.googleapis.com/auth/chat.memberships.readonly`<br>`https://www.googleapis.com/auth/chat.customemojis.readonly`<br>`https://www.googleapis.com/auth/chat.users.availability.readonly`<br>`https://www.googleapis.com/auth/chat.users.readstate.readonly`<br>`https://www.googleapis.com/auth/chat.users.sections.readonly`<br>`https://www.googleapis.com/auth/drive.readonly`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/chat.spaces`<br>`https://www.googleapis.com/auth/chat.messages`<br>`https://www.googleapis.com/auth/chat.memberships`<br>`https://www.googleapis.com/auth/chat.delete`<br>`https://www.googleapis.com/auth/chat.customemojis`<br>`https://www.googleapis.com/auth/chat.users.availability`<br>`https://www.googleapis.com/auth/chat.users.readstate`<br>`https://www.googleapis.com/auth/chat.users.sections`<br>`https://www.googleapis.com/auth/chat.users.spacesettings`<br>`https://www.googleapis.com/auth/drive`<br>`https://www.googleapis.com/auth/drive.apps.readonly`<br>`https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
 | forms | `https://www.googleapis.com/auth/forms.body.readonly`<br>`https://www.googleapis.com/auth/forms.responses.readonly` | `https://www.googleapis.com/auth/forms.body`<br>`https://www.googleapis.com/auth/forms.responses.readonly`<br>`https://www.googleapis.com/auth/drive.file` |
 | gmail | `https://www.googleapis.com/auth/gmail.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/` |
-| keep | `https://www.googleapis.com/auth/keep.readonly` | `https://www.googleapis.com/auth/keep` |
+| keep | _(none)_ | _(none)_ |
 | meet | `https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
 | modelarmor | _(none)_ | `https://www.googleapis.com/auth/cloud-platform` |
 | people | `https://www.googleapis.com/auth/contacts.readonly`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` | `https://www.googleapis.com/auth/contacts`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` |
@@ -129,7 +139,7 @@ Read methods that the read-only set does not cover, so they need a Read and writ
 - `sheets.spreadsheets.getByDataFilter`
 - `sheets.spreadsheets.values.batchGetByDataFilter`
 
-Google grants `https://www.googleapis.com/auth/chat.bot`, `https://www.googleapis.com/auth/chat.import`, `https://www.googleapis.com/auth/classroom.addons.student`, `https://www.googleapis.com/auth/classroom.addons.teacher` only to an app's own credentials (a Chat app or a Classroom add-on), so no access level requests them. These methods accept nothing else, so no Google sign-in can run them; `gws_catalog` and `gws_schema` mark them `appOnly`:
+Google grants `https://www.googleapis.com/auth/chat.bot`, `https://www.googleapis.com/auth/chat.import`, `https://www.googleapis.com/auth/classroom.addons.student`, `https://www.googleapis.com/auth/classroom.addons.teacher` only to an app's own credentials (a Chat app or a Classroom add-on), so no access level requests them. These methods accept nothing else, so no Google sign-in can run them; `gws_catalog` and `gws_schema` mark them `appOnly` and `restriction: "app-only"`:
 
 - `chat.spaces.completeImport`
 - `chat.spaces.messages.attachments.get`
@@ -160,6 +170,16 @@ Google grants `https://www.googleapis.com/auth/chat.bot`, `https://www.googleapi
 - `classroom.courses.posts.addOnAttachments.patch`
 - `classroom.courses.posts.addOnAttachments.studentSubmissions.patch`
 - `classroom.courses.posts.getAddOnContext`
+
+Google grants `https://www.googleapis.com/auth/keep`, `https://www.googleapis.com/auth/keep.readonly` only through domain-wide delegation, which a Workspace admin sets up, never through a person's own consent: a sign-in that asks for one is refused with `invalid_scope`. No access level requests them, and the default account does not enable Keep. These methods accept nothing else; `gws_catalog` and `gws_schema` mark them `restriction: "domain-wide-delegation"`. An account whose admin has set up delegation adds the scopes in `accounts.<alias>.scopes`:
+
+- `keep.media.download`
+- `keep.notes.create`
+- `keep.notes.delete`
+- `keep.notes.get`
+- `keep.notes.list`
+- `keep.notes.permissions.batchCreate`
+- `keep.notes.permissions.batchDelete`
 
 <!-- /generated:scopes -->
 

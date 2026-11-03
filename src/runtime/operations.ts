@@ -1,5 +1,5 @@
 import { auditErrorCode, type Audit } from "../domain/audit.js"
-import { appOnly } from "../domain/app-only.js"
+import { restrictionMarks } from "../domain/restricted.js"
 import { effectiveCategory, isCommittable } from "../domain/classify.js"
 import { buildCommand, itemCap, wantsPages } from "../domain/command.js"
 import type { CommitOutput, PlanOutput, ReadOutput, RequestInput, SchemaOutput } from "../domain/contract.js"
@@ -207,7 +207,7 @@ export class Operations {
     report(ctx, { status: "running", operation: entry.id })
     const schema = await this.runtime.schema.resolve(entry.service, [...entry.path, entry.method], ctx.signal)
     this.runtime.assertActive(ctx.signal)
-    return { ok: true, account: target.account, schema, ...(appOnly(entry.id) ? { appOnly: true as const } : {}) }
+    return { ok: true, account: target.account, schema, ...restrictionMarks(entry.id) }
   }
 
   /** Validate a commit against its stored plan without consuming it. */

@@ -32,6 +32,8 @@ export interface GwsAccount {
   grantedScopes?: string[]
   /** Scopes the enabled services need at this access level that were not granted. */
   missingScopes?: string[]
+  /** Enabled services that need domain-wide delegation the account's scopes do not add, so none of their methods can run. */
+  delegationRequired?: string[]
   /** What to do next, as one sentence; absent when nothing is needed. */
   nextStep?: string
 }
@@ -74,6 +76,7 @@ const account = object(
     clientSource: { enum: CLIENT_SOURCES },
     grantedScopes: texts,
     missingScopes: texts,
+    delegationRequired: texts,
     nextStep: text,
   },
   ["alias", "mode", "services", "connected"],
@@ -124,6 +127,7 @@ function isAccount(value: unknown): value is GwsAccount {
     optional(value["clientSource"], (entry) => CLIENT_SOURCES.includes(entry)) &&
     optional(value["grantedScopes"], isStrings) &&
     optional(value["missingScopes"], isStrings) &&
+    optional(value["delegationRequired"], isStrings) &&
     optional(value["nextStep"], isText)
   )
 }
@@ -166,6 +170,15 @@ export function connectionLabel(account: GwsAccount): "connected" | "sign-in req
 /** The OpenCode row: the version, tested or `host untested`. */
 export function openCodeLabel(status: GwsStatus): string {
   return status.hostWarning ? `${status.hostVersion} (host untested: ${status.hostWarning})` : `${status.hostVersion} (tested)`
+}
+
+/** The row naming services that need domain-wide delegation. */
+export const DELEGATION_LABEL = "Needs domain-wide delegation"
+
+/** That row's value: the services, and how an account whose admin set up delegation adds their scopes. */
+export function delegationText(account: GwsAccount): string {
+  const services = account.delegationRequired ?? []
+  return `${services.join(", ")} (a Workspace admin sets it up; then add the scopes to accounts.${account.alias}.scopes)`
 }
 
 /** Where the permission block goes. */

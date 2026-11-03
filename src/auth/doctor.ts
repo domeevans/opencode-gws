@@ -40,8 +40,14 @@ const PROBES: Readonly<Record<string, Probe>> = {
 export interface DoctorTarget {
   account: string
   service: string
-  /** The probe's operation id; absent when the service has no read-only check (events, workflow, modelarmor). */
+  /**
+   * The probe's operation id; absent when the service has no read-only
+   * check (events, workflow, modelarmor) or needs domain-wide delegation the
+   * account's scopes do not add.
+   */
   operation?: string
+  /** The service needs domain-wide delegation (Keep) and the account's scopes add none of its scopes, so no probe runs. */
+  needsDelegation?: true
 }
 
 /** DENIED: OpenCode refused the gws.read permission, so the probe did not run. */
@@ -55,10 +61,19 @@ export interface DoctorOutcome extends DoctorTarget {
   enableUrl?: string
 }
 
-/** The probe target for one account's service. */
-export function doctorTarget(account: string, service: string): DoctorTarget {
+/** The probe target for one account's service; `needsDelegation` skips the probe, because no sign-in without delegation can pass it. */
+export function doctorTarget(account: string, service: string, needsDelegation = false): DoctorTarget {
+  if (needsDelegation) return { account, service, needsDelegation: true }
   const probe = PROBES[service]
   return probe ? { account, service, operation: probe.operation } : { account, service }
+}
+
+/** Why a target without a probe is SKIPPED. */
+export function skipDetail(target: DoctorTarget): string {
+  if (target.needsDelegation) {
+    return `${target.service} needs domain-wide delegation, which a Workspace admin sets up; with it, add ${target.service} or ${target.service}.readonly to accounts.${target.account}.scopes and sign in again`
+  }
+  return "no read-only check exists for this service"
 }
 
 /** The gws argv for a target's probe. */

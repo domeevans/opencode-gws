@@ -527,6 +527,19 @@ describe("scope preflight", () => {
     expect(invocations(runtime)).toEqual([])
   })
 
+  it("refuses a Keep method with a next step that says it needs domain-wide delegation", async () => {
+    const services = ["gmail", "keep"]
+    const runtime = await testRuntime(
+      { accounts: { personal: account({ services, access: "write" }) } },
+      { tokenProvider: fakeTokens("ya29.write", requestedScopes(services, "write")) },
+    )
+    runtimes.push(runtime)
+    await expect(runtime.read(request("keep.notes.list", { fields: "notes(name)" }), call)).rejects.toThrow(
+      /^AUTH_SCOPE_MISSING: keep\.notes\.list needs keep or keep\.readonly, which Google grants only through domain-wide delegation that a Workspace admin sets up, and the sign-in for 'personal' has not granted it\. Next step: Tell the user this method needs domain-wide delegation; once their admin has set it up, they add keep or keep\.readonly to accounts\.personal\.scopes and sign in again\.$/,
+    )
+    expect(invocations(runtime)).toEqual([])
+  })
+
   it("fails with AUTH_REQUIRED and the sign-in step, before gws runs, when the account is not signed in", async () => {
     const runtime = await testRuntime({}, { tokenProvider: async () => undefined })
     runtimes.push(runtime)

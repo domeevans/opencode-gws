@@ -1,4 +1,4 @@
-import { BLOCK_PLACEMENT, NOTHING_TO_DO, connectionLabel, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
+import { BLOCK_PLACEMENT, DELEGATION_LABEL, NOTHING_TO_DO, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
 import type { PluginContext } from "./context.js"
 import type { DoctorOutcome, DoctorTarget } from "../auth/doctor.js"
 import { GOOGLE_LINKS, enableApisUrl } from "../auth/setup.js"
@@ -104,6 +104,7 @@ function accountLines(account: GwsAccount): string[] {
   lines.push(`Services: ${account.services.join(", ") || "none"}`)
   if (account.grantedScopes) lines.push(`Granted scopes: ${scopeList(account.grantedScopes)}`)
   if (account.missingScopes?.length) lines.push(`Scopes not granted: ${scopeList(account.missingScopes)}`)
+  if (account.delegationRequired?.length) lines.push(`${DELEGATION_LABEL}: ${delegationText(account)}`)
   return lines
 }
 

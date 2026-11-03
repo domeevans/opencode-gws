@@ -13,8 +13,10 @@ import type { AccessLevel } from "./types.js"
  *
  * `test/scopes.test.ts` checks the table against the manifest: every read
  * method is covered by its service's read set (except WRITE_ACCESS_READS)
- * and every method that can run by its write set, except the methods only
- * an app's own credentials can run (USER_UNUSABLE_METHODS).
+ * and every method that can run by its write set, except the methods an
+ * ordinary sign-in cannot run (restricted.ts): app-only methods and those
+ * that need domain-wide delegation. No set holds an app-only or a
+ * delegation scope.
  */
 
 export const SCOPE_PREFIX = "https://www.googleapis.com/auth/"
@@ -87,7 +89,8 @@ const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
   forms: { read: ["forms.body.readonly", "forms.responses.readonly"], write: ["forms.body", "forms.responses.readonly", "drive.file"] },
   // meetings.space.created reaches only spaces this client created; write keeps reading the others.
   meet: { read: ["meetings.space.readonly"], write: ["meetings.space.created", "meetings.space.readonly"] },
-  keep: { read: ["keep.readonly"], write: ["keep"] },
+  // Google grants Keep's scopes only through domain-wide delegation (restricted.ts), so neither level requests them.
+  keep: { read: [], write: [] },
   // Reports are read-only at both levels.
   "admin-reports": {
     read: ["admin.reports.audit.readonly", "admin.reports.usage.readonly"],

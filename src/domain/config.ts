@@ -4,6 +4,7 @@ import { GwsError } from "./errors.js"
 import type { AccountProfile, PluginConfig } from "./types.js"
 import { adminServices, canonicalService, loadManifest } from "./manifest.js"
 import { redirectProblem } from "./redirect.js"
+import { DELEGATION_SERVICES } from "./restricted.js"
 import { scopeUrl } from "./scopes.js"
 
 const absolutePath = z.string().min(1).refine((value) => isAbsolute(value), {
@@ -45,12 +46,17 @@ const accessLevel = z.enum(["read", "write"])
 
 /**
  * With no `accounts` option, one interactive account enables every manifest
- * service at Read and write, so one consent grants every scope the plugin
- * can use. Every change still needs a plan, the ask, and a commit; the form
- * still offers Read-only.
+ * service a person's sign-in can use at Read and write, so one consent
+ * grants every scope the plugin can use. Services that need domain-wide
+ * delegation (Keep) are left out: no ordinary sign-in can run them. Every
+ * change still needs a plan, the ask, and a commit; the form still offers
+ * Read-only.
  */
 function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
-  return { default: { mode: "interactive", enabledServices: loadManifest().services.map((service) => service.alias), access: "write" } }
+  const services = loadManifest()
+    .services.map((service) => service.alias)
+    .filter((service) => !DELEGATION_SERVICES.includes(service))
+  return { default: { mode: "interactive", enabledServices: services, access: "write" } }
 }
 
 const enabledServices = z.array(z.string().min(1)).min(1)

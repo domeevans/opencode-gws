@@ -277,6 +277,12 @@ describe("status dialog", () => {
     expect(view).toContain("Scopes not granted\ndrive.readonly")
   })
 
+  it("shows the services that need domain-wide delegation", async () => {
+    const view = (await open(status([{ ...ACCOUNTS.signedIn, alias: "notes", services: ["keep"], delegationRequired: ["keep"] }]))).view()
+    expect(view).toContain("Needs domain-wide delegation\nkeep (a Workspace admin sets it up; then add the scopes to accounts.notes.scopes)")
+    expect((await open(status([ACCOUNTS.signedIn]))).view()).not.toContain("delegation")
+  })
+
   it("shows an account without a client, an expired write sign-in, and headless accounts", async () => {
     const view = (await open(status([{ ...ACCOUNTS.noClient, alias: "work" }, { ...ACCOUNTS.expired, alias: "admin" }, ACCOUNTS.headless, { ...ACCOUNTS.headless, alias: "ops", connected: true }]))).view()
     expect(view).toContain("Connection\nsign-in required\nAccount\nwork (OpenCode sign-in)\nAccess\nread-only\nClient\nnone yet")
