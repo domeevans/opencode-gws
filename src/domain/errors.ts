@@ -91,6 +91,11 @@ export const ErrorCode = {
     meaning: "The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran.",
     next: "Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method.",
   },
+  ADMIN_PRIVILEGE_REQUIRED: {
+    meaning:
+      "The sign-in is valid, but Google refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports for admin-reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal.",
+    next: "Ask the user to sign in with a Workspace admin account that has the needed privilege (Reports for admin-reports), or to remove the service from enabledServices.",
+  },
   AUTH_CLIENT_REQUIRED: {
     meaning: "No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one.",
     next: "Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator.",

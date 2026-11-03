@@ -50,7 +50,7 @@ Set `oauthClient` in user, project, or system config. An organisation client of 
 4. **Create a Desktop client.** Under [Clients](https://console.developers.google.com/auth/clients), create a client of type **Desktop app**. A Web client does not work with the loopback redirect.
 5. **Copy its ID and secret.** Copy the client ID (`….apps.googleusercontent.com`) and the client secret, then run `/connect`, choose Google Workspace, and enter them. Choose the access: every change still needs a plan and your approval.
 
-Then run `/gws-doctor`. It makes one small read per enabled service and reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, or `API_DISABLED` with the enable URL.
+Then run `/gws-doctor`. It makes one small read per enabled service and reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `ADMIN_PRIVILEGE_REQUIRED` (a valid sign-in of an account without the admin privilege, such as Reports for `admin-reports`), or `API_DISABLED` with the enable URL. A service it cannot check, such as Keep without delegation, is `SKIPPED` with the reason.
 
 ## Sign in when OpenCode runs on another machine
 
@@ -81,7 +81,7 @@ The `default` account at Read and write requests every scope in the table below'
 - **Granular consent.** Google lists the scopes with a checkbox each. A scope you untick is not granted; `/gws-status` and `gws_status` list it under missing scopes, and the methods that need it fail with `AUTH_SCOPE_MISSING` until you sign in again and approve it.
 - **External client in Testing.** Many of these scopes are sensitive or restricted (Gmail, Drive, and others). An External client shows Google's unverified-app warning for them, only its test users can sign in, and in Testing status Google expires its refresh tokens after 7 days, so you sign in again every week. An Internal client in your own Workspace organisation avoids all three.
 - **APIs to enable** in the client's Cloud project, one per service: Gmail (`gmail.googleapis.com`), Drive (`drive.googleapis.com`), Calendar (`calendar-json.googleapis.com`), Docs (`docs.googleapis.com`), Sheets (`sheets.googleapis.com`), Slides (`slides.googleapis.com`), Tasks (`tasks.googleapis.com`), People (`people.googleapis.com`), Chat (`chat.googleapis.com`), Classroom (`classroom.googleapis.com`), Forms (`forms.googleapis.com`), Meet (`meet.googleapis.com`), Admin reports (`admin.googleapis.com`), Apps Script (`script.googleapis.com`), Workspace Events (`workspaceevents.googleapis.com`) and Model Armor (`modelarmor.googleapis.com`). `/gws-status` gives one link that enables them all for the account's services. A service whose API is off fails with `API_DISABLED`; the others still work.
-- **Account requirements.** Chat needs a Google Workspace account. Admin reports need a Workspace admin. Model Armor needs a Cloud project with the Model Armor API. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
+- **Account requirements.** Chat needs a Google Workspace account. Admin reports need a Workspace admin with the Reports privilege; any other account's sign-in is valid but its Reports calls fail with `ADMIN_PRIVILEGE_REQUIRED`, which never marks the sign-in as needing renewal. Model Armor needs a Cloud project with the Model Armor API. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
 
 To ask for less, set `accounts` with only the services you use, or `access: "read"`, or choose Read-only in the form.
 

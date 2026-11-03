@@ -1,6 +1,6 @@
 import { canonicalJson } from "../domain/digest.js"
 import { commandIndex } from "../domain/manifest.js"
-import { authProblem, parseResult } from "../domain/result.js"
+import { authProblem, parseResult, privilegeRefused } from "../domain/result.js"
 import type { ProcessResult } from "../domain/types.js"
 import { enableApisUrl } from "./setup.js"
 
@@ -50,8 +50,12 @@ export interface DoctorTarget {
   needsDelegation?: true
 }
 
-/** DENIED: OpenCode refused the gws.read permission, so the probe did not run. */
-export type DoctorStatus = "OK" | "AUTH_REQUIRED" | "AUTH_SCOPE_MISSING" | "API_DISABLED" | "ERROR" | "SKIPPED" | "DENIED"
+/**
+ * DENIED: OpenCode refused the gws.read permission, so the probe did not
+ * run. ADMIN_PRIVILEGE_REQUIRED: Google accepted the sign-in but the
+ * account lacks the admin privilege the service needs.
+ */
+export type DoctorStatus = "OK" | "AUTH_REQUIRED" | "AUTH_SCOPE_MISSING" | "ADMIN_PRIVILEGE_REQUIRED" | "API_DISABLED" | "ERROR" | "SKIPPED" | "DENIED"
 
 export interface DoctorOutcome extends DoctorTarget {
   status: DoctorStatus
@@ -90,6 +94,9 @@ const DISABLED = /accessNotConfigured|SERVICE_DISABLED|has not been used in proj
 export function probeOutcome(target: DoctorTarget, result: ProcessResult): DoctorOutcome {
   const parsed = parseResult(result, { maxInlineBytes: 64 * 1024 })
   if (parsed.ok) return { ...target, status: "OK" }
+  if (privilegeRefused(result, parsed)) {
+    return { ...target, status: "ADMIN_PRIVILEGE_REQUIRED", detail: "Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs" }
+  }
   const problem = authProblem(result, parsed)
   if (problem === "AUTH_REQUIRED") return { ...target, status: problem, detail: "Google rejected the sign-in" }
   if (problem === "AUTH_SCOPE_MISSING") return { ...target, status: problem, detail: "Google says the sign-in lacks a scope for this service" }

@@ -101,6 +101,7 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | Code | What to do |
 | --- | --- |
 | `AUTH_REQUIRED` | Run `/connect` and choose Google Workspace, or run `opencode auth login gws-<alias>`. |
+| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but the account is not a Workspace admin with the privilege the API needs, such as Reports for `admin-reports`. Signing in again as the same account does not help: sign in with an admin account that has it, or remove the service from `enabledServices`. |
 | `AUTH_SCOPE_MISSING` | Sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` (`restriction: "app-only"`) needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in. A Keep method (`restriction: "domain-wide-delegation"`) needs domain-wide delegation that a Workspace admin sets up. Nothing ran. |
 | `AUTH_CLIENT_REQUIRED` | Run `/connect` and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
 | `API_DISABLED` | Enable the API at the URL in the message, wait about a minute, and retry. `/gws-doctor` checks every service. |

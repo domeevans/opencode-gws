@@ -2,11 +2,11 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import { AuthStateTracker, type AuthState } from "../src/domain/auth-state.js"
-import { authProblem, errorFromProcess, parseResult } from "../src/domain/result.js"
+import { authProblem, errorFromProcess, parseResult, privilegeRefused } from "../src/domain/result.js"
 import type { ProcessResult } from "../src/domain/types.js"
 import { integrationAuthReporter } from "../src/host/integrations.js"
 import type { Runtime } from "../src/runtime/index.js"
-import { ALL_SCOPES, testConfig, testRuntime } from "./support/config.js"
+import { ALL_SCOPES, account, testConfig, testRuntime } from "./support/config.js"
 import { request } from "./support/requests.js"
 
 function processResult(stdout: string, exitCode = 1, stderr = ""): ProcessResult {
@@ -38,6 +38,22 @@ const SAMPLES = {
   notFound: processResult('{"error":{"code":404,"message":"Requested entity was not found."}}'),
   disabled: processResult('{"error":{"code":403,"message":"Gmail API has not been used in project 1 before or it is disabled."}}'),
   stderrOnly: processResult("", 2, "error[auth]: invalid_grant: Token has been expired or revoked."),
+  // The Reports API's answer to a valid sign-in of a non-admin, as gws
+  // 0.22.5 prints Google's 401: pretty JSON on stdout (reason from
+  // errors[0]), exit 1, and the error[api] line on stderr.
+  reportsRefusal: processResult(
+    '{\n  "error": {\n    "code": 401,\n    "message": "Access denied. You are not authorized to read activity records.",\n    "reason": "authError"\n  }\n}\n',
+    1,
+    "Using keyring backend: file\nerror[api]: Access denied. You are not authorized to read activity records.\n",
+  ),
+  // The Directory API's refusal of a non-admin.
+  directoryRefusal: processResult(
+    '{\n  "error": {\n    "code": 403,\n    "message": "Not Authorized to access this resource/api",\n    "reason": "forbidden"\n  }\n}\n',
+    1,
+    "error[api]: Not Authorized to access this resource/api\n",
+  ),
+  // The same refusal text with only stderr to go on.
+  refusalStderrOnly: processResult("", 1, "error[api]: Access denied. You are not authorized to read activity records."),
 }
 
 describe("auth error classification", () => {
@@ -56,13 +72,37 @@ describe("auth error classification", () => {
     expect(authProblem({ ...SAMPLES.invalidToken, timedOut: true })).toBeUndefined()
   })
 
+  it("tells an Admin SDK privilege refusal from a sign-in problem, though both are 401 authError", () => {
+    for (const refusal of [SAMPLES.reportsRefusal, SAMPLES.directoryRefusal, SAMPLES.refusalStderrOnly]) {
+      expect(privilegeRefused(refusal)).toBe(true)
+      expect(authProblem(refusal)).toBeUndefined()
+    }
+    for (const token of [SAMPLES.noCredentials, SAMPLES.invalidToken, SAMPLES.invalidGrant, SAMPLES.unauthenticated, SAMPLES.stderrOnly]) {
+      expect(privilegeRefused(token)).toBe(false)
+      expect(authProblem(token)).toBe("AUTH_REQUIRED")
+    }
+    // A gws auth error (exit 2) and invalid_grant are token failures whatever the text says.
+    expect(privilegeRefused({ ...SAMPLES.reportsRefusal, exitCode: 2 })).toBe(false)
+    expect(privilegeRefused(processResult('{"error":{"code":401,"message":"invalid_grant: not authorized to access","reason":"authError"}}'))).toBe(false)
+    expect(privilegeRefused(processResult('{"error":{"code":404,"message":"You are not authorized to access this file."}}'))).toBe(false)
+    for (const other of [SAMPLES.scope, SAMPLES.fileForbidden, SAMPLES.notFound, SAMPLES.disabled]) expect(privilegeRefused(other)).toBe(false)
+  })
+
   it("turns them into stable codes with remediation", () => {
     const message = (result: ProcessResult) =>
-      errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), { signIn: "sign in again: LOGIN", consent: "grant: CONSENT" })
+      errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), { signIn: "sign in again: LOGIN", consent: "grant: CONSENT", privilege: "sign in as an admin: PRIVILEGE" })
     expect(message(SAMPLES.invalidGrant)).toMatch(/^AUTH_REQUIRED: The Google Workspace sign-in is missing or no longer valid; sign in again: LOGIN \(gws: .*invalid_grant/)
     expect(message(SAMPLES.scope)).toMatch(/^AUTH_SCOPE_MISSING: The credential lacks a scope for this operation; grant: CONSENT/)
     expect(message(SAMPLES.disabled)).toMatch(/^API_DISABLED:/)
     expect(message(SAMPLES.fileForbidden)).toMatch(/^GWS_API_ERROR:/)
+    expect(message(SAMPLES.reportsRefusal)).toBe(
+      "ADMIN_PRIVILEGE_REQUIRED: Google accepted the sign-in but refused the call, because the account lacks a Workspace admin privilege; signing in again as the same account cannot help (gws: Access denied. You are not authorized to read activity records.). " +
+        "Next step: Sign in as an admin: PRIVILEGE.",
+    )
+    // Without the runtime's remediation, the generic next step.
+    expect(errorFromProcess(SAMPLES.reportsRefusal, parseResult(SAMPLES.reportsRefusal, { maxInlineBytes: 1024 }))).toMatch(
+      /Next step: Sign in with a Workspace admin account that has the admin privilege this operation needs, or remove the service from enabledServices\.$/,
+    )
   })
 })
 
@@ -102,6 +142,10 @@ case "$(cat '${mode}')" in
   401) printf '{"error":{"code":401,"message":"Request had invalid authentication credentials.","reason":"authError"}}'; exit 1;;
   403) printf '{"error":{"code":403,"message":"Request had insufficient authentication scopes.","reason":"insufficientPermissions"}}'; exit 1;;
   404) printf '{"error":{"code":404,"message":"Requested entity was not found."}}'; exit 1;;
+  privilege)
+    printf '{\n  "error": {\n    "code": 401,\n    "message": "Access denied. You are not authorized to read activity records.",\n    "reason": "authError"\n  }\n}\n'
+    printf 'error[api]: Access denied. You are not authorized to read activity records.\n' >&2
+    exit 1;;
   *) printf '{"emailAddress":"me@example.com"}';;
 esac
 `,
@@ -136,7 +180,7 @@ afterEach(() => {
   runtime = undefined
 })
 
-async function setup(): Promise<{ runtime: Runtime; reporter: ReturnType<typeof integrationAuthReporter> }> {
+async function setup(services?: string[]): Promise<{ runtime: Runtime; reporter: ReturnType<typeof integrationAuthReporter> }> {
   const ids = new Map([["personal", "gws-personal"]])
   const ctx = {
     integration: {
@@ -156,6 +200,7 @@ async function setup(): Promise<{ runtime: Runtime; reporter: ReturnType<typeof 
     {
       binary: { path: binary },
       policy: { rules: [] },
+      ...(services ? { accounts: { personal: account({ services }) } } : {}),
     },
     {
       tokenProvider: async () => {
@@ -234,6 +279,32 @@ describe("needs_auth reporting", () => {
     await (rt as Runtime & { settle: () => Promise<void> }).settle()
     expect(statusCalls).toEqual([])
     await read(rt)
+    await read(rt)
+    expect(statusCalls).toEqual([{ integrationID: "gws-personal", connection: { id: "conn_1" }, status: undefined }])
+  })
+
+  it("fails a non-admin's Reports read with ADMIN_PRIVILEGE_REQUIRED and never marks the sign-in as needing auth", async () => {
+    const { runtime: rt } = await setup(["gmail", "admin-reports"])
+    writeFileSync(mode, "privilege")
+    const reports = request("admin-reports.activities.list", { params: { userKey: "all", applicationName: "login", maxResults: 1 }, fields: "items(id)" })
+    let error: unknown
+    try {
+      await rt.read(reports, ctx)
+    } catch (thrown) {
+      error = thrown
+    } finally {
+      await (rt as Runtime & { settle: () => Promise<void> }).settle()
+    }
+    expect(String(error)).toBe(
+      "Error: ADMIN_PRIVILEGE_REQUIRED: Google accepted the sign-in but refused the call, because the account lacks a Workspace admin privilege; signing in again as the same account cannot help (gws: Access denied. You are not authorized to read activity records.). " +
+        "Next step: Sign in with a Workspace admin account that has the Reports privilege (run /connect and choose Google Workspace, or run opencode auth login gws-personal), or remove admin-reports from accounts.personal.enabledServices.",
+    )
+    expect(error).toMatchObject({ code: "ADMIN_PRIVILEGE_REQUIRED" })
+    // Neither status nor /connect hears of it: the sign-in is valid.
+    expect(statusCalls).toEqual([])
+    expect(String(await read(rt))).toMatch(/ADMIN_PRIVILEGE_REQUIRED/)
+    expect(statusCalls).toEqual([])
+    writeFileSync(mode, "ok")
     await read(rt)
     expect(statusCalls).toEqual([{ integrationID: "gws-personal", connection: { id: "conn_1" }, status: undefined }])
   })

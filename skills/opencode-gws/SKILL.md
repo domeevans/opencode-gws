@@ -115,6 +115,7 @@ An error is `CODE: What happened. Next step: What to do.` Do the next step once.
 | --- | --- |
 | `AUTH_REQUIRED` | Ask the user to sign in as the message says, then retry. |
 | `AUTH_SCOPE_MISSING` | Ask the user to sign in again with the access the message names, or to add the scope. Nothing ran. |
+| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid; the account lacks the Workspace admin privilege the API needs. Do not ask the user to sign in again as the same account. Tell them the message's next step. |
 | `API_DISABLED` | Ask the user to enable the API at the URL in the message, wait about a minute, and retry. |
 | `OPERATION_UNKNOWN` | The id is not in the catalog. Search again with `gws_catalog`. |
 | `HELPER_UNSUPPORTED` | The helper cannot run. Use the method `gws_catalog` names as `alternative`. |

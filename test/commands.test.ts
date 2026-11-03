@@ -15,7 +15,9 @@ import { request } from "./support/requests.js"
 
 // A scripted gws under the repo (binary trust rejects /tmp ancestors). It
 // logs each account call and answers per service: Gmail and Calendar work,
-// Drive's API is disabled, and Docs answers "not found" for the probe id.
+// Drive's API is disabled, Docs answers "not found" for the probe id, and
+// the Reports API refuses a non-admin as gws 0.22.5 prints it: Google's 401
+// as pretty JSON on stdout, exit 1, and the error[api] line on stderr.
 let dir: string
 let binary: string
 let log: string
@@ -32,6 +34,10 @@ echo "$*" >> '${log}'
 case "$1" in
   drive) printf '{"error":{"code":403,"message":"Google Drive API has not been used in project 123 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=123 then retry.","status":"PERMISSION_DENIED","details":[{"reason":"SERVICE_DISABLED"}]}}'; exit 1;;
   docs) printf '{"error":{"code":404,"message":"Requested entity was not found.","status":"NOT_FOUND"}}'; exit 1;;
+  admin-reports)
+    printf '{\n  "error": {\n    "code": 401,\n    "message": "Access denied. You are not authorized to read activity records.",\n    "reason": "authError"\n  }\n}\n'
+    printf 'Using keyring backend: file\nerror[api]: Access denied. You are not authorized to read activity records.\n' >&2
+    exit 1;;
   *) printf '{"ok":true}';;
 esac
 `,
@@ -289,6 +295,22 @@ describe("/gws-doctor", () => {
       "- personal docs: OK",
       "- personal events: SKIPPED · no read-only check exists for this service",
     ])
+  })
+
+  it("reports a non-admin's Reports refusal as ADMIN_PRIVILEGE_REQUIRED, keeps checking the account, and skips Keep without delegation", async () => {
+    const h = await setup({ accounts: { personal: account({ services: ["admin-reports", "gmail", "keep"] }) } }, { tokenProvider: fakeTokens("ya29.valid", ALL_SCOPES) })
+    await run(h, "gws-doctor")
+    expect(calls()).toEqual([
+      'admin-reports activities list --params {"applicationName":"login","fields":"items(id)","maxResults":1,"userKey":"all"} --format json',
+      'gmail users getProfile --params {"fields":"emailAddress","userId":"me"} --format json',
+    ])
+    expect(h.synthetic[0]).toMatchObject({ description: "Google Workspace doctor: 1 OK · 1 needs attention" })
+    expect(String(h.synthetic[0]!["text"]).split("\n").slice(2)).toEqual([
+      "- personal admin-reports: ADMIN_PRIVILEGE_REQUIRED · Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs. Next step: Sign in with a Workspace admin account that has the Reports privilege, or remove admin-reports from accounts.personal.enabledServices",
+      "- personal gmail: OK",
+      "- personal keep: SKIPPED · keep needs domain-wide delegation, which a Workspace admin sets up; with it, add keep or keep.readonly to accounts.personal.scopes and sign in again",
+    ])
+    expect(String(h.synthetic[0]!["text"])).not.toContain("AUTH_REQUIRED")
   })
 
   it("reports an account that is not signed in once, without running gws", async () => {

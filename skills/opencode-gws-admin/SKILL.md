@@ -26,7 +26,7 @@ Plugin policy cannot allow an admin call. A policy rule can only deny.
 
 ## Admin reports
 
-Read-only at both access levels. The sign-in still needs the admin report scopes from the auth doc.
+Read-only at both access levels. The sign-in still needs the admin report scopes from the auth doc, and the account must be a Workspace admin with the Reports privilege: otherwise every call fails with `ADMIN_PRIVILEGE_REQUIRED`, which signing in again as the same account does not fix.
 
 Activity list, read. `fields` is required because this is a list:
 

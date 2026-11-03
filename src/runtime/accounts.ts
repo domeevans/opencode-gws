@@ -6,7 +6,7 @@ import { accountSignInStatus, connectStep, type ConnectionView } from "../auth/s
 import type { Audit } from "../domain/audit.js"
 import type { AuthProblemCode, AuthState } from "../domain/auth-state.js"
 import { throwIfCancelled } from "../domain/errors.js"
-import { authProblem, type AuthRemediation } from "../domain/result.js"
+import { authProblem, privilegeName, type AuthRemediation } from "../domain/result.js"
 import { delegationRequired, restriction } from "../domain/restricted.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
@@ -228,24 +228,27 @@ export class Accounts {
     return ownedDir(join(this.runtime.paths.cacheDir, "accounts", this.integrationId(account).replace(/^gws-/, "")))
   }
 
-  /** Remediation text for an account's sign-in and consent problems, by credential mode. */
-  remediation(account: string, scopes?: readonly string[]): AuthRemediation {
+  /** Remediation text for an account's sign-in, consent and admin privilege problems, by credential mode. */
+  remediation(account: string, scopes?: readonly string[], service?: string): AuthRemediation {
     const profile = this.runtime.config.accounts[account]
     const named = scopes && scopes.length > 0 ? scopes.slice(0, 5).map(shortScope).join(", ") : undefined
     const grant = named ? `include one of: ${named}` : "include the scope this operation needs"
+    const admin = `a Workspace admin account that has ${privilegeName(service)}`
+    const remove = `remove ${service ?? "the service"} from accounts.${account}.enabledServices`
     if (profile?.mode === "credentials_file") {
       const source = profile.credentialsFileEnv ? `the credentials file named by ${profile.credentialsFileEnv}` : "the credentials file"
-      return { signIn: `replace ${source}`, consent: `replace ${source} with one whose grant can ${grant}` }
+      return { signIn: `replace ${source}`, consent: `replace ${source} with one whose grant can ${grant}`, privilege: `replace ${source} with one for ${admin}, or ${remove}` }
     }
     if (profile?.mode === "access_token") {
       const source = profile.tokenEnv ? `the access token in ${profile.tokenEnv}` : "the access token"
-      return { signIn: `refresh ${source}`, consent: `mint ${source} with scopes that ${grant}` }
+      return { signIn: `refresh ${source}`, consent: `mint ${source} with scopes that ${grant}`, privilege: `mint ${source} for ${admin}, or ${remove}` }
     }
     const connect = this.connect(account)
     const extra = named ? `, or add one of ${named} to accounts.${account}.scopes` : ""
     return {
       signIn: `to sign in again, ${connect}`,
       consent: `to grant the scope, ${connect}, sign in again, and approve every scope, choosing Read and write for a change${extra}`,
+      privilege: `sign in with ${admin} (${connect}), or ${remove}`,
     }
   }
 
