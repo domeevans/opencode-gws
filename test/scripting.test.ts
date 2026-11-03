@@ -34,6 +34,8 @@ interface SetupOptions {
   sessions?: Record<string, { agent?: string }>
   /** The host's answer to each assert; resolves by default. */
   assert?: (request: Request) => Promise<void>
+  /** Replaces the session lookup, for host failures other than "not found". */
+  lookup?: (sessionID: string) => Promise<unknown>
 }
 
 async function setup(options: SetupOptions = {}): Promise<Harness> {
@@ -65,8 +67,10 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
     },
     session: {
       get: async ({ sessionID }: { sessionID: string }) => {
+        if (options.lookup) return options.lookup(sessionID)
         const session = sessions[sessionID]
-        if (!session) throw new Error(`Session not found: ${sessionID}`)
+        // OpenCode rejects with its tagged Session.NotFoundError.
+        if (!session) throw Object.assign(new Error(`Session not found: ${sessionID}`), { _tag: "Session.NotFoundError", sessionID })
         return { id: sessionID, ...session }
       },
     },
@@ -182,6 +186,21 @@ describe("refusals", () => {
     const h = await setup()
     expect(await call(h, "read", get, "ses_missing")).toMatchObject(failure("SESSION_UNKNOWN"))
     expect(h.asserts).toEqual([])
+  })
+
+  it("reports a 404 from the session lookup as SESSION_UNKNOWN too", async () => {
+    const h = await setup({ lookup: async () => { throw Object.assign(new Error("Not Found"), { status: 404 }) } })
+    expect(await call(h, "read", get)).toMatchObject(failure("SESSION_UNKNOWN"))
+  })
+
+  it("lets any other session lookup failure propagate unchanged, never as SESSION_UNKNOWN", async () => {
+    const failures = [Object.assign(new Error("database is locked"), { _tag: "Storage.Error" }), new Error("connection reset")]
+    let next = 0
+    const h = await setup({ lookup: async () => { throw failures[next++] } })
+    await expect(call(h, "read", get)).rejects.toBe(failures[0])
+    await expect(call(h, "read", get)).rejects.toBe(failures[1])
+    expect(h.asserts).toEqual([])
+    expect(invocations(h.runtime)).toEqual([])
   })
 
   it("refuses a session that names no agent with SESSION_AGENT_REQUIRED before any assert", async () => {

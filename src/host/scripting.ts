@@ -59,6 +59,14 @@ type Description = z.output<typeof Description>
 type Spec = ToolSpec<z.ZodType, z.ZodType>
 type Context = { signal: AbortSignal; error: (type: "failed", message: string, data: z.output<typeof Failure>) => unknown }
 
+/** True when OpenCode refused a session lookup because the session does not exist: its Session.NotFoundError, or an HTTP 404. */
+function sessionNotFound(error: unknown): boolean {
+  if (error === null || typeof error !== "object") return false
+  const record = error as Record<string, unknown>
+  const tag = record["_tag"] ?? record["name"]
+  return tag === "Session.NotFoundError" || tag === "SessionNotFoundError" || record["status"] === 404 || record["statusCode"] === 404
+}
+
 export async function registerScripting(ctx: PluginContext, runtime: Runtime, status: StatusSource): Promise<() => Promise<void>> {
   // A refused assert becomes PERMISSION_DENIED, so a script reads one error shape.
   const assert: Assert = async (request) => {
@@ -76,8 +84,9 @@ export async function registerScripting(ctx: PluginContext, runtime: Runtime, st
     try {
       agent = (await runtime.wait(() => ctx.session.get({ sessionID: sessionID as never }), signal)).agent
     } catch (error) {
-      if (GwsError.from(error)?.code === "CANCELLED") throw error
-      throw new GwsError("SESSION_UNKNOWN", `there is no session '${sessionID}'`)
+      // Only OpenCode's "no such session" is SESSION_UNKNOWN; any other failure propagates as it is.
+      if (sessionNotFound(error)) throw new GwsError("SESSION_UNKNOWN", `there is no session '${sessionID}'`)
+      throw error
     }
     if (!agent) throw new GwsError("SESSION_AGENT_REQUIRED", `session '${sessionID}' names no agent`)
     return { sessionID, agent, script: true }

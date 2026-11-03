@@ -57,7 +57,7 @@ A refusal or failure is the RPC error `failed`, with `data: { code, next }` from
 
 | Code | When |
 | --- | --- |
-| `SESSION_UNKNOWN` | The session does not exist. |
+| `SESSION_UNKNOWN` | OpenCode says the session does not exist. Any other failure to look the session up is OpenCode's own error, passed through unchanged. |
 | `SESSION_AGENT_REQUIRED` | The session names no agent. |
 | `PERMISSION_DENIED` | The agent's or the session's rules deny the call, or ask for an approval. |
 
