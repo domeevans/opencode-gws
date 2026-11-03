@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-gws",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Unofficial OpenCode plugin for Google Workspace (gws CLI)",
   "type": "module",
   "license": "MIT",
@@ -50,10 +50,10 @@
     "docs:coverage": "node scripts/generate-docs.mjs"
   },
   "optionalDependencies": {
-    "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.0",
-    "@joe-broadhead/opencode-gws-bin-darwin-x64": "0.0.0",
-    "@joe-broadhead/opencode-gws-bin-linux-arm64-gnu": "0.0.0",
-    "@joe-broadhead/opencode-gws-bin-linux-x64-gnu": "0.0.0"
+    "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.1",
+    "@joe-broadhead/opencode-gws-bin-darwin-x64": "0.0.1",
+    "@joe-broadhead/opencode-gws-bin-linux-arm64-gnu": "0.0.1",
+    "@joe-broadhead/opencode-gws-bin-linux-x64-gnu": "0.0.1"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
