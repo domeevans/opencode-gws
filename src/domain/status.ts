@@ -33,12 +33,12 @@ const Host = z.object({
 })
 
 /** The plugin's state, in the shared status names. */
-export const STATES = ["connected", "sign_in_required", "not_configured", "host_untested"] as const
+export const STATES = ["connected", "sign_in_required", "not_configured"] as const
 
 export const StatusOutput = z.object({
   version: z.string().describe("The plugin's version"),
   host: Host,
-  state: z.enum(STATES).describe("connected; sign_in_required or not_configured when an account needs it; host_untested on an untested OpenCode"),
+  state: z.enum(STATES).describe("connected; sign_in_required or not_configured when an account needs it"),
   gws: z.object({ path: z.string(), version: z.string() }),
   services: z.array(z.string()).describe("Model-facing services"),
   accounts: z.array(AccountStatus),

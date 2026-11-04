@@ -41,7 +41,7 @@ Contract: `src/rpc.ts`, id `google-workspace.gws`, method `status` only. It is i
 | --- | --- |
 | `version` | This package's version. |
 | `host` | `{ version, range, tested }`: the OpenCode version (`null` when unknown), the supported range `>=2.2.3 <2.3.0`, and `true` only for a tested release (2.2.3, 2.2.4, 2.2.5). |
-| `state` | `sign_in_required` when an interactive account needs signing in, `not_configured` when a headless account's variable is unset, `host_untested` on an untested OpenCode, else `connected`. |
+| `state` | `sign_in_required` when an interactive account needs signing in, `not_configured` when a headless account's variable is unset, else `connected`. An untested OpenCode release inside the range keeps this state; only `host.tested` and the OpenCode row mark it. |
 | `gws` | `{ path, version }` of the resolved binary. |
 | `services` | Model-facing services. |
 | `accounts` | One entry per account, below. |

@@ -187,7 +187,7 @@ try {
   handlers.get("agent.updated")({ type: "agent.updated", data: {} })
   assert.equal(requests[3].signal.aborted, true)
   const block = '{ "agents": { "notes": { "permissions": [] } } }'
-  requests[4].resolve(status(SIGNED_IN.accounts[0], { host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "host_untested", unguardedAgents: ["notes"], permissionsBlock: block }))
+  requests[4].resolve(status(SIGNED_IN.accounts[0], { host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", unguardedAgents: ["notes"], permissionsBlock: block }))
   requests[3].resolve(SIGNED_OUT)
   text = await frame()
   assert.match(text, /OpenCode\s+2\.3\.0 \(host untested; supported range\s+>=2\.2\.3\s+<2\.3\.0\)/)

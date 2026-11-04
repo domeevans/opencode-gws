@@ -39,14 +39,14 @@ export interface GwsAccount {
 }
 
 /** The plugin's state, in the names every plugin's status RPC shares. */
-export type GwsState = "connected" | "sign_in_required" | "not_configured" | "host_untested"
+export type GwsState = "connected" | "sign_in_required" | "not_configured"
 
 export interface GwsStatus {
   /** The plugin's version. */
   version: string
   /** The OpenCode host: its version (null when unknown), the supported range, and whether that release is tested. */
   host: { version: string | null; range: string; tested: boolean }
-  /** sign_in_required or not_configured when an account needs it, host_untested on an untested host, else connected. */
+  /** sign_in_required or not_configured when an account needs it, else connected. */
   state: GwsState
   gws: { path: string; version: string }
   services: string[]
@@ -68,7 +68,7 @@ const object = (properties: Record<string, object>, required: readonly string[])
 const MODES: readonly unknown[] = ["interactive", "credentials_file", "access_token"]
 const ACCESS: readonly unknown[] = ["read", "write"]
 const CLIENT_SOURCES: readonly unknown[] = ["account", "plugin", "pasted"]
-const STATES: readonly unknown[] = ["connected", "sign_in_required", "not_configured", "host_untested"]
+const STATES: readonly unknown[] = ["connected", "sign_in_required", "not_configured"]
 
 const account = object(
   {

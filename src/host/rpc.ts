@@ -22,11 +22,16 @@ function nextStep(accounts: readonly GwsAccount[], agents: readonly string[]): s
   return undefined
 }
 
-/** An account that needs signing in comes first, then one whose headless credential is unset, then an untested host. */
-function stateOf(accounts: readonly GwsAccount[], tested: boolean): GwsState {
+/**
+ * An account that needs signing in comes first, then one whose headless
+ * credential is unset. An untested release inside the range keeps the
+ * working state: only host.tested and the OpenCode row say so. Outside the
+ * range setup refuses with HOST_UNTESTED, so there is no status-only state.
+ */
+function stateOf(accounts: readonly GwsAccount[]): GwsState {
   if (accounts.some((account) => account.needsAuth || (!account.connected && account.mode === "interactive"))) return "sign_in_required"
   if (accounts.some((account) => !account.connected)) return "not_configured"
-  return tested ? "connected" : "host_untested"
+  return "connected"
 }
 
 /** Plugin status with each account's sign-in state and the unguarded agents. Never a token or a client secret. */
@@ -38,7 +43,7 @@ export function statusSource(runtime: Runtime, listAgents: AgentList): StatusSou
     return {
       version: base.version,
       host: base.host,
-      state: stateOf(base.accounts, base.host.tested),
+      state: stateOf(base.accounts),
       gws: { path: base.binary.path, version: base.binary.version },
       services: base.services,
       accounts: base.accounts,

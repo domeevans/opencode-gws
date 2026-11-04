@@ -272,7 +272,8 @@ describe("status", () => {
     process.env["GWS_RPC_TEST_TOKEN"] = "ya29.test"
     try {
       const h = await setup({ host: untested, accounts: headless })
-      expect(await status(h)).toMatchObject({ host: untested, state: "host_untested", nextStep: "Nothing to do." })
+      // Inside the range, an untested release keeps the working state (S13); only host.tested says so.
+      expect(await status(h)).toMatchObject({ host: untested, state: "connected", nextStep: "Nothing to do." })
       await h.stop()
       await h.runtime.close()
     } finally {

@@ -172,7 +172,7 @@ describe("/gws-status", () => {
   })
 
   it("says Nothing to do. and marks an untested host", () => {
-    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "host_untested", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     const text = formatStatus(status)
     expect(text).toContain("OpenCode: 2.3.0 (host untested; supported range >=2.2.3 <2.3.0)")
     expect(text).toMatch(/Next step: Nothing to do\.$/)
