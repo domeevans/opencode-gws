@@ -76,7 +76,7 @@
   },
   "jelly": {
     "title": "Google Workspace",
-    "summary": "Gmail, Calendar, Drive, Docs and Sheets.",
+    "summary": "Gmail, Calendar, Drive, Docs, Sheets, Meet and the rest of Workspace.",
     "icon": "assets/icon.svg",
     "tools": [
       {

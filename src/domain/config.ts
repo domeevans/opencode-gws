@@ -45,18 +45,25 @@ export const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema]
 const accessLevel = z.enum(["read", "write"])
 
 /**
- * With no `accounts` option, one interactive account enables every manifest
- * service a person's sign-in can use at Read and write, so one consent
- * grants every scope the plugin can use. Services that need domain-wide
- * delegation (Keep) are left out: no ordinary sign-in can run them. Every
- * change still needs a plan, the ask, and a commit; the form still offers
- * Read-only.
+ * The services an interactive account enables when it names none: every
+ * manifest service a person's sign-in can use. Services that need
+ * domain-wide delegation (Keep) are left out: no ordinary sign-in can run
+ * them, and Google refuses the whole consent for a delegation scope.
  */
-function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
-  const services = loadManifest()
+export function defaultServices(): string[] {
+  return loadManifest()
     .services.map((service) => service.alias)
     .filter((service) => !DELEGATION_SERVICES.includes(service))
-  return { default: { mode: "interactive", enabledServices: services, access: "write" } }
+}
+
+/**
+ * With no `accounts` option, one interactive account enables the default
+ * services at Read and write, so one consent grants every scope the plugin
+ * can use. Every change still needs a plan, the ask, and a commit; the form
+ * still offers Read-only.
+ */
+function defaultAccounts(): Record<string, { mode: "interactive"; access: "write" }> {
+  return { default: { mode: "interactive", access: "write" } }
 }
 
 const enabledServices = z.array(z.string().min(1)).min(1)
@@ -67,7 +74,8 @@ const accountProfile = z.preprocess(
   z.discriminatedUnion("mode", [
     z.strictObject({
       mode: z.literal("interactive"),
-      enabledServices,
+      // Omitted: the default services, so a host need not know the manifest.
+      enabledServices: enabledServices.optional(),
       access: z.union([accessLevel, z.record(z.string().min(1), accessLevel)]).optional(),
       scopes: z.array(z.string().min(1)).optional(),
       oauthClient: OAuthClientSchema.optional(),
@@ -196,7 +204,7 @@ export function loadConfig(raw: unknown): PluginConfig {
   const known = new Set(loadManifest().services.map((service) => service.alias))
   const accounts: Record<string, AccountProfile> = {}
   for (const [alias, profile] of Object.entries(configured)) {
-    const enabled = [...new Set(profile.enabledServices.map(canonicalService))]
+    const enabled = [...new Set((profile.enabledServices ?? defaultServices()).map(canonicalService))]
     for (const service of enabled) {
       if (!known.has(service)) throw invalid(`Account '${alias}' enables the unknown service '${service}'`, `Fix accounts.${alias}.enabledServices in the plugin options.`)
     }
