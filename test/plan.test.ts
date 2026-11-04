@@ -28,6 +28,17 @@ describe("plan store", () => {
     expect(() => plans.acquire(id!, binding)).toThrow(/PLAN_ALREADY_USED/)
   })
 
+  it("still says a committed plan was used after other plans are created, until it expires", () => {
+    const plans = store()
+    const [id] = [...plans["plans"].keys()]
+    plans.acquire(id!, binding)
+    plans.complete(id!)
+    plans.create({ ...plans.get(id!)!, ttlSeconds: 300 })
+    expect(() => plans.check(id!, binding)).toThrow(
+      "PLAN_ALREADY_USED: This plan was already committed. Next step: Create a new plan to repeat the change; check the earlier result with gws_read first.",
+    )
+  })
+
   it("checks a binding without consuming the plan", () => {
     const plans = store()
     const [id] = [...plans["plans"].keys()]
@@ -94,5 +105,10 @@ describe("plan store", () => {
       },
     })
     expect(preview).toEqual({ method: "POST", bodySummary: "object(raw) 10 bytes" })
+  })
+
+  it("keeps why the recipients are unknown in the redacted preview", () => {
+    const preview = redactedPreview({ preview: { method: "POST", params: {}, recipientsUnknown: "the draft could not be read", account: "personal", category: "send" } })
+    expect(preview).toEqual({ method: "POST", recipientsUnknown: "the draft could not be read" })
   })
 })

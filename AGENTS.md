@@ -59,6 +59,11 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   top-level ones); `gws_status` gives the model only their count.
 - Plugin policy is deny-only content constraints plus the admin gate.
   `deploy` and `watch` are never committable.
+- Recipient rules fail closed (`src/domain/recipients.ts`): a send or
+  share whose recipients cannot all be determined is refused when a rule
+  limits recipients. A plan that reads recipients (a reply's message, a
+  draft, an event's guests) asserts `gws.read` on each read, and its commit
+  reads them again.
 
 ## Security
 
@@ -110,6 +115,7 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 ## Tests
 
 `npm run check` runs lint, typecheck (`src` and the whole test tree), build,
-unit tests, the embedded-host suite, the pack test on stock OpenCode 2.2.3 and
-2.2.4, the generated-file check and the TUI render. Tests never need a live
+unit tests, the embedded-host suite, the pack test on stock OpenCode 2.2.3,
+2.2.4 and 2.2.5 (`TESTED_HOSTS` in `src/domain/host.ts`, the one list),
+the generated-file check and the TUI render. Tests never need a live
 Google account; a live check needs the owner's approval for each run.

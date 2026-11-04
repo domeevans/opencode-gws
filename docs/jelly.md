@@ -39,7 +39,8 @@ skill ids collide with another plugin's or the agent's own.
   It draws `gmail.users.threads.get`: the subject, then each message's sender, time and text part
   (or Gmail's snippet). For any other read it declines, and the call keeps its ordinary look. It
   carries Jelly's bridge helper inline (`views/jelly-view.js`, the text of `@jelly/contracts`
-  `VIEW_HELPER`) and loads nothing by URL.
+  `VIEW_HELPER`) and loads nothing by URL. Its types, for a page checked with TypeScript, are in
+  the repository's `views/jelly-view.d.ts`; the package ships no `.d.ts`.
 
   `gws_read` is a direct tool for this: Jelly sees the result of a direct call, and not of a call
   made inside a Code Mode script. A thread read with `fields` narrow enough to stay under Jelly's
@@ -48,7 +49,7 @@ skill ids collide with another plugin's or the agent's own.
 
 ## Signing in
 
-`jelly.signIns` declares one sign-in, `google`, for OpenCode's integration `gws-*`: every account (`gws-<alias>`) folds into it, so the card waits while any account waits. Each account signs in with OAuth through a Desktop app client. Jelly holds the person's Desktop client and fills in `clientId` and `clientSecret`, so its form shows only Access (starting on `default`, read-only) and the write acknowledgement while it applies, and no `oauthClient` option is needed. Jelly writes only `{ mode: "interactive" }` for each account, with no `enabledServices`, so each account gets every service an ordinary sign-in can use (every manifest service but Keep) and Jelly lists none itself; a host that narrows an account adds `enabledServices`. When the engine runs on another machine than the person's browser, a host can also fill the form's hidden `redirectUri`, `callbackPort` and `clientJson` fields (a Web application client that lists the redirect), so Google's redirect comes back through the host to the engine's listener; see [docs/auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine).
+`jelly.signIns` declares one sign-in, `google`, for OpenCode's integration `gws-*`: every account (`gws-<alias>`) folds into it, so the card waits while any account waits. Each account signs in with OAuth through a Desktop app client. Jelly holds the person's Desktop client and fills in `clientId` and `clientSecret`, so its form shows only Access (starting on `default`, read-only) and the write acknowledgement while it applies, and no `oauthClient` option is needed. Jelly writes only `{ mode: "interactive", enabledServices }` for each account. When the engine runs on another machine than the person's browser, a host can also fill the form's hidden `redirectUri`, `callbackPort` and `clientJson` fields (a Web application client that lists the redirect), so Google's redirect comes back through the host to the engine's listener; see [docs/auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine). The sign-in declares `"relay": { "redirectField": "redirectUri", "portField": "callbackPort" }`: those are the two fields a Jelly web tab fills with its fixed relay address at Jelly ID and a loopback port for the listener (Jelly ADR 0019). The plugin's code is the same either way, and the Web application client must list that relay address.
 
 Jelly folds the declared sign-ins into this plugin's one card, which shows each as Connected, Not signed in or Sign in again (expired or revoked), and starts, renews and signs out of each. An agent's `jelly_connection_request`, or a tool result that names this plugin's "Run /connect and choose …" next step, opens the same card. The plugin still signs in through OpenCode, as it does without Jelly; the declaration only tells Jelly which of the engine's integrations and servers are this plugin's.
 

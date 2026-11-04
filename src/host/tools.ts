@@ -198,6 +198,8 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
         report(call, input.operation)
         const target = runtime.inspect(input, "plan")
         await authorize(call, operationRequest(call.host, "gws.plan", target))
+        // A plan that reads recipients (a reply's original message, a draft, an event's guests) shows them in its preview.
+        for (const operation of target.reads ?? []) await authorize(call, operationRequest(call.host, "gws.read", { ...target, operation, category: "read" }))
         const output = await runtime.plan(input, call.runtime)
         return { output, metadata: { operation: target.operation, category: output.category, account: target.account } }
       },

@@ -41,7 +41,7 @@ describe("rpc through client.rpc", () => {
   it("answers status with each account's sign-in state, never a token or secret", async () => {
     const status = await gws().status({}, at())
     if (!isStatus(status)) throw new Error(`not a status: ${JSON.stringify(status)}`)
-    expect(status).toMatchObject({ pluginVersion: packageJson.version, hostVersion: host.hostVersion, gws: { version: "gws 0.22.5" } })
+    expect(status).toMatchObject({ version: packageJson.version, host: { version: host.hostVersion, range: ">=2.2.3 <2.3.0" }, gws: { version: "gws 0.22.5" } })
     expect(status.accounts).toEqual([
       expect.objectContaining({ alias: ACCOUNT, mode: "interactive", services: ["gmail", "drive"], integrationID: `gws-${ACCOUNT}`, access: expect.stringMatching(/^(read|write)$/) }),
     ])

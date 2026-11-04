@@ -6,7 +6,8 @@ import type { CommitCategory, Plan } from "./types.js"
  * In-memory, single-use plan store. A plan is bound to the account,
  * session, agent, and category, holds the exact commit argv, and expires
  * after its TTL. It is consumed by exactly one commit attempt; a failed
- * commit does not resurrect it.
+ * commit does not resurrect it. A used or expired plan stays until its TTL,
+ * so a second commit hears that it was used, not that it never existed.
  */
 
 const MAX_PLANS = 512
@@ -18,15 +19,17 @@ const MAX_PLANS = 512
 export interface RedactedPreview {
   method: string
   recipients?: string[]
+  recipientsUnknown?: string
   destination?: string
   bodySummary?: string
   reason?: string
 }
 
 export function redactedPreview(plan: Pick<Plan, "preview">): RedactedPreview {
-  const { method, recipients, destination, bodySummary, reason } = plan.preview
+  const { method, recipients, recipientsUnknown, destination, bodySummary, reason } = plan.preview
   const view: RedactedPreview = { method }
   if (recipients && recipients.length > 0) view.recipients = [...recipients]
+  if (recipientsUnknown !== undefined) view.recipientsUnknown = recipientsUnknown
   if (destination !== undefined) view.destination = destination
   if (bodySummary !== undefined) view.bodySummary = bodySummary
   if (reason !== undefined) view.reason = reason
@@ -81,7 +84,9 @@ export class PlanStore {
   check(id: string, binding: { sessionId: string; agentId: string; category: CommitCategory }): Plan {
     const plan = this.get(id)
     if (!plan) throw new GwsError("PLAN_NOT_FOUND", "run gws_plan first")
-    if (plan.state === "consumed") throw new GwsError("PLAN_ALREADY_USED", "create a new plan")
+    if (plan.state === "consumed") {
+      throw new GwsError("PLAN_ALREADY_USED", "this plan was already committed", { next: "Create a new plan to repeat the change; check the earlier result with gws_read first." })
+    }
     if (plan.state === "expired" || Date.now() >= plan.expiresAt) throw new GwsError("PLAN_EXPIRED", "create a new plan")
     if (plan.state === "committing") throw new GwsError("PLAN_ALREADY_USED", "plan is committing", { next: "Wait for the running commit to finish; do not commit this plan again." })
     if (plan.sessionId !== binding.sessionId || plan.agentId !== binding.agentId) {
@@ -125,10 +130,7 @@ export class PlanStore {
   private sweep(): void {
     const now = Date.now()
     for (const [id, plan] of this.plans) {
-      if (plan.state === "ready" && now >= plan.expiresAt) this.expire(plan)
-      if (plan.state === "consumed" || plan.state === "expired" || now >= plan.expiresAt) {
-        this.plans.delete(id)
-      }
+      if (now >= plan.expiresAt && plan.state !== "committing") this.plans.delete(id)
     }
   }
 }

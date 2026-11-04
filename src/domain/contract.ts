@@ -232,7 +232,11 @@ export const Preview = z
     url: z.string().nullable().optional(),
     params: JsonObject.describe("Parameters with secret-like values redacted"),
     bodySummary: z.string().optional().describe("Body keys and size; never the body"),
-    recipients: z.array(z.string()).optional(),
+    recipients: z
+      .array(z.string())
+      .optional()
+      .describe("Every address a send or share reaches, including those read for a reply, a draft or an event; *@domain for a whole domain"),
+    recipientsUnknown: z.string().optional().describe("Why the plugin could not tell everyone this send or share reaches"),
     uploads: z.array(z.string()).optional().describe("Local files the commit uploads or attaches"),
     destination: z.string().optional().describe("Local file the export writes"),
     overwrite: z.boolean().optional().describe("The export replaces an existing file at destination"),

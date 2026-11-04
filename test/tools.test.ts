@@ -501,6 +501,17 @@ describe("commit permission assertions", () => {
     expect(h.runtime.plans.get(planId)?.state).toBe("ready")
   })
 
+  it("asks gws.read for a read a plan makes to find recipients, and stops when it is refused", async () => {
+    const reply = request("gmail.reply", { input: { messageId: "m1", body: "Thanks" } })
+    const h = await setup({}, (request) => request.action === "gws.read")
+    await expect(tool(h, "plan").execute(reply, context())).rejects.toThrow(/PermissionRejected: gws.read/)
+    expect(h.calls.map((call) => [call.action, call.resources])).toEqual([
+      ["gws.plan", ["personal:gmail.reply"]],
+      ["gws.read", ["personal:gmail.users.messages.get"]],
+    ])
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["--version"])
+  })
+
   it("refuses the wrong commit tool before asking", async () => {
     const h = await setup({})
     const planId = await plan(h)
@@ -553,7 +564,8 @@ describe("errors the model sees", () => {
     [4, "GWS_DISCOVERY_ERROR", { error: { code: 0, message: "could not fetch the Discovery document", reason: "discoveryError" } }],
     [5, "GWS_INTERNAL_ERROR", { error: { code: 0, message: "unexpected failure" } }],
     [1, "GWS_API_ERROR", { error: { code: 404, message: "Requested entity was not found." } }],
-    [1, "ADMIN_PRIVILEGE_REQUIRED", { error: { code: 401, message: "Access denied. You are not authorized to read activity records.", reason: "authError" } }],
+    // Only an Admin SDK service's refusal is ADMIN_PRIVILEGE_REQUIRED (test/auth-state.test.ts); on Gmail it is a sign-in failure.
+    [1, "AUTH_REQUIRED", { error: { code: 401, message: "Access denied. You are not authorized to read activity records.", reason: "authError" } }],
     [1, "AUTH_REQUIRED", { error: { code: 401, message: "Request had invalid authentication credentials.", reason: "authError" } }],
   ])("reads gws exit %s as %s", async (exit, code, payload) => {
     writeFileSync(failurePath, `${JSON.stringify(payload)}\n${exit}\n`)

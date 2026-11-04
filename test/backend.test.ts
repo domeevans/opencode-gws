@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { chmodSync, constants, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs"
+import { chmodSync, chownSync, constants, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -43,6 +43,10 @@ function installed(prepare?: (binary: string) => void): { from: string; binary: 
   writeFileSync(join(pkg, "package.json"), JSON.stringify({ name: gwsPackage(target!), version: "1.2.3" }))
   const binary = join(pkg, "bin", "gws")
   copyFileSync(fetchedBinary(), binary, constants.COPYFILE_FICLONE)
+  // A copy takes the source's group only when the user is in it, else its folder's (wheel under
+  // /private/tmp), and the kernel silently drops setgid from a file whose group is not the user's.
+  // Owning the copy with the user's own group keeps every mode below exactly as set, wherever TMPDIR is.
+  chownSync(binary, process.getuid!(), process.getgid!())
   chmodSync(binary, 0o755)
   prepare?.(binary)
   return { from: join(project, "node_modules", "@joe-broadhead", "opencode-gws", "dist", "index.js"), binary }
@@ -98,14 +102,17 @@ describe("packaged backend", () => {
     )
   })
 
-  it.each([0o755, 0o750, 0o700, 0o555, 0o500])("admits installed mode %s without changing it", (mode) => {
+  const octal = (modes: number[]) => modes.map((mode) => [mode.toString(8), mode] as const)
+
+  it.each(octal([0o755, 0o750, 0o700, 0o555, 0o500]))("admits installed mode %s without changing it", (_octal, mode) => {
     const { from, binary } = installed((path) => chmodSync(path, mode))
     expect(resolvePackagedBinary(platform, from)).toBe(binary)
     expect(statSync(binary).mode & 0o7777).toBe(mode)
   })
 
-  it.each([0o775, 0o757, 0o4755, 0o2755, 0o1755, 0o600, 0o111, 0o055])("rejects unsafe or unusable installed mode %s", (mode) => {
-    const { from } = installed((path) => chmodSync(path, mode))
+  it.each(octal([0o775, 0o757, 0o4755, 0o2755, 0o1755, 0o600, 0o111, 0o055]))("rejects unsafe or unusable installed mode %s", (_octal, mode) => {
+    const { from, binary } = installed((path) => chmodSync(path, mode))
+    expect(statSync(binary).mode & 0o7777).toBe(mode)
     expect(() => resolvePackagedBinary(platform, from)).toThrow(/^BINARY_TRUST_FAILED:/)
   })
 

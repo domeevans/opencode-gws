@@ -24,7 +24,7 @@ npm run build
 
 The host suite embeds `@opencode/sdk` 2.2.3. It needs Node 24. `HOST_SDK_DIR`, when set, is an extra embedded SDK directory for that pack check (for example a 2.2.4 SDK kept outside the lockfile).
 
-The pack check loads the installed tarball in stock OpenCode 2.2.3 and 2.2.4. Set `OPENCODE_BIN_2_2_3` and `OPENCODE_BIN_2_2_4` to those binaries to skip the download. When either is unset, the script installs `@opencode/cli` and the current platform package into its temp folder with scripts disabled. Do not set `OPENCODE_BIN`. The script ignores it. Each stock load uses its own temp root for `HOME`, the XDG folders, `OPENCODE_TEST_HOME` and `TMPDIR`, starts in that project directory, and refuses to continue unless every `opencode debug paths` entry is inside the root.
+The pack check loads the installed tarball in each tested stock OpenCode: 2.2.3, 2.2.4 and 2.2.5, the one list `TESTED_HOSTS` in `src/domain/host.ts`. Set `OPENCODE_BIN_2_2_3`, `OPENCODE_BIN_2_2_4` and `OPENCODE_BIN_2_2_5` to those binaries to skip the download. When one is unset, the script installs `@opencode/cli` and the current platform package into its temp folder with scripts disabled, once per version. It checks the version each binary reports, which must be inside `opencode.host`, so a slot may hold a newer binary. Do not set `OPENCODE_BIN`. The script ignores it. Each stock load uses its own temp root for `HOME`, the XDG folders, `OPENCODE_TEST_HOME` and `TMPDIR`, starts in that project directory, and refuses to continue unless every `opencode debug paths` entry is inside the root.
 
 ## Generated files
 

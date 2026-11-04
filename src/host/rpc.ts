@@ -1,4 +1,4 @@
-import { Gws, type GwsAccount, type GwsStatus } from "../rpc.js"
+import { Gws, NOTHING_TO_DO, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
 import type { Runtime } from "../runtime/index.js"
 import { permissionsBlock, unguardedAgents, type Rule } from "./agents.js"
 import type { PluginContext } from "./context.js"
@@ -22,6 +22,13 @@ function nextStep(accounts: readonly GwsAccount[], agents: readonly string[]): s
   return undefined
 }
 
+/** An account that needs signing in comes first, then one whose headless credential is unset, then an untested host. */
+function stateOf(accounts: readonly GwsAccount[], tested: boolean): GwsState {
+  if (accounts.some((account) => account.needsAuth || (!account.connected && account.mode === "interactive"))) return "sign_in_required"
+  if (accounts.some((account) => !account.connected)) return "not_configured"
+  return tested ? "connected" : "host_untested"
+}
+
 /** Plugin status with each account's sign-in state and the unguarded agents. Never a token or a client secret. */
 export function statusSource(runtime: Runtime, listAgents: AgentList): StatusSource {
   return async (signal) => {
@@ -29,16 +36,16 @@ export function statusSource(runtime: Runtime, listAgents: AgentList): StatusSou
     const agents = unguardedAgents(await runtime.wait(() => listAgents(), signal))
     const next = nextStep(base.accounts, agents)
     return {
-      pluginVersion: base.pluginVersion,
-      hostVersion: base.hostVersion,
-      ...(base.hostWarning ? { hostWarning: base.hostWarning } : {}),
+      version: base.version,
+      host: base.host,
+      state: stateOf(base.accounts, base.host.tested),
       gws: { path: base.binary.path, version: base.binary.version },
       services: base.services,
       accounts: base.accounts,
       auditDegraded: base.auditDegraded,
       unguardedAgents: agents,
       ...(agents.length > 0 ? { permissionsBlock: permissionsBlock(agents) } : {}),
-      ...(next ? { nextStep: next } : {}),
+      nextStep: next ?? NOTHING_TO_DO,
     }
   }
 }

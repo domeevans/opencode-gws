@@ -38,11 +38,16 @@ export interface GwsAccount {
   nextStep?: string
 }
 
+/** The plugin's state, in the names every plugin's status RPC shares. */
+export type GwsState = "connected" | "sign_in_required" | "not_configured" | "host_untested"
+
 export interface GwsStatus {
-  pluginVersion: string
-  hostVersion: string
-  /** Present when the host is outside the tested range and allowUntestedHost is set. */
-  hostWarning?: string
+  /** The plugin's version. */
+  version: string
+  /** The OpenCode host: its version (null when unknown), the supported range, and whether that release is tested. */
+  host: { version: string | null; range: string; tested: boolean }
+  /** sign_in_required or not_configured when an account needs it, host_untested on an untested host, else connected. */
+  state: GwsState
   gws: { path: string; version: string }
   services: string[]
   accounts: GwsAccount[]
@@ -52,8 +57,8 @@ export interface GwsStatus {
   unguardedAgents: string[]
   /** The permission block to add first in each unguarded agent's own permissions; present when any is unguarded. */
   permissionsBlock?: string
-  /** The one thing to do next, as one sentence; absent when nothing is needed. */
-  nextStep?: string
+  /** The one thing to do next, as one sentence; NOTHING_TO_DO when nothing is needed. */
+  nextStep: string
 }
 
 const text = { type: "string" } as const
@@ -63,6 +68,7 @@ const object = (properties: Record<string, object>, required: readonly string[])
 const MODES: readonly unknown[] = ["interactive", "credentials_file", "access_token"]
 const ACCESS: readonly unknown[] = ["read", "write"]
 const CLIENT_SOURCES: readonly unknown[] = ["account", "plugin", "pasted"]
+const STATES: readonly unknown[] = ["connected", "sign_in_required", "not_configured", "host_untested"]
 
 const account = object(
   {
@@ -84,9 +90,9 @@ const account = object(
 
 const status = object(
   {
-    pluginVersion: text,
-    hostVersion: text,
-    hostWarning: text,
+    version: text,
+    host: object({ version: { type: ["string", "null"] }, range: text, tested: { type: "boolean" } }, ["version", "range", "tested"]),
+    state: { enum: STATES },
     gws: object({ path: text, version: text }, ["path", "version"]),
     services: texts,
     accounts: { type: "array", items: account },
@@ -95,7 +101,7 @@ const status = object(
     permissionsBlock: text,
     nextStep: text,
   },
-  ["pluginVersion", "hostVersion", "gws", "services", "accounts", "unguardedAgents"],
+  ["version", "host", "state", "gws", "services", "accounts", "unguardedAgents", "nextStep"],
 )
 
 export const Gws = Rpc.define({
@@ -136,9 +142,12 @@ function isAccount(value: unknown): value is GwsAccount {
 export function isStatus(value: unknown): value is GwsStatus {
   return (
     isRecord(value) &&
-    isText(value["pluginVersion"]) &&
-    isText(value["hostVersion"]) &&
-    optional(value["hostWarning"], isText) &&
+    isText(value["version"]) &&
+    isRecord(value["host"]) &&
+    (value["host"]["version"] === null || isText(value["host"]["version"])) &&
+    isText(value["host"]["range"]) &&
+    typeof value["host"]["tested"] === "boolean" &&
+    STATES.includes(value["state"]) &&
     isRecord(value["gws"]) &&
     isText(value["gws"]["path"]) &&
     isText(value["gws"]["version"]) &&
@@ -148,7 +157,7 @@ export function isStatus(value: unknown): value is GwsStatus {
     optional(value["auditDegraded"], (entry) => typeof entry === "boolean") &&
     isStrings(value["unguardedAgents"]) &&
     optional(value["permissionsBlock"], isText) &&
-    optional(value["nextStep"], isText)
+    isText(value["nextStep"])
   )
 }
 
@@ -167,9 +176,10 @@ export function connectionLabel(account: GwsAccount): "connected" | "sign-in req
   return account.mode === "interactive" ? "sign-in required" : "not configured"
 }
 
-/** The OpenCode row: the version, tested or `host untested`. */
+/** The OpenCode row: the version, then `tested`, or `host untested` with the supported range. */
 export function openCodeLabel(status: GwsStatus): string {
-  return status.hostWarning ? `${status.hostVersion} (host untested: ${status.hostWarning})` : `${status.hostVersion} (tested)`
+  const version = status.host.version ?? "unknown"
+  return status.host.tested ? `${version} (tested)` : `${version} (host untested; supported range ${status.host.range})`
 }
 
 /** The row naming services that need domain-wide delegation. */

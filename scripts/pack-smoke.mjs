@@ -19,7 +19,8 @@
  *    - the SDK install in the embedded @opencode/sdk from devDependencies
  *      (2.2.3), and in the one under HOST_SDK_DIR when set (for example a
  *      2.2.4 SDK installed outside the lockfile);
- *    - the bare install in stock OpenCode 2.2.3 and 2.2.4, through
+ *    - the bare install in each stock OpenCode of TESTED_HOSTS
+ *      (src/domain/host.ts: 2.2.3, 2.2.4 and 2.2.5), through
  *      `opencode serve`. Only a stock CLI supplies @opencode/plugin to a
  *      plugin that does not install it; an embedded SDK host under Node
  *      does not.
@@ -29,9 +30,11 @@
  * of building one; the release workflow sets both to the tarballs it
  * publishes.
  *
- * Stock binaries come from OPENCODE_BIN_2_2_3 and OPENCODE_BIN_2_2_4. When
- * one is unset, @opencode/cli and the current platform package are installed
- * into the temp folder with scripts disabled. OPENCODE_BIN is ignored: a
+ * Stock binaries come from OPENCODE_BIN_2_2_3, OPENCODE_BIN_2_2_4 and
+ * OPENCODE_BIN_2_2_5. When one is unset, @opencode/cli and the current
+ * platform package are installed into the temp folder with scripts disabled,
+ * once per version. The version a binary reports is the one checked; it
+ * must be inside opencode.host. OPENCODE_BIN is ignored: a
  * stock binary must not be started without the isolation below.
  *
  * Every host runs in its own child process. HOME, the four XDG variables,
@@ -48,7 +51,6 @@ import { createHash, randomBytes } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createServer } from "node:net"
-import { tmpdir } from "node:os"
 import { dirname, join, sep } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { buildPackage, hostTarget, packageName, readProvenance, ROOT } from "./build-bin-packages.mjs"
@@ -57,7 +59,7 @@ const MAIN = "@joe-broadhead/opencode-gws"
 const PLUGIN_ID = "google-workspace.gws"
 const MAX_PACKED_BYTES = 1024 * 1024
 const TUI_MAX_BYTES = 30 * 1024
-const MAIN_FILES = /^(package\.json|README\.md|LICENSE|NOTICE|CHANGELOG\.md|manifest\/generated\.json|views\/(gmail-thread\.html|jelly-view\.js|jelly-view\.d\.ts)|skills\/[^/]+\/SKILL\.md)$/
+const MAIN_FILES = /^(package\.json|README\.md|LICENSE|NOTICE|CHANGELOG\.md|assets\/icon\.svg|manifest\/generated\.json|views\/(gmail-thread\.html|jelly-view\.js)|skills\/[^/]+\/SKILL\.md)$/
 // The two entries the host loads, each one self-contained file; nothing else ships in dist/.
 const DIST_FILES = ["dist/index.js", "dist/tui.js"]
 const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare"]
@@ -72,7 +74,9 @@ const STOCK_OPTIONS = {
   audit: { enabled: false },
   accounts: { default: { enabledServices: ["gmail"] }, work: { enabledServices: ["drive"], oauthClient: SMOKE_CLIENT } },
 }
-const STOCK_HOSTS = ["2.2.3", "2.2.4"]
+// The tested hosts: the one list, TESTED_HOSTS in src/domain/host.ts.
+const STOCK_HOSTS = JSON.parse(/TESTED_HOSTS: readonly string\[\] = (\[[^\]]*\])/.exec(readFileSync(join(ROOT, "src", "domain", "host.ts"), "utf8"))[1])
+const HOST_RANGE = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).opencode.host
 const HOST_TIMEOUT_MS = 180_000
 const OFFLINE = { OPENCODE_DISABLE_MODELS_FETCH: "1", OPENCODE_DISABLE_AUTOUPDATE: "1", OPENCODE_DISABLE_FREE_MODELS: "1" }
 // Same six rules as ASK_RULES in src/host/agents.ts. A stock load fails if the installed plugin inserts anything else.
@@ -144,10 +148,12 @@ function checkMainTarball(main) {
   const paths = main.files.map((file) => file.path).sort()
   equal(paths.filter((path) => path.startsWith("dist/")), DIST_FILES, "main tarball dist/ files")
   equal(paths.filter((path) => !path.startsWith("dist/") && !MAIN_FILES.test(path)), [], "main tarball files outside the whitelist")
-  for (const required of ["package.json", ...DIST_FILES, "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "views/jelly-view.d.ts", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]) {
+  for (const required of ["package.json", ...DIST_FILES, "assets/icon.svg", "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]) {
     check(paths.includes(required), `main tarball lacks ${required}`)
   }
   check(!paths.some((path) => /(^|\/)gws$/.test(path)), "main tarball contains a gws binary")
+  // S6: no type declarations ship.
+  equal(paths.filter((path) => /\.d\.[cm]?ts$/.test(path)), [], "main tarball .d.ts files")
   check(main.size <= MAX_PACKED_BYTES, `main tarball is ${main.size} bytes, over ${MAX_PACKED_BYTES}`)
   console.log(`ok main tarball: ${main.entryCount} files, ${main.size} bytes packed`)
 }
@@ -282,7 +288,7 @@ function checkLoaded(host, entry, status, expected, diagnostics) {
   try {
     equal(entry?.state, { status: "active" }, `${host}: plugin state`)
     check(entry.features?.server && entry.features?.tui && entry.features?.rpc === undefined, `${host}: plugin parts ${JSON.stringify(entry.features)}`)
-    equal([status.pluginVersion, status.hostVersion, status.gws], [expected.version, expected.hostVersion, { path: expected.binary, version: "gws 0.22.5" }], `${host}: status`)
+    equal([status.version, status.host?.version, status.host?.range, status.gws], [expected.version, expected.hostVersion, HOST_RANGE, { path: expected.binary, version: "gws 0.22.5" }], `${host}: status`)
   } catch (error) {
     throw new Error(`${error.message}\n${diagnostics()}`)
   }
@@ -334,10 +340,18 @@ function checkEmbeddedHost(sdkDir, pluginDir, expected, root) {
   checkLoaded(`embedded @opencode/sdk ${hostVersion}`, entry, status, { ...expected, hostVersion }, () => `host warnings:\n${warnings.map((line) => JSON.stringify(line)).join("\n")}`)
 }
 
-/** OPENCODE_BIN_<version>, or the stock binary installed from npm with scripts disabled. */
+/** Each version's stock binary, installed once per run. */
+const stockBinaries = new Map()
+
+/** OPENCODE_BIN_<version>, or the stock binary installed from npm with scripts disabled, once per version. */
 function stockBinary(version, work) {
   const configured = process.env[`OPENCODE_BIN_${version.replaceAll(".", "_")}`]
   if (configured) return configured
+  if (!stockBinaries.has(version)) stockBinaries.set(version, installStock(version, work))
+  return stockBinaries.get(version)
+}
+
+function installStock(version, work) {
   const dir = join(work, `cli-${version}`)
   mkdirSync(dir)
   writeFileSync(join(dir, "package.json"), `${JSON.stringify({ name: "cli", private: true })}\n`)
@@ -437,13 +451,23 @@ async function checkSignIn(version, api) {
   )
 }
 
+/** True when a plain x.y.z version is inside a `>=a.b.c <d.e.f` range. */
+function inRange(version, range) {
+  const triple = (text) => text.split(".").map(Number)
+  const compare = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]
+  const bounds = /^>=(\d+\.\d+\.\d+) <(\d+\.\d+\.\d+)$/.exec(range)
+  check(bounds, `unsupported host range ${range}`)
+  return /^\d+\.\d+\.\d+$/.test(version) && compare(triple(version), triple(bounds[1])) >= 0 && compare(triple(version), triple(bounds[2])) < 0
+}
+
 /**
- * Loads the installed plugin into stock OpenCode `version` from a project config, as a user does.
+ * Loads the installed plugin into the stock OpenCode `slot` names, from a project config, as a user does.
+ * The version checked is the one the binary reports, which must be inside opencode.host.
  * The plugin must be active, its server part registered, its ask rules after each agent's base allow,
  * and its status RPC answering with gws 0.22.5 from the installed platform package.
  */
-async function checkStockHost(version, binary, pluginDir, expected, root) {
-  const base = realpathSync(mkdtempSync(join(root, `stock-${version}-`)))
+async function checkStockHost(slot, binary, pluginDir, expected, root) {
+  const base = realpathSync(mkdtempSync(join(root, `stock-${slot}-`)))
   const project = join(base, "project")
   mkdirSync(project)
   writeFileSync(
@@ -467,7 +491,8 @@ async function checkStockHost(version, binary, pluginDir, expected, root) {
       no_proxy: "127.0.0.1,localhost",
     })
     const reported = run(binary, ["--version"], { cwd: project, env }).trim()
-    check(reported === `opencode v${version}`, `${binary} reports ${JSON.stringify(reported)}, not opencode v${version}`)
+    const version = reported.replace(/^opencode v/, "")
+    check(inRange(version, HOST_RANGE), `${binary} (the ${slot} slot) reports ${JSON.stringify(reported)}, outside opencode.host ${HOST_RANGE}`)
     const listed = debugPaths(run(binary, ["debug", "paths"], { cwd: project, env }))
     check(listed.length >= 8, `opencode ${version} debug paths returned ${listed.length} entries`)
     const outside = listed.filter((path) => !insideRoot(path, base))
@@ -527,8 +552,8 @@ async function checkStockHost(version, binary, pluginDir, expected, root) {
 
       const { output } = await api("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })
       equal(
-        [output?.pluginVersion, output?.hostVersion, output?.gws],
-        [expected.version, version, { path: expected.binary, version: "gws 0.22.5" }],
+        [output?.version, output?.host, output?.gws],
+        [expected.version, { version, range: HOST_RANGE, tested: STOCK_HOSTS.includes(version) }, { path: expected.binary, version: "gws 0.22.5" }],
         `opencode ${version}: status`,
       )
       check(proxy.attempts.length === 0, `opencode ${version} tried to reach the network: ${proxy.attempts.join(", ")}`)
@@ -558,7 +583,8 @@ async function main() {
   const version = packageJson(ROOT).version
   for (const file of ["index.js", "tui.js"]) check(readdirSync(join(ROOT, "dist")).includes(file), `dist/${file} is missing; run npm run build first`)
 
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "opencode-gws-pack-")))
+  // Never under $HOME or an inherited TMPDIR: OpenCode finds .opencode/ folders by searching upward.
+  const root = realpathSync(mkdtempSync(join(existsSync("/private/tmp") ? "/private/tmp" : "/tmp", "opencode-gws-pack-")))
   try {
     for (const dir of ["tarballs", "bin"]) mkdirSync(join(root, dir))
     const main = process.env.PACK_TARBALL ? packed(realpathSync(process.env.PACK_TARBALL)) : pack(ROOT, join(root, "tarballs"))

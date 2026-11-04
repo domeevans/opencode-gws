@@ -47,7 +47,7 @@ A change is two calls.
 | export | `gws_export` |
 | admin | `gws_admin` |
 
-The plan's category wins over the manifest. A Drive update whose body sets `trashed` to true is a delete: commit with `gws_delete`. A Calendar event write whose `sendUpdates` is `all` or `externalOnly` is a send: commit with `gws_send`. A read with `download.path` is an export: commit with `gws_export`.
+The plan's category wins over the manifest. A Drive update whose body sets `trashed` to true is a delete: commit with `gws_delete`. A Calendar event write whose `sendUpdates` is not `none`, or whose `sendNotifications` is true, emails the guests and is a send: commit with `gws_send`. A read with `download.path` is an export: commit with `gws_export`.
 
 Plans are single-use and bound to this session, agent, and account. `PLAN_EXPIRED`, `PLAN_ALREADY_USED`, and `PLAN_CALLER_MISMATCH` mean: read the current state, plan again, and show the new preview. `CATEGORY_MISMATCH` means you called the wrong commit tool.
 
@@ -120,6 +120,8 @@ An error is `CODE: What happened. Next step: What to do.` Do the next step once.
 | `OPERATION_UNKNOWN` | The id is not in the catalog. Search again with `gws_catalog`. |
 | `HELPER_UNSUPPORTED` | The helper cannot run. Use the method `gws_catalog` names as `alternative`. |
 | `POLICY_DENIED` | Stop. Tell the user. Do not rephrase the call to get around the deny. |
+| `RECIPIENTS_UNKNOWN` | A recipient rule applies and the plugin could not tell who the send or share reaches. Name the recipients in `to`, `cc` and `bcc` (or the `To`, `Cc` and `Bcc` headers of `raw`) once; otherwise tell the user. |
+| `ACCOUNT_DOMAIN_UNKNOWN` | A rule refuses external recipients and the account's own domain is unknown. Tell the user the message's next step. |
 | `GWS_VALIDATION_ERROR` | Fix the request. `gws_schema` shows the parameters. List and search need `fields`. |
 | `CANCELLED` | Do not retry unless the user asks. A commit that was already running may have been applied. Check with `gws_read` before planning again. |
 | `SESSION_UNKNOWN` | A script named a session that does not exist. Have it create a session and keep that id. |

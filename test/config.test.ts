@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { signInForm } from "../src/auth/form.js"
-import { defaultServices, loadConfig } from "../src/domain/config.js"
+import { loadConfig } from "../src/domain/config.js"
 import { loadManifest } from "../src/domain/manifest.js"
 import { FAKE_GWS, TEST_CLIENT, account, testConfig } from "./support/config.js"
 
@@ -54,23 +54,6 @@ describe("accounts", () => {
         default: { mode: "interactive", enabledServices: services, access: "write", scopes: [] },
       })
     }
-  })
-
-  it("gives a named interactive account without enabledServices the default account's services, still read with write offered", () => {
-    const profile = loadConfig({ accounts: { google: { mode: "interactive" } } }).accounts.google!
-    expect(profile.enabledServices).toEqual(loadConfig(undefined).accounts.default!.enabledServices)
-    expect(profile.enabledServices).toEqual(defaultServices())
-    expect(profile.enabledServices).toContain("meet")
-    expect(profile.enabledServices).not.toContain("keep")
-    expect(profile).toMatchObject({ mode: "interactive", access: "read", scopes: [] })
-    expect(signInForm("google", profile, undefined)[2].options.map((option) => option.value)).toEqual(["read", "write"])
-    expect(loadConfig({ accounts: { google: {} } }).accounts.google!.enabledServices).toEqual(defaultServices())
-  })
-
-  it("still requires enabledServices on a headless account", () => {
-    expect(() => loadConfig({ accounts: { ci: { mode: "credentials_file", credentialsFileEnv: "GWS_CREDENTIALS" } } })).toThrow(/enabledServices/)
-    expect(() => loadConfig({ accounts: { ci: { mode: "access_token", tokenEnv: "GWS_TOKEN" } } })).toThrow(/enabledServices/)
-    expect(() => loadConfig({ accounts: { google: { enabledServices: [] } } })).toThrow(/enabledServices/)
   })
 
   it("says in the default form nothing about Keep, and in a Keep account's form that Keep needs domain-wide delegation", () => {

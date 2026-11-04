@@ -11,12 +11,17 @@ import type { BuiltCommand, Category, MethodEntry, Request } from "./types.js"
  * commands that the manifest marked denied or unparseable.
  */
 
-const NOTIFYING_UPDATES = new Set(["all", "externalonly"])
-
+/**
+ * True when a Calendar event write emails its guests: `sendUpdates` set to
+ * anything but `none`, or the deprecated `sendNotifications` set to anything
+ * but false. Either one is enough, so an unclear value counts as a send.
+ */
 function emailsAttendees(entry: MethodEntry, request: Request): boolean {
   if (entry.service !== "calendar" || entry.path.join(".") !== "events") return false
-  const value = request.params?.["sendUpdates"]
-  return typeof value === "string" && NOTIFYING_UPDATES.has(value.toLowerCase())
+  const updates = request.params?.["sendUpdates"]
+  const legacy = request.params?.["sendNotifications"]
+  const off = (value: unknown, none: string) => value === undefined || value === false || (typeof value === "string" && value.toLowerCase() === none)
+  return !off(updates, "none") || !off(legacy, "false")
 }
 
 export function effectiveCategory(entry: MethodEntry, request: Request): Category {

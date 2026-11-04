@@ -83,6 +83,8 @@ Reply. Same commit tool, `gws_send`:
 }
 ```
 
+The preview lists who the reply reaches: the sender, and for `gmail.reply-all` everyone else on the message. `to`, `cc` and `bcc` add recipients; `remove` leaves people out of a reply-all. `gmail.forward` takes `to`, `cc`, `bcc`, `body`, `attachments` and `noOriginalAttachments`. `gws_schema` lists every helper flag.
+
 ## Drive
 
 Recent files, read:
@@ -169,7 +171,7 @@ Create an event that does not email anyone. Plan category is write. Commit with 
 }
 ```
 
-Create or move an event that emails attendees (`sendUpdates` of `all` or `externalOnly`). The plan category is **send**. Commit with `gws_send`.
+Create or move an event that emails attendees (`sendUpdates` of `all` or `externalOnly`; prefer it to the deprecated `sendNotifications`, which counts as a send too). The plan category is **send**. Commit with `gws_send`.
 
 ```json
 {

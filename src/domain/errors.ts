@@ -43,10 +43,20 @@ export const ErrorCode = {
       "Plugin policy refused the call: the category, the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",
     next: "Do not work around it. If the message says to use gws_plan, plan the change; otherwise tell the user, who can change the plugin policy.",
   },
+  RECIPIENTS_UNKNOWN: {
+    meaning:
+      "A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran.",
+    next: "Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method.",
+  },
+  ACCOUNT_DOMAIN_UNKNOWN: {
+    meaning:
+      "A policy rule sets allowExternalRecipients to false, and the account's own email domain is unknown: accounts.<alias>.domains is unset and the signed-in address could not be read. Nothing ran.",
+    next: "Ask the user to set accounts.<alias>.domains to the account's email domains, or to enable Gmail, Drive or Calendar for the account so the plugin can read its address.",
+  },
 
   // ── Plans ─────────────────────────────────────────────────────────────
   PLAN_NOT_FOUND: {
-    meaning: "No plan has this planId, or it was removed.",
+    meaning: "No plan has this planId: it never existed, or its time limit passed and it was removed.",
     next: "Create a plan with gws_plan, then commit its planId.",
   },
   PLAN_ALREADY_USED: {
@@ -69,16 +79,16 @@ export const ErrorCode = {
   // ── Scripts (the tools RPC) ───────────────────────────────────────────
   SESSION_UNKNOWN: {
     meaning: "A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules.",
-    next: "Pass the id of an existing session, or create one for the agent the script should run as.",
+    next: 'Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id.',
   },
   SESSION_AGENT_REQUIRED: {
     meaning: "A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent.",
-    next: 'Create the script\'s session with an agent, for example POST /api/session with {"agent":"build"}.',
+    next: 'Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id.',
   },
   PERMISSION_DENIED: {
     meaning:
       "The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run.",
-    next: "Run the script as a session whose agent allows the action, or add an allow rule for that action to the agent.",
+    next: "Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it.",
   },
 
   // ── Sign-in ───────────────────────────────────────────────────────────
@@ -93,7 +103,7 @@ export const ErrorCode = {
   },
   ADMIN_PRIVILEGE_REQUIRED: {
     meaning:
-      "The sign-in is valid, but Google refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports for admin-reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal.",
+      "The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code.",
     next: "Ask the user to sign in with a Workspace admin account that has the needed privilege (Reports for admin-reports), or to remove the service from enabledServices.",
   },
   AUTH_CLIENT_REQUIRED: {
@@ -184,8 +194,8 @@ export const ErrorCode = {
 
   // ── Setup: these stop the plugin from loading ────────────────────────
   HOST_UNTESTED: {
-    meaning: "The OpenCode version is outside the tested range in package.json opencode.host.",
-    next: "Use a tested OpenCode release, or set allowUntestedHost to true to run anyway with a status warning.",
+    meaning: "The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0).",
+    next: "Use OpenCode 2.2.3, 2.2.4 or 2.2.5 (tested) or another release in the range, or set allowUntestedHost to true to run anyway; status then shows the host as untested.",
   },
   OPTIONS_INVALID: {
     meaning: "The plugin options are not valid: an unknown key, a wrong type, an unknown service, or access or scopes that name something the account does not enable.",

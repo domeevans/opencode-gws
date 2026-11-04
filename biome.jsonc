@@ -20,6 +20,11 @@
     {
       "includes": ["src/tui.tsx"],
       "linter": { "rules": { "a11y": { "preset": "none" } } }
+    },
+    {
+      // Jelly's icon cleaner refuses a <title> today (hey-jelly issue #33 asks it to allow one).
+      "includes": ["assets/icon.svg"],
+      "linter": { "rules": { "a11y": { "noSvgWithoutTitle": "off" } } }
     }
   ]
 }

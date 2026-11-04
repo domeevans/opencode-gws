@@ -32,11 +32,46 @@ export const COMMIT_TOOLS: ReadonlySet<string> = new Set(["write", "send", "shar
 
 const UNATTENDED = "A script cannot answer an approval prompt; this needs an allow rule for the session's agent."
 
-const Envelope = z.strictObject({
-  sessionID: z.string().min(1),
-  input: z.unknown(),
-})
-type Envelope = z.output<typeof Envelope>
+/** The envelope's messages: the wording every plugin's tools RPC shares (the shared tools-rpc README, "Envelope errors"). */
+const ENVELOPE_MESSAGES = {
+  notObject: `the envelope must be an object, such as {"sessionID":"<session>","input":<the tool's input>}`,
+  unknownKey: (key: string) => `"${key}" is not allowed`,
+  sessionID: `"sessionID" must be a non-empty string`,
+  inputMissing: `"input" is missing`,
+  describe: "describe takes no input",
+} as const
+
+type Envelope = { sessionID: string; input: unknown }
+type Validation = { value: unknown } | { issues: Array<{ message: string }> }
+
+const plainObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+
+/**
+ * A plain JSON Schema with a strict Standard Schema validator attached, not
+ * enumerable, so the contract still reads as JSON Schema. OpenCode prefers
+ * the validator, and answers its issues as rpc.invalid_input.
+ */
+function strict(schema: Record<string, unknown>, validate: (value: unknown) => Validation): Record<string, unknown> {
+  return Object.defineProperty({ ...schema }, "~standard", { value: { version: 1, vendor: "opencode-gws", validate }, enumerable: false })
+}
+
+const ENVELOPE = strict(
+  { type: "object", properties: { sessionID: { type: "string", minLength: 1 }, input: {} }, required: ["sessionID", "input"], additionalProperties: false },
+  (value) => {
+    if (!plainObject(value)) return { issues: [{ message: ENVELOPE_MESSAGES.notObject }] }
+    const found = [
+      ...Object.keys(value).filter((key) => key !== "sessionID" && key !== "input").map(ENVELOPE_MESSAGES.unknownKey),
+      ...(typeof value["sessionID"] === "string" && value["sessionID"] !== "" ? [] : [ENVELOPE_MESSAGES.sessionID]),
+      ...("input" in value ? [] : [ENVELOPE_MESSAGES.inputMissing]),
+    ]
+    return found.length === 0 ? { value } : { issues: found.map((message) => ({ message })) }
+  },
+)
+
+/** describe's input: nothing, or an empty object. */
+const DESCRIBE_INPUT = strict({ type: "object", properties: {}, additionalProperties: false }, (value) =>
+  value === undefined || value === null || (plainObject(value) && Object.keys(value).length === 0) ? { value } : { issues: [{ message: ENVELOPE_MESSAGES.describe }] },
+)
 
 /** Every method's one declared error: the code from the error table and its next step. */
 const Failure = z.strictObject({ code: z.string(), next: z.string() })
@@ -111,8 +146,8 @@ export async function registerScripting(ctx: PluginContext, runtime: Runtime, st
   const contract = Rpc.define({
     id: TOOLS_RPC_ID,
     methods: {
-      describe: { input: z.strictObject({}).optional(), output: Description },
-      ...Object.fromEntries(specs.map((spec) => [spec.name, { input: Envelope, output: spec.output, errors: { failed: Failure } }])),
+      describe: { input: DESCRIBE_INPUT, output: Description },
+      ...Object.fromEntries(specs.map((spec) => [spec.name, { input: ENVELOPE, output: spec.output, errors: { failed: Failure } }])),
     },
     events: {},
   })

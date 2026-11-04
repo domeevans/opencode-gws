@@ -46,7 +46,7 @@ interface SetupOptions {
   connections?: Record<string, unknown>
   /** Stored credential per integration id. */
   credentials?: Record<string, unknown>
-  hostWarning?: string
+  host?: { version: string | null; range: string; tested: boolean }
   accounts?: Record<string, unknown>
   /** The agents OpenCode lists. */
   agents?: Array<{ id: string; permissions: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }>
@@ -82,7 +82,7 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
       binary: { path: binary },
       accounts: options.accounts ?? { personal: account(), work: account({ services: ["gmail", "drive"] }) },
     },
-    { hostVersion: "2.2.3", hostWarning: options.hostWarning, connection: integrationConnection(ctx as never, ids) },
+    { host: options.host ?? { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, connection: integrationConnection(ctx as never, ids) },
   )
   const handlers: Record<string, Handler> = {}
   let disposed = false
@@ -110,12 +110,12 @@ describe("rpc contract", () => {
     expect(Object.keys(Gws.events)).toEqual([])
     const { input, output } = Gws.methods.status
     expect(input).toEqual({ type: "object", properties: {}, additionalProperties: false })
-    expect(output).toMatchObject({ type: "object", required: ["pluginVersion", "hostVersion", "gws", "services", "accounts", "unguardedAgents"] })
+    expect(output).toMatchObject({ type: "object", required: ["version", "host", "state", "gws", "services", "accounts", "unguardedAgents", "nextStep"] })
     expect(JSON.parse(JSON.stringify(output))).toEqual(output)
   })
 
   it("accepts only the status shape in isStatus", () => {
-    const valid = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
+    const valid = { version: "1", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "sign_in_required", nextStep: "Sign in.", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
     expect(isStatus(valid)).toBe(true)
     expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: ["keep"] }] })).toBe(true)
     for (const broken of [
@@ -124,7 +124,10 @@ describe("rpc contract", () => {
       { ...valid, gws: { path: "/g" } },
       { ...valid, accounts: [{ ...valid.accounts[0], mode: "other" }] },
       { ...valid, accounts: [{ ...valid.accounts[0], needsAuth: false }] },
-      { ...valid, hostWarning: 3 },
+      { ...valid, host: { ...valid.host, tested: "yes" } },
+      { ...valid, host: { ...valid.host, version: undefined } },
+      { ...valid, state: "ready" },
+      { ...valid, nextStep: undefined },
       { ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: "keep" }] },
     ]) expect(isStatus(broken), JSON.stringify(broken)).toBe(false)
   })
@@ -141,7 +144,7 @@ describe("status", () => {
       credentials: { cred_1: storedSignIn("read", requestedScopes(["gmail"], "read"), "plugin"), cred_2: storedSignIn("write", work) },
     })
     const output = await status(h)
-    expect(output).toMatchObject({ pluginVersion: "test", hostVersion: "2.2.3", gws: { path: binary, version: "gws 0.22.5" }, services: ["drive", "gmail"], auditDegraded: false })
+    expect(output).toMatchObject({ version: "test", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, gws: { path: binary, version: "gws 0.22.5" }, services: ["drive", "gmail"], auditDegraded: false })
     expect(output.accounts).toEqual([
       {
         alias: "personal",
@@ -233,13 +236,13 @@ describe("status", () => {
     expect((await status(h))["nextStep"]).toBe("Put the permission block first in the own permissions of each agent without default rules, followed by your top-level rules for gws actions.")
   })
 
-  it("has no next step when every account is ready and every agent guarded", async () => {
+  it("says Nothing to do. when every account is ready and every agent guarded", async () => {
     vi.stubEnv("GWS_CREDENTIALS", "/dev/null")
     const h = await setup({ accounts: { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } } })
     const output = await status(h)
     expect(output["unguardedAgents"]).toEqual([])
     expect(output).not.toHaveProperty("permissionsBlock")
-    expect(output).not.toHaveProperty("nextStep")
+    expect(output).toMatchObject({ state: "connected", nextStep: "Nothing to do." })
   })
 
   it("treats a failing connection lookup as not connected", async () => {
@@ -259,16 +262,24 @@ describe("status", () => {
     expect((await status(h)).accounts).toEqual([{ alias: "ci", mode: "credentials_file", services: ["drive"], connected: true }])
   })
 
-  it("carries the untested-host warning only when setup continued past the host guard", async () => {
-    const quiet = await setup()
-    expect(await quiet.runtime.status()).not.toHaveProperty("hostWarning")
-    expect(await status(quiet)).not.toHaveProperty("hostWarning")
-    await quiet.stop()
-    await quiet.runtime.close()
-    const warning = "tested with OpenCode ^2.2.3, found 3.0.0; running anyway because allowUntestedHost is true"
-    const h = await setup({ hostWarning: warning })
-    expect((await h.runtime.status()).hostWarning).toBe(warning)
-    expect(await status(h)).toMatchObject({ hostWarning: warning })
+  it("reports the shared fields: version, host, state, unguardedAgents and nextStep", async () => {
+    const signedOut = await setup()
+    expect(await status(signedOut)).toMatchObject({ version: "test", state: "sign_in_required", unguardedAgents: [], nextStep: expect.stringMatching(/^personal: /) })
+    await signedOut.stop()
+    await signedOut.runtime.close()
+    const untested = { version: "2.2.9", range: ">=2.2.3 <2.3.0", tested: false }
+    const headless = { ci: { mode: "access_token", enabledServices: ["gmail"], tokenEnv: "GWS_RPC_TEST_TOKEN" } }
+    process.env["GWS_RPC_TEST_TOKEN"] = "ya29.test"
+    try {
+      const h = await setup({ host: untested, accounts: headless })
+      expect(await status(h)).toMatchObject({ host: untested, state: "host_untested", nextStep: "Nothing to do." })
+      await h.stop()
+      await h.runtime.close()
+    } finally {
+      delete process.env["GWS_RPC_TEST_TOKEN"]
+    }
+    const unset = await setup({ accounts: headless })
+    expect(await status(unset)).toMatchObject({ state: "not_configured" })
   })
 
   it("projects audit degradation", async () => {

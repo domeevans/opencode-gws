@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import ts from "typescript"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { Audit, auditErrorCode } from "../src/domain/audit.js"
+import { AUDIT_MAX_BYTES, Audit, auditErrorCode } from "../src/domain/audit.js"
 import { GwsError } from "../src/domain/errors.js"
 
 const cleanup: (() => void)[] = []
@@ -149,3 +149,18 @@ describe("audit to stderr", () => {
     expect(result.stderr).toMatch(/^\[opencode-gws\] .*"event":"plugin.loaded".*\n$/)
   }, 10_000)
 })
+
+describe("audit file rotation", () => {
+  it("moves a full audit.jsonl to audit.jsonl.1 and starts a new one, keeping one previous file", async () => {
+    expect(AUDIT_MAX_BYTES).toBe(5 * 1024 * 1024)
+    const { sink, path } = audit()
+    writeFileSync(path, `${"x".repeat(AUDIT_MAX_BYTES - 10)}\n`)
+    writeFileSync(`${path}.1`, "older\n")
+    sink.emit({ event: "plugin.loaded", outcome: "success" })
+    await vi.waitFor(() => expect(existsSync(path) && readFileSync(path, "utf8").includes("plugin.loaded")).toBe(true))
+    expect(readFileSync(path, "utf8").split("\n").filter(Boolean)).toHaveLength(1)
+    expect(statSync(`${path}.1`).size).toBe(AUDIT_MAX_BYTES - 9)
+    expect(statSync(path).mode & 0o777).toBe(0o600)
+  })
+})
+

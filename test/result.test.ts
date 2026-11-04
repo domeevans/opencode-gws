@@ -7,7 +7,7 @@ function processResult(stdout: unknown, exitCode: number | null = 1, stderr = ""
   return { exitCode, signal: null, stdout: Buffer.from(text), stderr: Buffer.from(stderr), durationMs: 5, timedOut: false, outputCapped: false }
 }
 
-const failure = (result: ProcessResult) => processError(result, parseResult(result, { maxInlineBytes: 64 * 1024 }))
+const failure = (result: ProcessResult) => processError(result, parseResult(result, { maxInlineBytes: 64 * 1024 }), "drive")
 
 const ENABLE = "https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=123456789"
 
@@ -41,7 +41,7 @@ describe("gws exit codes", () => {
 
   it("keeps the message form for callers that need text", () => {
     const result = processResult({ error: { code: 404, message: "Requested entity was not found." } }, 1)
-    expect(errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }))).toBe(failure(result).message)
+    expect(errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), "drive")).toBe(failure(result).message)
   })
 })
 

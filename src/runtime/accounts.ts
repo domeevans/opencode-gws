@@ -1,3 +1,4 @@
+import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { doctorTarget, probeArgv, probeOutcome, skipDetail, type DoctorOutcome, type DoctorTarget } from "../auth/doctor.js"
 import { signInScopes } from "../auth/form.js"
@@ -10,6 +11,7 @@ import { authProblem, privilegeName, type AuthRemediation } from "../domain/resu
 import { delegationRequired, restriction } from "../domain/restricted.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
+import { HOST_RANGE, type HostCheck } from "../domain/host.js"
 import type { AccountProfile, PluginConfig, ProcessResult } from "../domain/types.js"
 import { buildChildEnv } from "../process/env.js"
 import { ownedDir, type PluginPaths } from "../process/paths.js"
@@ -49,9 +51,8 @@ export interface AccountCredential {
 
 export interface RuntimeOptions {
   pluginVersion: string
-  hostVersion?: string
-  /** Why setup continued on an untested host; shown in status. */
-  hostWarning?: string
+  /** The OpenCode host setup checked; unknown in a runtime made without one. */
+  host?: HostCheck
   projectDirectory?: string
   /** Plugin-owned directories; the platform defaults unless given. */
   paths?: PluginPaths
@@ -77,7 +78,7 @@ interface RunOptions {
   scopes?: readonly string[]
   /** A --dry-run never contacts Google, so its success says nothing about the credential. */
   dryRun?: boolean
-  /** Run gws in this staging directory (calls with local files). */
+  /** Run gws in this staging directory (calls with local files); otherwise in a private directory removed after the call. */
   cwd?: string
 }
 
@@ -125,9 +126,8 @@ export class Accounts {
     )
     return {
       auditDegraded: this.runtime.audit.degraded,
-      pluginVersion: options.pluginVersion,
-      hostVersion: options.hostVersion ?? "unknown",
-      ...(options.hostWarning ? { hostWarning: options.hostWarning } : {}),
+      version: options.pluginVersion,
+      host: options.host ?? { version: null, range: HOST_RANGE, tested: false },
       binary: { path: this.runtime.binary, version: this.runtime.version },
       services: [...this.runtime.visibleServices()].sort(),
       accounts,
@@ -154,11 +154,19 @@ export class Accounts {
     this.runtime.assertActive(ctx.signal)
     const env = buildChildEnv(profile, this.accountDir(account), this.runtime.workDir, credential?.access)
     report(ctx, { status: "running", operation })
-    const result = await this.spawn(argv, env, operation, ctx, options.paged === true, options.cwd ?? this.runtime.workDir)
+    // gws saves a body that is not JSON to a file in its working directory:
+    // a call without its own staging directory runs in a private one, removed after.
+    const scratch = options.cwd ? undefined : await mkdtemp(join(this.runtime.workDir, "call-"))
+    let result: ProcessResult
+    try {
+      result = await this.spawn(argv, env, operation, ctx, options.paged === true, options.cwd ?? scratch!)
+    } finally {
+      if (scratch) await rm(scratch, { recursive: true, force: true }).catch(() => undefined)
+    }
     // Only a call that used the integration credential says anything about
     // that connection; headless credentials have no connection to mark.
     if (credential) {
-      const problem = authProblem(result)
+      const problem = authProblem(result, serviceOf(operation))
       if (problem) this.observeAuth(account, { status: "needs_auth", code: problem, message: this.authMessage(account, problem, options.scopes) })
       else if (result.exitCode === 0 && options.dryRun !== true) this.observeAuth(account, { status: "ok" })
     }
@@ -332,6 +340,11 @@ function delegationField(profile: AccountProfile): { delegationRequired?: string
   if (profile.mode !== "interactive") return {}
   const services = delegationRequired(profile.enabledServices, profile.scopes)
   return services.length > 0 ? { delegationRequired: services } : {}
+}
+
+/** The service of an operation id: its first part, as in `admin-reports.activities.list`. */
+function serviceOf(operation: string): string {
+  return operation.slice(0, operation.indexOf("."))
 }
 
 function capitalize(text: string): string {

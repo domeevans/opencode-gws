@@ -3,33 +3,12 @@ import type { BuiltCommand, MethodEntry, PluginConfig, Request } from "./types.j
 import { canonicalJson } from "./digest.js"
 import { GwsError } from "./errors.js"
 import { inputFiles, outputRel, type FileSpecs } from "./files.js"
+import { recipientLabels, scanRecipients } from "./recipients.js"
 
 /**
  * Argv builder for Discovery methods. The model never supplies argv: every
  * element is derived from a manifest entry and a validated request.
  */
-
-function recipientsOf(request: Request): string[] {
-  const out = new Set<string>()
-  const visit = (value: unknown, key?: string): void => {
-    if (typeof value === "string") {
-      if (key && /^(to|cc|bcc|email|emailAddress|address|recipient)$/i.test(key) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        out.add(value.toLowerCase())
-      }
-      return
-    }
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item, key)
-      return
-    }
-    if (value && typeof value === "object") {
-      for (const [childKey, child] of Object.entries(value as Record<string, unknown>)) visit(child, childKey)
-    }
-  }
-  visit(request.params)
-  visit(request.body)
-  return [...out]
-}
 
 /** True when the request asks gws to follow `nextPageToken` (NDJSON, one line per page). */
 export function wantsPages(request: Request): boolean {
@@ -136,7 +115,7 @@ export function buildCommand(
       url: entry.pathTemplate,
       params: redactParams(params),
       bodySummary: request.body === undefined ? undefined : summarizeBody(request.body),
-      recipients: recipientsOf(request),
+      recipients: recipientLabels(scanRecipients(request)),
       uploads: request.upload ? [request.upload.path] : undefined,
       destination: request.download?.path,
       overwrite: request.download?.overwrite === true ? true : undefined,

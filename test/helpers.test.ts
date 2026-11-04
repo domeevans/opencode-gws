@@ -1,8 +1,11 @@
+import { execFileSync } from "node:child_process"
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { helperAdapter } from "../src/domain/helpers.js"
 import { loadManifest, resolveHelper } from "../src/domain/manifest.js"
+import { resolvePackagedBinary } from "../src/process/binary.js"
 import type { Runtime } from "../src/runtime/index.js"
 import { testRuntime } from "./support/config.js"
 import { request as requestFor } from "./support/requests.js"
@@ -226,12 +229,40 @@ describe("helper planning", () => {
     for (const id of mutating) {
       writeFileSync(log, "")
       const planned = await runtime!.plan(requestFor(id, { input: samples[id] }), call)
-      const ran = readFileSync(log, "utf8").split("\n").filter(Boolean)
+      const lines = readFileSync(log, "utf8").split("\n").filter(Boolean)
+      // A reply also reads the message it answers, to show and check its recipients.
+      const ran = lines.filter((line) => line.split(" ")[1]?.startsWith("+"))
+      expect(lines.some((line) => line.startsWith("gmail users messages get ")), id).toBe(id.startsWith("gmail.reply"))
       expect(ran, id).toHaveLength(1)
       expect(ran[0]!.endsWith(" --dry-run"), id).toBe(true)
       const plan = runtime!.inspectPlan(planned.category, { planId: planned.planId }, call)
       expect(plan.argv, id).not.toContain("--dry-run")
       expect([...plan.argv, "--dry-run"].join(" "), id).toBe(ran[0])
+    }
+  })
+})
+
+describe("helper adapters match gws's own flags", () => {
+  /** Flags the plugin sets itself or never offers: --dry-run (plans), --format on sends (JSON receipts), --sanitize (Model Armor), --help. */
+  const PLUGIN_OWNED = new Set(["dry-run", "sanitize", "help"])
+  const SEND_HELPERS = new Set(["gmail.send", "gmail.reply", "gmail.reply-all", "gmail.forward"])
+  /** Adapter keys that are not the flag's camelCase. */
+  const RENAMED: Record<string, string> = { attach: "attachments" }
+
+  it.each(adaptedHelpers())("%s takes every flag gws 0.22.5 has for it", (id) => {
+    const [service, name] = id.split(".") as [string, string]
+    const home = mkdtempSync(join(tmpdir(), "gws-help-"))
+    try {
+      const help = execFileSync(resolvePackagedBinary(), [service, `+${name}`, "--help"], { env: { HOME: home, PATH: "" }, encoding: "utf8" })
+      // Option lines only: the flag, its value name, then its description after two or more spaces.
+      const flags = [...new Set([...help.matchAll(/^\s+(?:-\w, )?--([a-z-]+)(?: <[^>]+>)? {2,}\S/gm)].map((match) => match[1]!))]
+      const expected = flags
+        .filter((flag) => !PLUGIN_OWNED.has(flag) && !(flag === "format" && SEND_HELPERS.has(id)))
+        .map((flag) => RENAMED[flag] ?? flag.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase()))
+      const shape = (helperAdapter(id)!.inputSchema as unknown as { shape: Record<string, unknown> }).shape
+      expect(Object.keys(shape).sort()).toEqual(expected.sort())
+    } finally {
+      rmSync(home, { recursive: true, force: true })
     }
   })
 })

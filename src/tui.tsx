@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin/tui"
 import { type RGBA, TextAttributes } from "@opentui/core"
 import { For, Show, createSignal } from "solid-js"
-import { BLOCK_PLACEMENT, DELEGATION_LABEL, Gws, NOTHING_TO_DO, connectionLabel, delegationText, isStatus, openCodeLabel, type GwsAccount, type GwsStatus } from "./rpc.js"
+import { BLOCK_PLACEMENT, DELEGATION_LABEL, Gws, connectionLabel, delegationText, isStatus, openCodeLabel, type GwsAccount, type GwsStatus } from "./rpc.js"
 
 /**
  * The TUI part: one palette command, "Google Workspace: Status" (slash
@@ -141,8 +141,8 @@ function StatusBody(props: { readonly status: GwsStatus; readonly colors: Colors
         <Show when={props.status.auditDegraded}>
           <Row label="Audit" value="some records could not be saved, so the audit log may be incomplete" fg={tone("warning")} muted={muted()} />
         </Show>
-        <Row label="OpenCode" value={openCodeLabel(props.status)} fg={tone(props.status.hostWarning ? "warning" : "success")} muted={muted()} />
-        <Row label="Next step" value={props.status.nextStep ?? NOTHING_TO_DO} fg={base()} muted={muted()} />
+        <Row label="OpenCode" value={openCodeLabel(props.status)} fg={tone(props.status.host.tested ? "success" : "warning")} muted={muted()} />
+        <Row label="Next step" value={props.status.nextStep} fg={base()} muted={muted()} />
       </box>
     </box>
   )

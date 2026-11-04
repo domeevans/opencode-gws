@@ -35,20 +35,20 @@ describe("policy does not ask", () => {
       const entry = method(service, resources, name)
       const req = request(entry, { userId: "me" })
       expect(effectiveCategory(entry, req)).toBe(category)
-      expect(evaluatePolicy(config(), entry, category, req).effect).toBe("allow")
+      expect(evaluatePolicy(config(), entry, category, req, "pending").effect).toBe("allow")
     }
   })
 
   it("keeps admin denied until the admin gate is opened", () => {
     const entry: MethodEntry = { ...method("drive", ["files"], "list"), category: "admin" }
-    expect(evaluatePolicy(config(), entry, "admin", request(entry)).effect).toBe("deny")
+    expect(evaluatePolicy(config(), entry, "admin", request(entry), "pending").effect).toBe("deny")
   })
 
   it("lets a deny rule block one category", () => {
     const entry = method("drive", ["files"], "delete")
     const req = request(entry, { fileId: "x" })
-    expect(evaluatePolicy(config({ rules: [{ id: "no-delete", effect: "deny", categories: ["delete"] }] }), entry, "delete", req).effect).toBe("deny")
-    expect(evaluatePolicy(config({ rules: [{ id: "no-write", effect: "deny", categories: ["write"] }] }), method("gmail", ["users", "drafts"], "create"), "write", req).effect).toBe("deny")
+    expect(evaluatePolicy(config({ rules: [{ id: "no-delete", effect: "deny", categories: ["delete"] }] }), entry, "delete", req, "pending").effect).toBe("deny")
+    expect(evaluatePolicy(config({ rules: [{ id: "no-write", effect: "deny", categories: ["write"] }] }), method("gmail", ["users", "drafts"], "create"), "write", req, "pending").effect).toBe("deny")
   })
 
   it("rejects policy.defaults", () => {
@@ -68,6 +68,18 @@ describe("writes that reach other people are sends", () => {
       expect(effectiveCategory(entry, request(entry, { calendarId: "primary", sendUpdates: "externalOnly" }))).toBe("send")
       expect(effectiveCategory(entry, request(entry, { calendarId: "primary", sendUpdates: "none" }))).toBe("write")
       expect(effectiveCategory(entry, request(entry, { calendarId: "primary" }))).toBe("write")
+    }
+  })
+
+  it("promotes the deprecated sendNotifications, and any sendUpdates but none", () => {
+    for (const name of ["insert", "patch", "update", "quickAdd", "move"]) {
+      const entry = method("calendar", ["events"], name)
+      for (const params of [{ sendNotifications: true }, { sendNotifications: "true" }, { sendNotifications: 1 }, { sendUpdates: "ALL" }, { sendUpdates: "bogus" }, { sendUpdates: "none", sendNotifications: true }]) {
+        expect(effectiveCategory(entry, request(entry, { calendarId: "primary", ...params })), `${name} ${JSON.stringify(params)}`).toBe("send")
+      }
+      for (const params of [{ sendNotifications: false }, { sendNotifications: "false" }, { sendUpdates: "None" }]) {
+        expect(effectiveCategory(entry, request(entry, { calendarId: "primary", ...params })), `${name} ${JSON.stringify(params)}`).toBe("write")
+      }
     }
   })
 

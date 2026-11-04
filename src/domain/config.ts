@@ -45,28 +45,23 @@ export const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema]
 const accessLevel = z.enum(["read", "write"])
 
 /**
- * The services an interactive account enables when it names none: every
- * manifest service a person's sign-in can use. Services that need
- * domain-wide delegation (Keep) are left out: no ordinary sign-in can run
- * them, and Google refuses the whole consent for a delegation scope.
+ * With no `accounts` option, one interactive account enables every manifest
+ * service a person's sign-in can use at Read and write, so one consent
+ * grants every scope the plugin can use. Services that need domain-wide
+ * delegation (Keep) are left out: no ordinary sign-in can run them. Every
+ * change still needs a plan, the ask, and a commit; the form still offers
+ * Read-only.
  */
-export function defaultServices(): string[] {
-  return loadManifest()
+function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
+  const services = loadManifest()
     .services.map((service) => service.alias)
     .filter((service) => !DELEGATION_SERVICES.includes(service))
-}
-
-/**
- * With no `accounts` option, one interactive account enables the default
- * services at Read and write, so one consent grants every scope the plugin
- * can use. Every change still needs a plan, the ask, and a commit; the form
- * still offers Read-only.
- */
-function defaultAccounts(): Record<string, { mode: "interactive"; access: "write" }> {
-  return { default: { mode: "interactive", access: "write" } }
+  return { default: { mode: "interactive", enabledServices: services, access: "write" } }
 }
 
 const enabledServices = z.array(z.string().min(1)).min(1)
+/** The account's own email domains: recipients outside them are external. */
+const domains = z.array(z.string().regex(/^[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+$/u, "must be a domain such as example.com")).min(1)
 
 /** `mode` may be omitted: an account is interactive unless it names a headless mode. */
 const accountProfile = z.preprocess(
@@ -74,8 +69,8 @@ const accountProfile = z.preprocess(
   z.discriminatedUnion("mode", [
     z.strictObject({
       mode: z.literal("interactive"),
-      // Omitted: the default services, so a host need not know the manifest.
-      enabledServices: enabledServices.optional(),
+      enabledServices,
+      domains: domains.optional(),
       access: z.union([accessLevel, z.record(z.string().min(1), accessLevel)]).optional(),
       scopes: z.array(z.string().min(1)).optional(),
       oauthClient: OAuthClientSchema.optional(),
@@ -83,11 +78,13 @@ const accountProfile = z.preprocess(
     z.strictObject({
       mode: z.literal("credentials_file"),
       enabledServices,
+      domains: domains.optional(),
       credentialsFileEnv: envVarName,
     }),
     z.strictObject({
       mode: z.literal("access_token"),
       enabledServices,
+      domains: domains.optional(),
       tokenEnv: envVarName,
     }),
   ]),
@@ -204,7 +201,7 @@ export function loadConfig(raw: unknown): PluginConfig {
   const known = new Set(loadManifest().services.map((service) => service.alias))
   const accounts: Record<string, AccountProfile> = {}
   for (const [alias, profile] of Object.entries(configured)) {
-    const enabled = [...new Set((profile.enabledServices ?? defaultServices()).map(canonicalService))]
+    const enabled = [...new Set(profile.enabledServices.map(canonicalService))]
     for (const service of enabled) {
       if (!known.has(service)) throw invalid(`Account '${alias}' enables the unknown service '${service}'`, `Fix accounts.${alias}.enabledServices in the plugin options.`)
     }
@@ -230,6 +227,7 @@ export function loadConfig(raw: unknown): PluginConfig {
     accounts[alias] = {
       mode: profile.mode,
       enabledServices: enabled,
+      ...(profile.domains ? { domains: [...new Set(profile.domains.map((domain) => domain.toLowerCase()))] } : {}),
       access,
       ...(accessSpecified ? { accessSpecified } : {}),
       scopes: [...new Set(scopes)],

@@ -116,6 +116,22 @@ describe("tools RPC on a real host", () => {
     expect(await run("read", sessions.agentless!, list)).toMatchObject({ type: "failed", code: "SESSION_AGENT_REQUIRED" })
   })
 
+  it("answers a bad envelope with the shared wording", async () => {
+    const raw = async (method: string, body: unknown) => {
+      try {
+        return { value: await tools()[method]!(body, at()) }
+      } catch (error) {
+        const e = error as Record<string, any>
+        return { type: e.type ?? e._tag, message: String(e.message ?? e) }
+      }
+    }
+    const extra = await raw("read", { sessionID: sessions.build!, input: list, extra: 1 })
+    expect(extra.value).toBeUndefined()
+    expect(extra.message).toContain('"extra" is not allowed')
+    expect((await raw("read", { input: list })).message).toContain('"sessionID" must be a non-empty string')
+    expect((await raw("describe", { sessionID: sessions.build! })).message).toContain("describe takes no input")
+  })
+
   it("has no commit method", async () => {
     const result = await run("write", sessions.build!, { planId: "p" })
     expect(result.value).toBeUndefined()

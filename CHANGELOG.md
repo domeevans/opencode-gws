@@ -2,6 +2,45 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-11-04
+
+### Added
+
+- Jelly shows the plugin's one-line summary ("Gmail, Calendar, Drive, Docs and Sheets.") and its icon, a neutral envelope over a page (`assets/icon.svg`, now in the package). A Jelly release that does not know these two fields refuses the declaration, so this version needs a Jelly that accepts them.
+- In Jelly, a web tab can sign in to Google Workspace through Jelly's sign-in relay: the `google` sign-in declares `relay` with the `redirectUri` and `callbackPort` fields the plugin already takes. Nothing changes without Jelly.
+
+### Fixed
+
+- Planning `gmail.users.drafts.send` for a draft that cannot be read, or that names no recipient, now sets `recipientsUnknown` in the preview ("the draft could not be read or names no recipient"), so a recipient rule refuses it with `RECIPIENTS_UNKNOWN`. Before, such a plan could show no recipients and no reason.
+
+## [0.0.3] - 2026-11-04
+
+### Fixed
+
+- Policy recipient rules no longer fail open. `allowedRecipientDomains`, `allowedRecipients`, `deniedRecipientDomains` and `allowExternalRecipients` now read every address in `to`, `cc` and `bcc`: comma- and semicolon-separated strings, `Name <address>`, quoted names and groups. They read the `To`, `Cc` and `Bcc` headers of a raw `gmail.users.messages.send`, and before the plan they read who a reply, reply-all, `gmail.users.drafts.send`, a notifying event change or a Drive permission update reaches. Calendar ACL scopes (by address, domain or rule id), Gmail delegates and forwarding addresses, Drive domain shares and the other share methods are read too. When a matching rule limits recipients and the plugin cannot tell who a send or share reaches, the plan is refused with the new code `RECIPIENTS_UNKNOWN`. A plan whose recipients were read is checked again at commit, and expires if someone was added.
+- A Calendar event write that emails its guests through the deprecated `sendNotifications: true`, or a `sendUpdates` value other than `none`, is now a `send`, so it asks every time and never offers Always. Before, only `sendUpdates` `all` and `externalOnly` were sends, and `sendNotifications` committed as a `write`.
+- `allowExternalRecipients: false` now compares each recipient with the account's own domain, not with the first recipient, so a send only to outside addresses is refused. The domain is the new `accounts.<alias>.domains` option, or the signed-in address's domain, read with Gmail, Drive or Calendar; when neither is known the plan is refused with the new code `ACCOUNT_DOMAIN_UNKNOWN`.
+- An operation that is not a download no longer reports gws's `{"saved_file":"download.html",…}` when Google answers with an empty body, as a Drive delete does: the result is empty (`""`), and no file is left in the plugin's work folder. Each gws call without staged files now runs in its own private folder, removed afterwards. A read whose body is not JSON reports its `mimeType` and `bytes`, with a next step to save it through `download.path` and `gws_export`.
+- A plan's preview, and so the approval prompt and `/gws-status`, now names everyone a send or share reaches. A reply lists the sender (or `Reply-To`) of the message it answers, a reply-all every other participant except the account itself, a raw message its `To`, `Cc` and `Bcc`, and a draft, a notifying event change or a Drive permission update the recipients read for it. Before, a reply showed only its `cc` and `bcc`. When the plugin cannot tell who a send or share reaches, the preview says why in the new `recipientsUnknown` field.
+- `ADMIN_PRIVILEGE_REQUIRED` applies only to Admin SDK services (`admin-reports`, and any later `admin-*`). A Chat, Drive, Classroom or other refusal worded "not authorized to access" is now that service's own error (`GWS_API_ERROR`, or `AUTH_REQUIRED` for a 401), not a pointer to a Workspace admin account. Reads, plans, commits and `/gws-doctor` agree.
+- The package no longer ships `views/jelly-view.d.ts`: no type declarations ship (it stays in the repository for view authors), and the pack test refuses any `.d.ts`.
+- Committing a plan a second time says `PLAN_ALREADY_USED: This plan was already committed`, with the next step to create a new plan, until the plan's time limit passes. Before, creating any other plan removed the used one, and the second commit said `PLAN_NOT_FOUND: Run gws_plan first`.
+- Work folders (`$TMPDIR/opencode-gws-*`) left by a server that stopped without closing are removed at the next start, once they are a day old and the process that owned them is gone. A folder from an earlier version, which has no owner record, is removed after a week.
+- The audit log no longer grows without bound: `audit.jsonl` is capped at 5 MiB, and a write that would pass the cap first moves it to `audit.jsonl.1`, replacing the previous one.
+- The README's Uninstall now signs out first, while the plugin's sign-ins still exist, then removes the plugin, then names the state and cache folders to delete (`~/Library/Application Support/opencode-gws` and `~/Library/Caches/opencode-gws` on macOS, `~/.local/state/opencode-gws` and `~/.cache/opencode-gws` on Linux). Install says to run `opencode reload` and `/gws-status`, and a new paragraph explains updating.
+- `docs/scripting.md` says that `opencode api` calls run in the service's default location (your home directory), not the directory you run them in, and how to target a project; that `opencode api` exits with status 1 on an RPC error; and when a read's `data` is text rather than JSON.
+
+### Changed
+
+- The status RPC (`google-workspace.gws/status`) and `gws_status` use the field names every plugin shares. `pluginVersion` is now `version`; `hostVersion` and `hostWarning` are now `host: { version, range, tested }`; the new `state` is `connected`, `sign_in_required`, `not_configured` or `host_untested`; and `nextStep` is always present, `Nothing to do.` when nothing is needed (before, it was absent).
+- The tools RPC's envelope errors use the wording every plugin's tools RPC shares: `"extra" is not allowed`, `"sessionID" must be a non-empty string`, `"input" is missing`, `the envelope must be an object, such as …`, and `describe takes no input`, instead of zod's text such as `Unrecognized key: "extra"`. The next steps of `SESSION_UNKNOWN`, `SESSION_AGENT_REQUIRED` and `PERMISSION_DENIED` match the shared ones too.
+- OpenCode 2.2.5 is a tested host. Status calls only 2.2.3, 2.2.4 and 2.2.5 tested: another release inside `>=2.2.3 <2.3.0` starts as before, and now shows as host untested, with the supported range, in `/gws-status` and the dialog. `HOST_UNTESTED` says the range is supported, not tested.
+
+### Added
+
+- `accounts.<alias>.domains`: the account's own email domains, for `allowExternalRecipients`.
+- Helper flags from gws 0.22.5: `to` on `gmail.reply` and `gmail.reply-all` (extra To recipients), `remove` on `gmail.reply-all`, `cc`, `bcc`, `from`, `draft`, `attachments` and `noOriginalAttachments` on `gmail.forward`, and `format` on `gmail.triage`. Before, these were refused with `GWS_VALIDATION_ERROR`. A test now compares every adapter with the flags `gws <service> +<helper> --help` lists.
+
 ## [0.0.2] - 2026-11-03
 
 ### Fixed

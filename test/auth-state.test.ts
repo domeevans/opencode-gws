@@ -58,39 +58,49 @@ const SAMPLES = {
 
 describe("auth error classification", () => {
   it("classifies sign-in and consent problems and nothing else", () => {
-    expect(authProblem(SAMPLES.noCredentials)).toBe("AUTH_REQUIRED")
-    expect(authProblem(SAMPLES.invalidToken)).toBe("AUTH_REQUIRED")
-    expect(authProblem(SAMPLES.invalidGrant)).toBe("AUTH_REQUIRED")
-    expect(authProblem(SAMPLES.unauthenticated)).toBe("AUTH_REQUIRED")
-    expect(authProblem(SAMPLES.stderrOnly)).toBe("AUTH_REQUIRED")
-    expect(authProblem(SAMPLES.scope)).toBe("AUTH_SCOPE_MISSING")
-    expect(authProblem(SAMPLES.scopeReasonOnly)).toBe("AUTH_SCOPE_MISSING")
-    expect(authProblem(SAMPLES.fileForbidden)).toBeUndefined()
-    expect(authProblem(SAMPLES.notFound)).toBeUndefined()
-    expect(authProblem(SAMPLES.disabled)).toBeUndefined()
-    expect(authProblem(processResult('{"id":"1"}', 0))).toBeUndefined()
-    expect(authProblem({ ...SAMPLES.invalidToken, timedOut: true })).toBeUndefined()
+    expect(authProblem(SAMPLES.noCredentials, "admin-reports")).toBe("AUTH_REQUIRED")
+    expect(authProblem(SAMPLES.invalidToken, "admin-reports")).toBe("AUTH_REQUIRED")
+    expect(authProblem(SAMPLES.invalidGrant, "admin-reports")).toBe("AUTH_REQUIRED")
+    expect(authProblem(SAMPLES.unauthenticated, "admin-reports")).toBe("AUTH_REQUIRED")
+    expect(authProblem(SAMPLES.stderrOnly, "admin-reports")).toBe("AUTH_REQUIRED")
+    expect(authProblem(SAMPLES.scope, "admin-reports")).toBe("AUTH_SCOPE_MISSING")
+    expect(authProblem(SAMPLES.scopeReasonOnly, "admin-reports")).toBe("AUTH_SCOPE_MISSING")
+    expect(authProblem(SAMPLES.fileForbidden, "admin-reports")).toBeUndefined()
+    expect(authProblem(SAMPLES.notFound, "admin-reports")).toBeUndefined()
+    expect(authProblem(SAMPLES.disabled, "admin-reports")).toBeUndefined()
+    expect(authProblem(processResult('{"id":"1"}', 0), "admin-reports")).toBeUndefined()
+    expect(authProblem({ ...SAMPLES.invalidToken, timedOut: true }, "admin-reports")).toBeUndefined()
   })
 
   it("tells an Admin SDK privilege refusal from a sign-in problem, though both are 401 authError", () => {
     for (const refusal of [SAMPLES.reportsRefusal, SAMPLES.directoryRefusal, SAMPLES.refusalStderrOnly]) {
-      expect(privilegeRefused(refusal)).toBe(true)
-      expect(authProblem(refusal)).toBeUndefined()
+      expect(privilegeRefused(refusal, "admin-reports")).toBe(true)
+      expect(authProblem(refusal, "admin-reports")).toBeUndefined()
     }
     for (const token of [SAMPLES.noCredentials, SAMPLES.invalidToken, SAMPLES.invalidGrant, SAMPLES.unauthenticated, SAMPLES.stderrOnly]) {
-      expect(privilegeRefused(token)).toBe(false)
-      expect(authProblem(token)).toBe("AUTH_REQUIRED")
+      expect(privilegeRefused(token, "admin-reports")).toBe(false)
+      expect(authProblem(token, "admin-reports")).toBe("AUTH_REQUIRED")
     }
     // A gws auth error (exit 2) and invalid_grant are token failures whatever the text says.
-    expect(privilegeRefused({ ...SAMPLES.reportsRefusal, exitCode: 2 })).toBe(false)
-    expect(privilegeRefused(processResult('{"error":{"code":401,"message":"invalid_grant: not authorized to access","reason":"authError"}}'))).toBe(false)
-    expect(privilegeRefused(processResult('{"error":{"code":404,"message":"You are not authorized to access this file."}}'))).toBe(false)
-    for (const other of [SAMPLES.scope, SAMPLES.fileForbidden, SAMPLES.notFound, SAMPLES.disabled]) expect(privilegeRefused(other)).toBe(false)
+    expect(privilegeRefused({ ...SAMPLES.reportsRefusal, exitCode: 2 }, "admin-reports")).toBe(false)
+    expect(privilegeRefused(processResult('{"error":{"code":401,"message":"invalid_grant: not authorized to access","reason":"authError"}}'), "admin-reports")).toBe(false)
+    expect(privilegeRefused(processResult('{"error":{"code":404,"message":"You are not authorized to access this file."}}'), "admin-reports")).toBe(false)
+    for (const other of [SAMPLES.scope, SAMPLES.fileForbidden, SAMPLES.notFound, SAMPLES.disabled]) expect(privilegeRefused(other, "admin-reports")).toBe(false)
+  })
+
+  it("never reads another service's refusal as an admin privilege refusal", () => {
+    const chat = processResult('{"error":{"code":403,"message":"The caller is not authorized to access this space.","status":"PERMISSION_DENIED"}}')
+    for (const service of ["chat", "drive", "classroom", "gmail"]) {
+      for (const refusal of [SAMPLES.reportsRefusal, chat]) expect(privilegeRefused(refusal, service), service).toBe(false)
+      expect(errorFromProcess(chat, parseResult(chat, { maxInlineBytes: 1024 }), service)).toMatch(/^GWS_API_ERROR: The caller is not authorized/)
+    }
+    expect(errorFromProcess(SAMPLES.reportsRefusal, parseResult(SAMPLES.reportsRefusal, { maxInlineBytes: 1024 }), "drive")).toMatch(/^AUTH_REQUIRED:/)
+    expect(authProblem(SAMPLES.reportsRefusal, "drive")).toBe("AUTH_REQUIRED")
   })
 
   it("turns them into stable codes with remediation", () => {
     const message = (result: ProcessResult) =>
-      errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), { signIn: "sign in again: LOGIN", consent: "grant: CONSENT", privilege: "sign in as an admin: PRIVILEGE" })
+      errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), "admin-reports", { signIn: "sign in again: LOGIN", consent: "grant: CONSENT", privilege: "sign in as an admin: PRIVILEGE" })
     expect(message(SAMPLES.invalidGrant)).toMatch(/^AUTH_REQUIRED: The Google Workspace sign-in is missing or no longer valid; sign in again: LOGIN \(gws: .*invalid_grant/)
     expect(message(SAMPLES.scope)).toMatch(/^AUTH_SCOPE_MISSING: The credential lacks a scope for this operation; grant: CONSENT/)
     expect(message(SAMPLES.disabled)).toMatch(/^API_DISABLED:/)
@@ -100,7 +110,7 @@ describe("auth error classification", () => {
         "Next step: Sign in as an admin: PRIVILEGE.",
     )
     // Without the runtime's remediation, the generic next step.
-    expect(errorFromProcess(SAMPLES.reportsRefusal, parseResult(SAMPLES.reportsRefusal, { maxInlineBytes: 1024 }))).toMatch(
+    expect(errorFromProcess(SAMPLES.reportsRefusal, parseResult(SAMPLES.reportsRefusal, { maxInlineBytes: 1024 }), "admin-reports")).toMatch(
       /Next step: Sign in with a Workspace admin account that has the admin privilege this operation needs, or remove the service from enabledServices\.$/,
     )
   })
@@ -302,7 +312,8 @@ describe("needs_auth reporting", () => {
     expect(error).toMatchObject({ code: "ADMIN_PRIVILEGE_REQUIRED" })
     // Neither status nor /connect hears of it: the sign-in is valid.
     expect(statusCalls).toEqual([])
-    expect(String(await read(rt))).toMatch(/ADMIN_PRIVILEGE_REQUIRED/)
+    expect(String(await rt.read(reports, ctx).catch((thrown: unknown) => thrown))).toMatch(/ADMIN_PRIVILEGE_REQUIRED/)
+    await (rt as Runtime & { settle: () => Promise<void> }).settle()
     expect(statusCalls).toEqual([])
     writeFileSync(mode, "ok")
     await read(rt)

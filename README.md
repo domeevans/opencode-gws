@@ -6,7 +6,7 @@ Unofficial; not affiliated with Google.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3 and 2.2.4.
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. Another release in that range starts, and status shows it as host untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
 - macOS (arm64, x64) or Linux (arm64, x64, glibc).
 - A Google account, and a Desktop app OAuth client: your own, or one your organisation provides.
 
@@ -15,6 +15,8 @@ Unofficial; not affiliated with Google.
 ```sh
 opencode plugin add @joe-broadhead/opencode-gws
 ```
+
+Run `opencode reload`, or restart OpenCode. Then run `/gws-status`.
 
 npm also installs the matching `@joe-broadhead/opencode-gws-bin-<target>` package, which holds the unmodified `gws` binary at the version the plugin pins ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
 
@@ -29,6 +31,8 @@ opencode auth login gws-default
 ```
 
 No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 45 scopes (37 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
+
+To update, run `opencode plugin update @joe-broadhead/opencode-gws`, then `opencode reload`. An entry pinned to a version (`@joe-broadhead/opencode-gws@0.0.2`) does not update: remove the `@version` from `plugins` first. Your options and sign-ins are kept.
 
 Details and the scope table: [docs/auth.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md).
 
@@ -105,19 +109,33 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | `AUTH_SCOPE_MISSING` | Sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` (`restriction: "app-only"`) needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in. A Keep method (`restriction: "domain-wide-delegation"`) needs domain-wide delegation that a Workspace admin sets up. Nothing ran. |
 | `AUTH_CLIENT_REQUIRED` | Run `/connect` and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
 | `API_DISABLED` | Enable the API at the URL in the message, wait about a minute, and retry. `/gws-doctor` checks every service. |
-| `HOST_UNTESTED` | Use OpenCode 2.2.3 or a later 2.2.x, or set `"allowUntestedHost": true`. |
+| `HOST_UNTESTED` | Use OpenCode 2.2.3, 2.2.4 or 2.2.5, or another 2.2.x release, or set `"allowUntestedHost": true`. |
 | `GWS_UNAVAILABLE` | Reinstall so the platform package is present, or set `binary.path` to a `gws` executable of the pinned version ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). |
 | `POLICY_DENIED` | A policy rule or the admin gate refused the call. A deny is final. |
+| `RECIPIENTS_UNKNOWN` | A recipient rule applies, and the plugin could not tell who the send or share reaches. |
+
+Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`, and removes it when it stops. A server that stopped without closing leaves its folder behind; the next start removes such folders once they are a day old and their process is gone.
 
 `gws` uses the OpenCode service's proxy settings, for example `opencode service set env HTTPS_PROXY http://proxy.example:8080`. All codes: [Errors](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#errors).
 
 ## Uninstall
 
-```sh
-opencode plugin remove @joe-broadhead/opencode-gws
-```
+1. Sign out each account while the plugin is still installed: in `/connect`, or with `opencode auth logout gws-<alias>` (`gws-default` for the default account). After the plugin is removed, its sign-ins no longer appear.
+2. Remove the plugin:
 
-Then remove each Google Workspace sign-in in `/connect`, or with `opencode auth logout gws-<alias>`.
+   ```sh
+   opencode plugin remove @joe-broadhead/opencode-gws
+   ```
+
+3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.
+
+   | | macOS | Linux |
+   | --- | --- | --- |
+   | State | `~/Library/Application Support/opencode-gws` | `~/.local/state/opencode-gws` |
+   | Cache | `~/Library/Caches/opencode-gws` | `~/.cache/opencode-gws` |
+
+   `$XDG_STATE_HOME/opencode-gws` and `$XDG_CACHE_HOME/opencode-gws` replace them when those variables are set, and `audit.path` names its own file.
+4. Remove any permission block you copied into an agent's own `permissions`.
 
 ## Links
 

@@ -40,24 +40,24 @@ describe("admin surface", () => {
     expect(config.admin.enabled).toBe(true)
     expect(config.admin.requireReason).toBe(true)
     expect(config.admin.allowedServices).toEqual(["admin-reports", "drive", "modelarmor"])
-    expect(evaluatePolicy(config, adminEntry(), "admin", adminRequest()).effect).toBe("allow")
+    expect(evaluatePolicy(config, adminEntry(), "admin", adminRequest(), "pending").effect).toBe("allow")
   })
 
   it("denies every admin service when admin.allowedServices is an explicit empty array, gate on by default", () => {
     const config = configWith({ admin: { allowedServices: [] } })
     expect(config.admin.enabled).toBe(true)
     expect(config.admin.allowedServices).toEqual([])
-    expect(evaluatePolicy(config, adminEntry(), "admin", adminRequest()).effect).toBe("deny")
+    expect(evaluatePolicy(config, adminEntry(), "admin", adminRequest(), "pending").effect).toBe("deny")
   })
 
   it("denies admin when admin.enabled is false", () => {
-    const decision = evaluatePolicy(adminConfig({ enabled: false }), adminEntry(), "admin", adminRequest())
+    const decision = evaluatePolicy(adminConfig({ enabled: false }), adminEntry(), "admin", adminRequest(), "pending")
     expect(decision.effect).toBe("deny")
     expect(decision.violations).toContain("admin-disabled")
   })
 
   it("permits admin when the gate is open, without a policy allow rule", () => {
-    const decision = evaluatePolicy(adminConfig({ enabled: true }, []), adminEntry(), "admin", adminRequest())
+    const decision = evaluatePolicy(adminConfig({ enabled: true }, []), adminEntry(), "admin", adminRequest(), "pending")
     expect(decision.effect).toBe("allow")
   })
 
@@ -66,7 +66,7 @@ describe("admin surface", () => {
       adminConfig({ enabled: true }, [{ id: "no-admin", effect: "deny", categories: ["admin"] }]),
       adminEntry(),
       "admin",
-      adminRequest(),
+      adminRequest(), "pending"
     )
     expect(decision.effect).toBe("deny")
     expect(decision.ruleId).toBe("no-admin")
@@ -74,11 +74,11 @@ describe("admin surface", () => {
 
   it("denies an admin plan without a reason when requireReason is default", () => {
     const config = adminConfig()
-    const missing = evaluatePolicy(config, adminEntry(), "admin", adminRequest({ reason: undefined }))
+    const missing = evaluatePolicy(config, adminEntry(), "admin", adminRequest({ reason: undefined }), "pending")
     expect(missing.effect).toBe("deny")
     expect(missing.violations).toContain("admin plans require a non-empty reason")
 
-    const blank = evaluatePolicy(config, adminEntry(), "admin", adminRequest({ reason: "   " }))
+    const blank = evaluatePolicy(config, adminEntry(), "admin", adminRequest({ reason: "   " }), "pending")
     expect(blank.effect).toBe("deny")
     expect(blank.violations).toContain("admin plans require a non-empty reason")
   })
@@ -88,7 +88,7 @@ describe("admin surface", () => {
       adminConfig({ enabled: true, requireReason: false }),
       adminEntry(),
       "admin",
-      adminRequest({ reason: undefined }),
+      adminRequest({ reason: undefined }), "pending"
     )
     expect(decision.effect).toBe("allow")
   })
@@ -98,7 +98,7 @@ describe("admin surface", () => {
       adminConfig({ enabled: true, allowedServices: ["modelarmor"] }),
       adminEntry(),
       "admin",
-      adminRequest(),
+      adminRequest(), "pending"
     )
     expect(decision.effect).toBe("deny")
     expect(decision.violations).toContain("admin-service-not-allowed")

@@ -77,6 +77,29 @@ export function parseResult(
   }
 }
 
+/**
+ * gws's answer for a 2xx body that is not JSON, when no --output names a
+ * file: it saves the body as `download.<ext>` in its working directory and
+ * prints `{bytes, mimeType, saved_file, status}`. The runtime removes that
+ * directory, so the call reports the body itself: an empty result for an
+ * empty body (a delete's 204), else its type and size and, for a read,
+ * how to save it.
+ */
+export function withoutSavedBody(data: unknown, next?: string): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data
+  const record = data as Record<string, unknown>
+  const keys = Object.keys(record)
+  if (typeof record["saved_file"] !== "string" || typeof record["bytes"] !== "number" || record["status"] !== "success") return data
+  if (!keys.every((key) => ["bytes", "mimeType", "saved_file", "status"].includes(key))) return data
+  if (record["bytes"] === 0) return ""
+  return {
+    ...(typeof record["mimeType"] === "string" ? { mimeType: record["mimeType"] } : {}),
+    bytes: record["bytes"],
+    saved: false,
+    ...(next ? { next } : {}),
+  }
+}
+
 interface PagedData {
   /** One element per page. */
   data: unknown[]
@@ -203,14 +226,22 @@ const PRIVILEGE_REFUSALS = /\bnot authori[sz]ed to (?:read|access|view|list|use|
  * the account lacks an admin privilege (`ADMIN_PRIVILEGE_REQUIRED`). Not a
  * sign-in problem: signing in again as the same account cannot help, so
  * the account is never marked as needing sign-in. A gws auth error (exit
- * 2) and invalid_grant are token failures, never a refusal.
+ * 2) and invalid_grant are token failures, never a refusal. Only an Admin
+ * SDK service's refusal counts: another service's "not authorized to
+ * access" is its own error.
  */
-export function privilegeRefused(result: ProcessResult, parsed?: ParsedResult): boolean {
+export function privilegeRefused(result: ProcessResult, service: string, parsed?: ParsedResult): boolean {
+  if (!isAdminService(service)) return false
   if (result.timedOut || result.outputCapped || result.exitCode === 0 || result.exitCode === EXIT.auth) return false
   const error = apiErrorOf(result, parsed)
   if (error?.code !== undefined && error.code !== 401 && error.code !== 403) return false
   const text = [error?.message, stderrText(result)].filter(Boolean).join("\n")
   return !/invalid_grant/i.test(text) && PRIVILEGE_REFUSALS.test(text)
+}
+
+/** True for an Admin SDK service (admin-reports, and any later admin-*): the only ones whose refusal needs an admin privilege. */
+function isAdminService(service: string): boolean {
+  return service.startsWith("admin-")
 }
 
 /** The Workspace admin privilege a service's API needs, as the Admin console names it. */
@@ -229,9 +260,9 @@ export function privilegeName(service?: string): string {
  * scope (403 insufficientPermissions / ACCESS_TOKEN_SCOPE_INSUFFICIENT).
  * An admin privilege refusal (`privilegeRefused`) is neither.
  */
-export function authProblem(result: ProcessResult, parsed?: ParsedResult): AuthProblemCode | undefined {
+export function authProblem(result: ProcessResult, service: string, parsed?: ParsedResult): AuthProblemCode | undefined {
   if (result.timedOut || result.outputCapped) return undefined
-  if (privilegeRefused(result, parsed)) return undefined
+  if (privilegeRefused(result, service, parsed)) return undefined
   const error = apiErrorOf(result, parsed)
   if (result.exitCode === 0 && !error) return undefined
   const reasons = [error?.reason, ...(error?.errors ?? []).map((item) => item?.reason), ...(error?.details ?? []).map((item) => item?.reason)]
@@ -293,20 +324,20 @@ export function disabledApi(result: ProcessResult, parsed?: ParsedResult): Disab
  * exit 1 or 2), a disabled API, and then gws's own exit code: 2 auth,
  * 3 validation, 4 Discovery, 5 internal. Anything else is Google's error.
  */
-export function processError(result: ProcessResult, parsed: ParsedResult, remediation: AuthRemediation = GENERIC_REMEDIATION): GwsError {
+export function processError(result: ProcessResult, parsed: ParsedResult, service: string, remediation: AuthRemediation = GENERIC_REMEDIATION): GwsError {
   if (result.timedOut) return new GwsError("TIMEOUT", `gws did not finish within the configured execution.timeoutMs (${result.durationMs}ms elapsed)`)
   if (result.outputCapped) return new GwsError("OUTPUT_LIMIT", "gws output exceeded execution.maxStdoutBytes/maxStderrBytes; narrow fields or pagination")
   const stderr = stderrText(result)
   const payload = apiErrorOf(result, parsed)
   const message = payload?.message || stderr || "gws command failed"
-  if (privilegeRefused(result, parsed)) {
+  if (privilegeRefused(result, service, parsed)) {
     return new GwsError(
       "ADMIN_PRIVILEGE_REQUIRED",
       `Google accepted the sign-in but refused the call, because the account lacks a Workspace admin privilege; signing in again as the same account cannot help (gws: ${message.slice(0, 300)})`,
       { next: `${remediation.privilege.charAt(0).toUpperCase()}${remediation.privilege.slice(1)}.` },
     )
   }
-  const problem = authProblem(result, parsed) ?? (result.exitCode === EXIT.auth ? "AUTH_REQUIRED" : undefined)
+  const problem = authProblem(result, service, parsed) ?? (result.exitCode === EXIT.auth ? "AUTH_REQUIRED" : undefined)
   if (problem === "AUTH_SCOPE_MISSING") {
     return new GwsError("AUTH_SCOPE_MISSING", `the credential lacks a scope for this operation; ${remediation.consent} (gws: ${message.slice(0, 300)})`)
   }
@@ -328,6 +359,6 @@ export function processError(result: ProcessResult, parsed: ParsedResult, remedi
 }
 
 /** The message of `processError`. */
-export function errorFromProcess(result: ProcessResult, parsed: ParsedResult, remediation: AuthRemediation = GENERIC_REMEDIATION): string {
-  return processError(result, parsed, remediation).message
+export function errorFromProcess(result: ProcessResult, parsed: ParsedResult, service: string, remediation: AuthRemediation = GENERIC_REMEDIATION): string {
+  return processError(result, parsed, service, remediation).message
 }

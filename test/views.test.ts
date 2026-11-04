@@ -14,6 +14,8 @@ const manifest = JSON.parse(readFileSync(new URL("package.json", root), "utf8"))
   files: string[]
   jelly: {
     tools: { name: string; permission: string; effect: string; readOnly: boolean }[]
+    summary: string
+    icon: string
     skills: string[]
     views: { place: string; tools?: string[]; page?: string; grants: string[] }[]
   }
@@ -36,7 +38,7 @@ describe("the Gmail thread view", () => {
     expect(manifest.jelly.views).toEqual([
       { v: 1, id: "gmail-thread", place: "tool-result", tools: ["gws_read"], title: "Gmail thread", page: "views/gmail-thread.html", grants: ["data"] },
     ])
-    expect(manifest.files).toContain("views")
+    expect(manifest.files).toContain("views/gmail-thread.html")
     expect(existsSync(new URL("views/gmail-thread.html", root))).toBe(true)
   })
 
@@ -86,5 +88,23 @@ describe("the jelly declaration", () => {
 
   it("names every skill the package ships", () => {
     expect([...manifest.jelly.skills].sort()).toEqual(readdirSync(new URL("skills", root)).sort())
+  })
+
+  it("has a one-line summary of at most 120 characters", () => {
+    expect(manifest.jelly.summary.trim()).toBe(manifest.jelly.summary)
+    expect(manifest.jelly.summary.length).toBeGreaterThan(0)
+    expect(manifest.jelly.summary.length).toBeLessThanOrEqual(120)
+    expect(manifest.jelly.summary).not.toMatch(/\n/)
+  })
+
+  it("ships a small icon of drawing elements only, with no title (Jelly's cleaner drops an icon with one)", () => {
+    expect(manifest.jelly.icon).toBe("assets/icon.svg")
+    expect(manifest.files).toContain(manifest.jelly.icon)
+    const icon = readFileSync(new URL(manifest.jelly.icon, root), "utf8")
+    expect(Buffer.byteLength(icon)).toBeLessThan(2048)
+    expect(icon.trim()).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 (24 24|32 32|48 48)"[^>]*>[\s\S]*<\/svg>$/)
+    const elements = [...icon.matchAll(/<([A-Za-z][A-Za-z0-9]*)/g)].map((match) => match[1])
+    expect(elements.filter((name) => !["svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon"].includes(name!))).toEqual([])
+    expect(icon).not.toMatch(/<title|<style|<script|href=|<!|&/i)
   })
 })
