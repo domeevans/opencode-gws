@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - The package no longer ships `views/jelly-view.d.ts`: no type declarations ship (it stays in the repository for view authors), and the pack test refuses any `.d.ts`.
 - Committing a plan a second time says `PLAN_ALREADY_USED: This plan was already committed`, with the next step to create a new plan, until the plan's time limit passes. Before, creating any other plan removed the used one, and the second commit said `PLAN_NOT_FOUND: Run gws_plan first`.
 - Work folders (`$TMPDIR/opencode-gws-*`) left by a server that stopped without closing are removed at the next start, once they are a day old and the process that owned them is gone. A folder from an earlier version, which has no owner record, is removed after a week.
+- The audit log no longer grows without bound: `audit.jsonl` is capped at 5 MiB, and a write that would pass the cap first moves it to `audit.jsonl.1`, replacing the previous one.
+- The README's Uninstall now signs out first, while the plugin's sign-ins still exist, then removes the plugin, then names the state and cache folders to delete (`~/Library/Application Support/opencode-gws` and `~/Library/Caches/opencode-gws` on macOS, `~/.local/state/opencode-gws` and `~/.cache/opencode-gws` on Linux). Install says to run `opencode reload` and `/gws-status`, and a new paragraph explains updating.
 
 ### Changed
 

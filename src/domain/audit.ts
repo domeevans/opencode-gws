@@ -1,4 +1,4 @@
-import { writeFile, mkdir } from "node:fs/promises"
+import { mkdir, rename, stat, writeFile } from "node:fs/promises"
 import { write } from "node:fs"
 import { dirname } from "node:path"
 import { GwsError, isErrorCode } from "./errors.js"
@@ -27,6 +27,13 @@ interface AuditEvent {
 }
 
 type Writer = (line: string, signal: AbortSignal) => Promise<void>
+
+/**
+ * The JSONL file's size cap. A write that would pass it first moves the file
+ * to `<path>.1`, replacing the previous one, so the log never exceeds about
+ * twice this.
+ */
+export const AUDIT_MAX_BYTES = 5 * 1024 * 1024
 const MAX_QUEUE = 64
 const WRITE_TIMEOUT_MS = 100
 
@@ -47,6 +54,9 @@ export class Audit {
     this.write = writer ?? (async (line, signal) => {
       if (this.config.sink === "jsonl" && this.config.path) {
         await mkdir(dirname(this.config.path), { recursive: true, mode: 0o700 })
+        if (signal.aborted) return
+        const size = await stat(this.config.path).then((found) => found.size, () => 0)
+        if (size > 0 && size + Buffer.byteLength(line) > AUDIT_MAX_BYTES) await rename(this.config.path, `${this.config.path}.1`)
         if (signal.aborted) return
         await writeFile(this.config.path, line, { flag: "a", mode: 0o600, signal })
       } else {
