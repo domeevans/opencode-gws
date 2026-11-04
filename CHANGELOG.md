@@ -22,6 +22,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - The status RPC (`google-workspace.gws/status`) and `gws_status` use the field names every plugin shares. `pluginVersion` is now `version`; `hostVersion` and `hostWarning` are now `host: { version, range, tested }`; the new `state` is `connected`, `sign_in_required`, `not_configured` or `host_untested`; and `nextStep` is always present, `Nothing to do.` when nothing is needed (before, it was absent).
+- The tools RPC's envelope errors use the wording every plugin's tools RPC shares: `"extra" is not allowed`, `"sessionID" must be a non-empty string`, `"input" is missing`, `the envelope must be an object, such as …`, and `describe takes no input`, instead of zod's text such as `Unrecognized key: "extra"`. The next steps of `SESSION_UNKNOWN`, `SESSION_AGENT_REQUIRED` and `PERMISSION_DENIED` match the shared ones too.
 - OpenCode 2.2.5 is a tested host. Status calls only 2.2.3, 2.2.4 and 2.2.5 tested: another release inside `>=2.2.3 <2.3.0` starts as before, and now shows as host untested, with the supported range, in `/gws-status` and the dialog. `HOST_UNTESTED` says the range is supported, not tested.
 
 ### Added

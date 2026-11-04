@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { statusSource } from "../src/host/rpc.js"
+import { ErrorCode } from "../src/domain/errors.js"
 import { COMMIT_TOOLS, TOOLS_RPC_ID, registerScripting } from "../src/host/scripting.js"
 import { toolSpecs } from "../src/host/tools.js"
 import type { Runtime } from "../src/runtime/index.js"
@@ -127,6 +128,38 @@ describe("tools RPC contract", () => {
     expect(read.input).toMatchObject({ type: "object", properties: { operation: expect.any(Object) } })
     expect(read.output).toMatchObject({ type: "object", properties: { data: expect.anything(), truncated: expect.any(Object) } })
     expect(JSON.parse(JSON.stringify(description))).toEqual(description)
+  })
+})
+
+describe("envelope errors", () => {
+  /** The issues OpenCode reports for a method's input, from the strict validator it prefers. */
+  const issues = (h: Harness, method: string, value: unknown): string[] => {
+    const input = (h.contract.methods[method] as { input: { "~standard": { validate: (value: unknown) => { issues?: Array<{ message: string }> } } } }).input
+    return (input["~standard"].validate(value).issues ?? []).map((issue) => issue.message)
+  }
+
+  it("uses the wording every plugin's tools RPC shares", async () => {
+    const h = await setup()
+    expect(issues(h, "read", { sessionID: "ses_1", input: {} })).toEqual([])
+    expect(issues(h, "read", "text")).toEqual(['the envelope must be an object, such as {"sessionID":"<session>","input":<the tool\'s input>}'])
+    expect(issues(h, "read", { sessionID: "ses_1", input: {}, extra: 1 })).toEqual(['"extra" is not allowed'])
+    expect(issues(h, "read", { operation: "gmail.users.messages.list", params: {}, fields: "x" })).toEqual([
+      '"operation" is not allowed',
+      '"params" is not allowed',
+      '"fields" is not allowed',
+      '"sessionID" must be a non-empty string',
+      '"input" is missing',
+    ])
+    expect(issues(h, "read", { sessionID: "", input: {} })).toEqual(['"sessionID" must be a non-empty string'])
+    expect(issues(h, "describe", undefined)).toEqual([])
+    expect(issues(h, "describe", {})).toEqual([])
+    expect(issues(h, "describe", { sessionID: "ses_1" })).toEqual(["describe takes no input"])
+  })
+
+  it("gives the shared next steps for a missing session, a session without an agent, and a refusal", () => {
+    expect(ErrorCode.SESSION_UNKNOWN.next).toBe('Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id.')
+    expect(ErrorCode.SESSION_AGENT_REQUIRED.next).toBe(ErrorCode.SESSION_UNKNOWN.next)
+    expect(ErrorCode.PERMISSION_DENIED.next).toBe("Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it.")
   })
 })
 

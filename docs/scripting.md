@@ -63,7 +63,17 @@ A refusal or failure is the RPC error `failed`, with `data: { code, next }` from
 | `SESSION_AGENT_REQUIRED` | The session names no agent. |
 | `PERMISSION_DENIED` | The agent's or the session's rules deny the call, or ask for an approval. |
 
-OpenCode itself answers `rpc.invalid_input` for a body without `sessionID` or `input`, and `rpc.method_not_found` for a method that does not exist, such as a commit tool.
+OpenCode itself answers `rpc.method_not_found` for a method that does not exist, such as a commit tool, and `rpc.invalid_input` for a bad envelope, with one message per problem, in the wording every plugin's tools RPC uses:
+
+| Case | Message |
+| --- | --- |
+| The envelope (the body's `input`) is not an object | `the envelope must be an object, such as {"sessionID":"<session>","input":<the tool's input>}` |
+| An unknown key, such as `extra` | `"extra" is not allowed` |
+| `sessionID` missing, not a string, or empty | `"sessionID" must be a non-empty string` |
+| `input` missing | `"input" is missing` |
+| `describe` given anything but nothing or `{}` | `describe takes no input` |
+
+The tool's own input is checked by the tool, as `GWS_VALIDATION_ERROR`.
 
 `opencode api` exits with status 1 on any RPC error, and prints the error body, so a shell script can test `$?` and read `data.code`.
 
