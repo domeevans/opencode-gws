@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Audit } from "../domain/audit.js"
@@ -14,6 +14,7 @@ import { resolveBinary } from "../process/binary.js"
 import { localEnv } from "../process/env.js"
 import { ownedDir, pluginPaths, type PluginPaths } from "../process/paths.js"
 import { runProcess } from "../process/run.js"
+import { createWorkDir, removeStaleWorkDirs } from "../process/workdir.js"
 import { SchemaClient } from "../process/schema.js"
 import { Accounts, type CallContext, type RuntimeOptions } from "./accounts.js"
 import { Operations, type SchemaTarget, type Target } from "./operations.js"
@@ -62,8 +63,7 @@ export class Runtime {
   ) {
     this.binary = binary
     this.paths = options.paths ?? pluginPaths()
-    this.workDir = mkdtempSync(join(tmpdir(), "opencode-gws-"))
-    writeFileSync(join(this.workDir, ".env"), "")
+    this.workDir = createWorkDir()
     this.audit = new Audit({ ...config.audit, path: config.audit.path ?? join(this.paths.stateDir, "audit.jsonl") }, options.pluginVersion)
     this.schema = new SchemaClient(binary, this.workDir, localEnv(this.workDir, ownedDir(join(this.paths.cacheDir, "discovery"))), config.execution.schemaTimeoutMs)
     this.accounts = new Accounts(this)
@@ -72,6 +72,8 @@ export class Runtime {
 
   static async create(config: PluginConfig, options: RuntimeOptions): Promise<Runtime> {
     const binary = resolveBinary(config, options.projectDirectory)
+    // Work folders of servers that stopped without closing.
+    removeStaleWorkDirs()
     const probeDir = mkdtempSync(join(tmpdir(), "opencode-gws-probe-"))
     let version = "unknown"
     try {

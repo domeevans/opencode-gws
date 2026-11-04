@@ -110,6 +110,8 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | `POLICY_DENIED` | A policy rule or the admin gate refused the call. A deny is final. |
 | `RECIPIENTS_UNKNOWN` | A recipient rule applies, and the plugin could not tell who the send or share reaches. |
 
+Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`, and removes it when it stops. A server that stopped without closing leaves its folder behind; the next start removes such folders once they are a day old and their process is gone.
+
 `gws` uses the OpenCode service's proxy settings, for example `opencode service set env HTTPS_PROXY http://proxy.example:8080`. All codes: [Errors](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#errors).
 
 ## Uninstall
