@@ -172,7 +172,11 @@
       {
         "id": "google",
         "label": "Google Workspace",
-        "integration": "gws-*"
+        "integration": "gws-*",
+        "relay": {
+          "redirectField": "redirectUri",
+          "portField": "callbackPort"
+        }
       }
     ],
     "contributes": {
