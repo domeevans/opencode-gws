@@ -141,6 +141,7 @@ const replyBase = {
   messageId: z.string().min(1),
   body: z.string().min(1).max(100_000),
   from: z.string().email().optional(),
+  to: z.union([z.string(), z.array(z.string())]).optional().describe("Extra To recipients, besides the ones the reply goes to"),
   cc: z.union([z.string(), z.array(z.string())]).optional(),
   bcc: z.union([z.string(), z.array(z.string())]).optional(),
   html: z.boolean().optional(),
@@ -148,16 +149,23 @@ const replyBase = {
   attachments: z.array(absolutePath).max(20).optional(),
 }
 
-function replyAdapter(id: string, name: string): HelperAdapter {
+const replyAllBase = {
+  ...replyBase,
+  remove: z.union([z.string(), z.array(z.string())]).optional().describe("Addresses to leave out of the reply-all, the sender's included"),
+}
+
+function replyAdapter(id: string, name: string, all: boolean): HelperAdapter {
   return {
     id,
     service: "gmail",
     category: "send",
-    inputSchema: z.strictObject(replyBase),
+    inputSchema: z.strictObject(all ? replyAllBase : replyBase),
     build(input, request) {
-      const parsed = this.inputSchema.parse(input) as z.infer<z.ZodObject<typeof replyBase>>
+      const parsed = this.inputSchema.parse(input) as z.infer<z.ZodObject<typeof replyAllBase>>
       const argv = ["gmail", name, "--message-id", parsed.messageId, "--body", parsed.body]
       if (parsed.from) argv.push("--from", parsed.from)
+      if (parsed.to) argv.push("--to", emails(parsed.to).join(","))
+      if (parsed.remove) argv.push("--remove", emails(parsed.remove).join(","))
       if (parsed.cc) argv.push("--cc", emails(parsed.cc).join(","))
       if (parsed.bcc) argv.push("--bcc", emails(parsed.bcc).join(","))
       if (parsed.html) argv.push("--html")
@@ -170,9 +178,9 @@ function replyAdapter(id: string, name: string): HelperAdapter {
         files,
         preview: {
           method: `gmail ${name}`,
-          params: { messageId: parsed.messageId, cc: emails(parsed.cc), bcc: emails(parsed.bcc) },
+          params: { messageId: parsed.messageId, to: emails(parsed.to), cc: emails(parsed.cc), bcc: emails(parsed.bcc), ...(all ? { remove: emails(parsed.remove) } : {}), draft: parsed.draft ?? false },
           bodySummary: bytes(parsed.body),
-          recipients: [...emails(parsed.cc), ...emails(parsed.bcc)],
+          recipients: [...emails(parsed.to), ...emails(parsed.cc), ...emails(parsed.bcc)],
           uploads: parsed.attachments,
           account: request.account,
           category: "send",
@@ -182,30 +190,46 @@ function replyAdapter(id: string, name: string): HelperAdapter {
   }
 }
 
+const forwardSchema = z.strictObject({
+  messageId: z.string().min(1),
+  to: z.union([z.string(), z.array(z.string())]),
+  cc: z.union([z.string(), z.array(z.string())]).optional(),
+  bcc: z.union([z.string(), z.array(z.string())]).optional(),
+  from: z.string().email().optional(),
+  body: z.string().max(100_000).optional().describe("A note above the forwarded message"),
+  html: z.boolean().optional(),
+  draft: z.boolean().optional(),
+  attachments: z.array(absolutePath).max(20).optional(),
+  noOriginalAttachments: z.boolean().optional().describe("Leave out the original message's attachments"),
+})
+
 const gmailForward: HelperAdapter = {
   id: "gmail.forward",
   service: "gmail",
   category: "send",
-  inputSchema: z.strictObject({
-    messageId: z.string().min(1),
-    to: z.union([z.string(), z.array(z.string())]),
-    body: z.string().max(100_000).optional(),
-    html: z.boolean().optional(),
-  }),
+  inputSchema: forwardSchema,
   build(input, request) {
-    const parsed = this.inputSchema.parse(input) as { messageId: string; to: string | string[]; body?: string; html?: boolean }
+    const parsed = this.inputSchema.parse(input) as z.infer<typeof forwardSchema>
     const argv = ["gmail", "+forward", "--message-id", parsed.messageId, "--to", emails(parsed.to).join(",")]
+    if (parsed.cc) argv.push("--cc", emails(parsed.cc).join(","))
+    if (parsed.bcc) argv.push("--bcc", emails(parsed.bcc).join(","))
+    if (parsed.from) argv.push("--from", parsed.from)
     if (parsed.body) argv.push("--body", parsed.body)
     if (parsed.html) argv.push("--html")
+    if (parsed.draft) argv.push("--draft")
+    if (parsed.noOriginalAttachments) argv.push("--no-original-attachments")
+    const files = attach(argv, parsed.attachments)
     return {
       id: this.id,
       category: "send",
       argv,
+      files,
       preview: {
         method: "gmail +forward",
-        params: { messageId: parsed.messageId, to: emails(parsed.to) },
+        params: { messageId: parsed.messageId, to: emails(parsed.to), cc: emails(parsed.cc), bcc: emails(parsed.bcc), draft: parsed.draft ?? false },
         bodySummary: parsed.body ? bytes(parsed.body) : undefined,
-        recipients: emails(parsed.to),
+        recipients: [...emails(parsed.to), ...emails(parsed.cc), ...emails(parsed.bcc)],
+        uploads: parsed.attachments,
         account: request.account,
         category: "send",
       },
@@ -221,13 +245,15 @@ const gmailTriage: HelperAdapter = {
     max: z.number().int().positive().max(200).optional(),
     query: z.string().max(2000).optional(),
     labels: z.boolean().optional(),
+    format: outputFormat.optional(),
   }),
   build(input, request) {
-    const parsed = this.inputSchema.parse(input) as { max?: number; query?: string; labels?: boolean }
+    const parsed = this.inputSchema.parse(input) as { max?: number; query?: string; labels?: boolean; format?: z.infer<typeof outputFormat> }
     const argv = ["gmail", "+triage"]
     if (parsed.max) argv.push("--max", String(parsed.max))
     if (parsed.query) argv.push("--query", parsed.query)
     if (parsed.labels) argv.push("--labels")
+    if (parsed.format) argv.push("--format", parsed.format)
     return {
       id: this.id,
       category: "read",
@@ -399,8 +425,8 @@ const weeklyDigest: HelperAdapter = {
 const ADAPTERS = new Map<string, HelperAdapter>([
   [gmailSend.id, gmailSend],
   [gmailRead.id, gmailRead],
-  ["gmail.reply", replyAdapter("gmail.reply", "+reply")],
-  ["gmail.reply-all", replyAdapter("gmail.reply-all", "+reply-all")],
+  ["gmail.reply", replyAdapter("gmail.reply", "+reply", false)],
+  ["gmail.reply-all", replyAdapter("gmail.reply-all", "+reply-all", true)],
   [gmailForward.id, gmailForward],
   [gmailTriage.id, gmailTriage],
   [calendarAgenda.id, calendarAgenda],

@@ -83,6 +83,8 @@ Reply. Same commit tool, `gws_send`:
 }
 ```
 
+The preview lists who the reply reaches: the sender, and for `gmail.reply-all` everyone else on the message. `to`, `cc` and `bcc` add recipients; `remove` leaves people out of a reply-all. `gmail.forward` takes `to`, `cc`, `bcc`, `body`, `attachments` and `noOriginalAttachments`. `gws_schema` lists every helper flag.
+
 ## Drive
 
 Recent files, read:

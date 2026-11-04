@@ -108,6 +108,14 @@ describe("recipients the request does not carry", () => {
     await expect(gws.plan({ operation: "gmail.reply-all", input: { messageId: "m1", body: "hi" } }, ctx)).rejects.toThrow(/^POLICY_DENIED: .*evil@evil\.com/)
   })
 
+  it("honours reply-all's remove, and checks a reply's extra to and a forward's cc", async () => {
+    const gws = await runtime([DOMAIN_RULE])
+    responses({ "gmail.users.messages.get": message({ From: "ok@example.com", Cc: "Evil <evil@evil.com>" }) })
+    await expect(gws.plan({ operation: "gmail.reply-all", input: { messageId: "m1", body: "hi", remove: "evil@evil.com" } }, ctx)).resolves.toMatchObject({ category: "send" })
+    await expect(gws.plan({ operation: "gmail.reply", input: { messageId: "m1", body: "hi", to: "evil@evil.com" } }, ctx)).rejects.toThrow(/^POLICY_DENIED:/)
+    await expect(gws.plan({ operation: "gmail.forward", input: { messageId: "m1", to: "ok@example.com", cc: "evil@evil.com" } }, ctx)).rejects.toThrow(/^POLICY_DENIED:/)
+  })
+
   it("refuses a reply when the original message cannot be read", async () => {
     const gws = await runtime([DOMAIN_RULE])
     responses({ "gmail.users.messages.get": null })

@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - `accounts.<alias>.domains`: the account's own email domains, for `allowExternalRecipients`.
+- Helper flags from gws 0.22.5: `to` on `gmail.reply` and `gmail.reply-all` (extra To recipients), `remove` on `gmail.reply-all`, `cc`, `bcc`, `from`, `draft`, `attachments` and `noOriginalAttachments` on `gmail.forward`, and `format` on `gmail.triage`. Before, these were refused with `GWS_VALIDATION_ERROR`. A test now compares every adapter with the flags `gws <service> +<helper> --help` lists.
 
 ## [0.0.2] - 2026-11-03
 
