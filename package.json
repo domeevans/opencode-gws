@@ -26,6 +26,7 @@
   },
   "files": [
     "dist",
+    "assets/icon.svg",
     "skills",
     "manifest/generated.json",
     "views/gmail-thread.html",
@@ -76,6 +77,8 @@
   },
   "jelly": {
     "title": "Google Workspace",
+    "summary": "Gmail, Calendar, Drive, Docs and Sheets.",
+    "icon": "assets/icon.svg",
     "tools": [
       {
         "name": "gws.status",

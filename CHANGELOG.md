@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Jelly shows the plugin's one-line summary ("Gmail, Calendar, Drive, Docs and Sheets.") and its icon, a neutral envelope over a page (`assets/icon.svg`, now in the package). A Jelly release that does not know these two fields refuses the declaration, so this version needs a Jelly that accepts them.
+
 ### Fixed
 
 - Planning `gmail.users.drafts.send` for a draft that cannot be read, or that names no recipient, now sets `recipientsUnknown` in the preview ("the draft could not be read or names no recipient"), so a recipient rule refuses it with `RECIPIENTS_UNKNOWN`. Before, such a plan could show no recipients and no reason.
