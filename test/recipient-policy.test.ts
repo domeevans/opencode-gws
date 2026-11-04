@@ -133,6 +133,22 @@ describe("recipients the request does not carry", () => {
     await expect(gws.plan(draft, ctx)).resolves.toMatchObject({ category: "send" })
   })
 
+  it.each([
+    ["fails", null],
+    ["answers with no draft", {}],
+    ["answers with an empty body", ""],
+    ["answers with a draft that has no headers", { message: { payload: { headers: [] } } }],
+  ])("marks the recipients unknown when the draft read %s, and a recipient rule refuses it (LIVE-15)", async (_case, answer) => {
+    const draft = { operation: "gmail.users.drafts.send", params: { userId: "me" }, body: { id: "no-such-draft" } }
+    responses({ "gmail.users.drafts.get": answer })
+    const open = await runtime([])
+    const plan = await open.plan(draft, ctx)
+    expect(plan.preview.recipients ?? []).toEqual([])
+    expect(plan.preview.recipientsUnknown).toMatch(/draft/)
+    const ruled = await runtime([DOMAIN_RULE])
+    await expect(ruled.plan(draft, ctx)).rejects.toThrow(/^RECIPIENTS_UNKNOWN: .*draft/)
+  })
+
   it("reads a draft again at commit and refuses when its recipients changed", async () => {
     const gws = await runtime([DOMAIN_RULE])
     const draft = { operation: "gmail.users.drafts.send", params: { userId: "me" }, body: { id: "d1" } }

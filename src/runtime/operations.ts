@@ -469,7 +469,7 @@ export class Operations {
     let recipients: Recipients = plan.known
     if (plan.lookups.length > 0) {
       const self = plan.needsSelf ? await this.ownAddress(request.account, entry.service, ctx) : undefined
-      for (const lookup of plan.lookups) recipients = withLookup(recipients, await this.lookup(lookup, request.account, ctx, self), lookup.what)
+      for (const lookup of plan.lookups) recipients = withLookup(recipients, await this.lookup(lookup, request.account, ctx, self), lookup)
     }
     const configured = this.runtime.config.accounts[request.account]?.domains
     const reaches = recipients.addresses.length > 0 || recipients.domains.length > 0 || recipients.unknown !== undefined

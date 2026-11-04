@@ -45,7 +45,7 @@ export const ErrorCode = {
   },
   RECIPIENTS_UNKNOWN: {
     meaning:
-      "A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, or a method whose recipients it does not know. Nothing ran.",
+      "A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran.",
     next: "Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method.",
   },
   ACCOUNT_DOMAIN_UNKNOWN: {

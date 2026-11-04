@@ -32,6 +32,8 @@ export interface RecipientLookup {
   params: Record<string, unknown>
   /** What the read finds, for the refusal: "the message being replied to". */
   what: string
+  /** Why recipients that are still none after this read stay unknown: a draft always names someone, so none means the read found nothing. */
+  none?: string
   /**
    * The recipients in its response, or undefined when the response has an
    * unexpected shape. `self` is the account's own address, when known.
@@ -262,6 +264,7 @@ const draftsSend: Spec = (request) => {
     operation: "gmail.users.drafts.get",
     params: { userId, id, format: "metadata", fields: "message/payload/headers" },
     what: "the draft",
+    none: "the draft could not be read or names no recipient",
     extract(data) {
       const found = headers(record(data)["message"])
       return found ? setOf([...(found.get("to") ?? []), ...(found.get("cc") ?? []), ...(found.get("bcc") ?? [])]) : undefined
@@ -472,13 +475,15 @@ export function recipientPlan(operation: string, category: Category, request: Re
 }
 
 /** Add a lookup's answer, or its failure, to recipients found so far. */
-export function withLookup(recipients: Recipients, found: RecipientSet | undefined, what: string): Recipients {
-  if (!found) return { ...recipients, unknown: recipients.unknown ?? `${what} could not be read` }
-  return {
+export function withLookup(recipients: Recipients, found: RecipientSet | undefined, lookup: Pick<RecipientLookup, "what" | "none">): Recipients {
+  if (!found) return { ...recipients, unknown: recipients.unknown ?? `${lookup.what} could not be read` }
+  const merged: Recipients = {
     ...recipients,
     addresses: [...new Set([...recipients.addresses, ...found.addresses])],
     domains: [...new Set([...recipients.domains, ...found.domains])],
   }
+  if (lookup.none && merged.addresses.length === 0 && merged.domains.length === 0) merged.unknown ??= lookup.none
+  return merged
 }
 
 /** How a preview names recipients: each address, and `*@domain` for a domain share. */
