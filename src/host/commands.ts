@@ -143,6 +143,7 @@ function planLines(plans: readonly PlanSummary[], now: number): string[] {
     for (const plan of plans) {
       const details = [
         plan.preview.recipients?.length ? `to ${plan.preview.recipients.join(", ")}` : undefined,
+        plan.preview.recipientsUnknown ? `recipients unknown: ${plan.preview.recipientsUnknown}` : undefined,
         plan.preview.destination ? `destination ${plan.preview.destination}` : undefined,
         plan.preview.bodySummary ? `body ${plan.preview.bodySummary}` : undefined,
         `expires ${remaining(plan.expiresAt, now)}`,

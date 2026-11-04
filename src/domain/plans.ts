@@ -18,15 +18,17 @@ const MAX_PLANS = 512
 export interface RedactedPreview {
   method: string
   recipients?: string[]
+  recipientsUnknown?: string
   destination?: string
   bodySummary?: string
   reason?: string
 }
 
 export function redactedPreview(plan: Pick<Plan, "preview">): RedactedPreview {
-  const { method, recipients, destination, bodySummary, reason } = plan.preview
+  const { method, recipients, recipientsUnknown, destination, bodySummary, reason } = plan.preview
   const view: RedactedPreview = { method }
   if (recipients && recipients.length > 0) view.recipients = [...recipients]
+  if (recipientsUnknown !== undefined) view.recipientsUnknown = recipientsUnknown
   if (destination !== undefined) view.destination = destination
   if (bodySummary !== undefined) view.bodySummary = bodySummary
   if (reason !== undefined) view.reason = reason

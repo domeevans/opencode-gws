@@ -208,3 +208,35 @@ describe("allowExternalRecipients: false", () => {
     await expect(gws.plan(send({ to: "colleague@example.com" }), ctx)).rejects.toThrow(/^ACCOUNT_DOMAIN_UNKNOWN: .*Next step: .*accounts\.personal\.domains/)
   })
 })
+
+describe("previews name who a send or share reaches", () => {
+  it("lists a reply's real recipients, without the account itself", async () => {
+    const gws = await runtime([])
+    responses({
+      "gmail.users.getProfile": { emailAddress: "me@example.com" },
+      "gmail.users.messages.get": message({ From: "Alice <alice@example.com>", To: "me@example.com, bob@example.com", Cc: "carol@example.org" }),
+    })
+    const reply = await gws.plan({ operation: "gmail.reply", input: { messageId: "m1", body: "hi", cc: "dave@example.com" } }, ctx)
+    expect(reply.preview.recipients?.sort()).toEqual(["alice@example.com", "dave@example.com"])
+    const all = await gws.plan({ operation: "gmail.reply-all", input: { messageId: "m1", body: "hi" } }, ctx)
+    expect(all.preview.recipients?.sort()).toEqual(["alice@example.com", "bob@example.com", "carol@example.org"])
+  })
+
+  it("lists a raw message's recipients and a domain share", async () => {
+    const gws = await runtime([])
+    const sent = await gws.plan({ operation: "gmail.users.messages.send", params: { userId: "me" }, body: { raw: raw("To: Bob <bob@example.com>\r\nCc: carol@example.org") } }, ctx)
+    expect(sent.preview.recipients).toEqual(["bob@example.com", "carol@example.org"])
+    const shared = await gws.plan({ operation: "drive.permissions.create", params: { fileId: "f1" }, body: { role: "reader", type: "domain", domain: "example.org" } }, ctx)
+    expect(shared.preview.recipients).toEqual(["*@example.org"])
+  })
+
+  it("says when it could not tell who a send reaches", async () => {
+    const gws = await runtime([])
+    const posted = await gws.plan({ operation: "chat.spaces.messages.create", params: { parent: "spaces/s1" }, body: { text: "hi" } }, ctx)
+    expect(posted.preview.recipientsUnknown).toMatch(/cannot tell/)
+    responses({ "gmail.users.messages.get": null })
+    const reply = await gws.plan({ operation: "gmail.reply", input: { messageId: "m1", body: "hi" } }, ctx)
+    expect(reply.preview.recipientsUnknown).toMatch(/message being replied to/)
+  })
+})
+

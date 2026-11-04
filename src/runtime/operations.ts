@@ -9,7 +9,7 @@ import { helperAdapter, type HelperAdapter } from "../domain/helpers.js"
 import { commandIndex, HELPER_ALTERNATIVES, helperInput, resolveOperation } from "../domain/manifest.js"
 import type { PlanStore } from "../domain/plans.js"
 import { evaluatePolicy, needsAccountDomains, type PolicyDecision, type PolicyFacts } from "../domain/policy.js"
-import { ACCOUNT_ADDRESS_READS, domainOf, recipientPlan, withLookup, type RecipientLookup, type RecipientPlan, type Recipients } from "../domain/recipients.js"
+import { ACCOUNT_ADDRESS_READS, domainOf, recipientLabels, recipientPlan, withLookup, type RecipientLookup, type RecipientPlan, type Recipients } from "../domain/recipients.js"
 import { capPageItems, inlineCap, isApiError, parseResult, processError, redactDryRun, withoutSavedBody } from "../domain/result.js"
 import type { BuiltCommand, Category, CommitCategory, HelperEntry, MethodEntry, Plan, PluginConfig, Request } from "../domain/types.js"
 import type { SchemaClient } from "../process/schema.js"
@@ -348,7 +348,13 @@ export class Operations {
     // The reason is operator context, not a gws argument: it lives only in
     // the preview and the plan of any category; audit never stores this free text.
     const reason = request.reason?.trim()
-    const planPreview = reason ? { ...preview, reason } : preview
+    // A send or share previews everyone it reaches, as resolved for the policy, and says when that is not known.
+    const { recipients } = facts
+    const reached =
+      category === "send" || category === "share"
+        ? { ...preview, recipients: recipientLabels(recipients), ...(recipients.unknown ? { recipientsUnknown: recipients.unknown } : {}) }
+        : preview
+    const planPreview = reason ? { ...reached, reason } : reached
 
     const plan = this.runtime.plans.create({
       account: request.account,

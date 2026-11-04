@@ -95,4 +95,9 @@ describe("plan store", () => {
     })
     expect(preview).toEqual({ method: "POST", bodySummary: "object(raw) 10 bytes" })
   })
+
+  it("keeps why the recipients are unknown in the redacted preview", () => {
+    const preview = redactedPreview({ preview: { method: "POST", params: {}, recipientsUnknown: "the draft could not be read", account: "personal", category: "send" } })
+    expect(preview).toEqual({ method: "POST", recipientsUnknown: "the draft could not be read" })
+  })
 })
