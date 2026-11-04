@@ -23,6 +23,8 @@ it("scrubs inherited environment before host modules load", () => {
     "TMPDIR", "TMP", "TEMP", "LANG", "TZ", "NODE_ENV", "HOST_SDK_DIR",
   ].includes(key))).toEqual([])
   expect(process.env.HOME).toContain("plugin-host-worker-")
+  // Outside the real home, where OpenCode's upward search would find .opencode/ folders.
+  expect(process.env.HOME).toMatch(/^\/(?:private\/)?tmp\/plugin-host-worker-/)
 })
 
 it("blocks a reachable unregistered loopback listener with zero dispatch", async () => {

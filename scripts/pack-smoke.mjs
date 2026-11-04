@@ -51,7 +51,6 @@ import { createHash, randomBytes } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createServer } from "node:net"
-import { tmpdir } from "node:os"
 import { dirname, join, sep } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { buildPackage, hostTarget, packageName, readProvenance, ROOT } from "./build-bin-packages.mjs"
@@ -584,7 +583,8 @@ async function main() {
   const version = packageJson(ROOT).version
   for (const file of ["index.js", "tui.js"]) check(readdirSync(join(ROOT, "dist")).includes(file), `dist/${file} is missing; run npm run build first`)
 
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "opencode-gws-pack-")))
+  // Never under $HOME or an inherited TMPDIR: OpenCode finds .opencode/ folders by searching upward.
+  const root = realpathSync(mkdtempSync(join(existsSync("/private/tmp") ? "/private/tmp" : "/tmp", "opencode-gws-pack-")))
   try {
     for (const dir of ["tarballs", "bin"]) mkdirSync(join(root, dir))
     const main = process.env.PACK_TARBALL ? packed(realpathSync(process.env.PACK_TARBALL)) : pack(ROOT, join(root, "tarballs"))

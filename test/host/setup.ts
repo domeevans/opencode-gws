@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { afterAll } from "vitest"
 import { installNetworkGuard } from "./network.js"
@@ -7,7 +6,8 @@ import { installNetworkGuard } from "./network.js"
 // Runs before tests import plugin contracts or the SDK. Remove provider keys,
 // proxy settings and credential paths, not just OPENCODE-prefixed variables.
 const sdkOverride = process.env.HOST_SDK_DIR
-const root = realpathSync(mkdtempSync(join(tmpdir(), "plugin-host-worker-")))
+// Never under $HOME or an inherited TMPDIR: OpenCode finds .opencode/ folders by searching upward.
+const root = realpathSync(mkdtempSync(join(existsSync("/private/tmp") ? "/private/tmp" : "/tmp", "plugin-host-worker-")))
 for (const key of Object.keys(process.env)) delete process.env[key]
 Object.assign(process.env, {
   PATH: `${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,
