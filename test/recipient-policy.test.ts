@@ -143,6 +143,16 @@ describe("recipients the request does not carry", () => {
   })
 })
 
+describe("notifying Calendar writes", () => {
+  it("checks the guests of an event created with the deprecated sendNotifications", async () => {
+    const gws = await runtime([DOMAIN_RULE])
+    const insert = { operation: "calendar.events.insert", params: { calendarId: "primary", sendNotifications: true }, body: { summary: "Sync", attendees: [{ email: "evil@evil.com" }] } }
+    await expect(gws.plan(insert, ctx)).rejects.toThrow(/^POLICY_DENIED: .*evil@evil\.com/)
+    const quiet = { ...insert, params: { calendarId: "primary", sendNotifications: false } }
+    await expect(gws.plan(quiet, ctx)).resolves.toMatchObject({ category: "write" })
+  })
+})
+
 describe("shares", () => {
   it("reads Calendar ACL scopes, by address, domain and rule id", async () => {
     const gws = await runtime([DOMAIN_RULE])

@@ -47,7 +47,7 @@ A change is two calls.
 | export | `gws_export` |
 | admin | `gws_admin` |
 
-The plan's category wins over the manifest. A Drive update whose body sets `trashed` to true is a delete: commit with `gws_delete`. A Calendar event write whose `sendUpdates` is `all` or `externalOnly` is a send: commit with `gws_send`. A read with `download.path` is an export: commit with `gws_export`.
+The plan's category wins over the manifest. A Drive update whose body sets `trashed` to true is a delete: commit with `gws_delete`. A Calendar event write whose `sendUpdates` is not `none`, or whose `sendNotifications` is true, emails the guests and is a send: commit with `gws_send`. A read with `download.path` is an export: commit with `gws_export`.
 
 Plans are single-use and bound to this session, agent, and account. `PLAN_EXPIRED`, `PLAN_ALREADY_USED`, and `PLAN_CALLER_MISMATCH` mean: read the current state, plan again, and show the new preview. `CATEGORY_MISMATCH` means you called the wrong commit tool.
 

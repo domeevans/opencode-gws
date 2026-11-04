@@ -88,7 +88,7 @@ The check fails closed. When a matching rule limits recipients and the plugin ca
 
 Deploy and watch are never committable, whatever a rule says. Admin is the admin gate, not a policy allow. See [admin.md](admin.md).
 
-A Calendar event write becomes `send` when `params.sendUpdates` is `all` or `externalOnly`. Drive `files.update` with `body.trashed` true becomes `delete`, including when the same body also renames the file. Commit with the plan's category, not the manifest category.
+A Calendar event write (`insert`, `patch`, `update`, `move`, `quickAdd`) becomes `send` when it emails guests: `params.sendUpdates` is anything but `none`, or the deprecated `params.sendNotifications` is anything but `false`. A notifying `calendar.events.delete` stays `delete`, which asks every time and never offers Always. Calendar ACL changes, which notify by default, are already `share`. Drive `files.update` with `body.trashed` true becomes `delete`, including when the same body also renames the file. Commit with the plan's category, not the manifest category.
 
 ## Approvals
 

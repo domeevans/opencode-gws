@@ -71,6 +71,18 @@ describe("writes that reach other people are sends", () => {
     }
   })
 
+  it("promotes the deprecated sendNotifications, and any sendUpdates but none", () => {
+    for (const name of ["insert", "patch", "update", "quickAdd", "move"]) {
+      const entry = method("calendar", ["events"], name)
+      for (const params of [{ sendNotifications: true }, { sendNotifications: "true" }, { sendNotifications: 1 }, { sendUpdates: "ALL" }, { sendUpdates: "bogus" }, { sendUpdates: "none", sendNotifications: true }]) {
+        expect(effectiveCategory(entry, request(entry, { calendarId: "primary", ...params })), `${name} ${JSON.stringify(params)}`).toBe("send")
+      }
+      for (const params of [{ sendNotifications: false }, { sendNotifications: "false" }, { sendUpdates: "None" }]) {
+        expect(effectiveCategory(entry, request(entry, { calendarId: "primary", ...params })), `${name} ${JSON.stringify(params)}`).toBe("write")
+      }
+    }
+  })
+
   it("keeps a Calendar delete a delete even when it notifies", () => {
     const entry = method("calendar", ["events"], "delete")
     expect(effectiveCategory(entry, request(entry, { calendarId: "primary", eventId: "e", sendUpdates: "all" }))).toBe("delete")

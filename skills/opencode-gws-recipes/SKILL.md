@@ -169,7 +169,7 @@ Create an event that does not email anyone. Plan category is write. Commit with 
 }
 ```
 
-Create or move an event that emails attendees (`sendUpdates` of `all` or `externalOnly`). The plan category is **send**. Commit with `gws_send`.
+Create or move an event that emails attendees (`sendUpdates` of `all` or `externalOnly`; prefer it to the deprecated `sendNotifications`, which counts as a send too). The plan category is **send**. Commit with `gws_send`.
 
 ```json
 {
