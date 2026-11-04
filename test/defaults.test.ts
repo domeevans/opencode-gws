@@ -35,20 +35,20 @@ describe("policy does not ask", () => {
       const entry = method(service, resources, name)
       const req = request(entry, { userId: "me" })
       expect(effectiveCategory(entry, req)).toBe(category)
-      expect(evaluatePolicy(config(), entry, category, req).effect).toBe("allow")
+      expect(evaluatePolicy(config(), entry, category, req, "pending").effect).toBe("allow")
     }
   })
 
   it("keeps admin denied until the admin gate is opened", () => {
     const entry: MethodEntry = { ...method("drive", ["files"], "list"), category: "admin" }
-    expect(evaluatePolicy(config(), entry, "admin", request(entry)).effect).toBe("deny")
+    expect(evaluatePolicy(config(), entry, "admin", request(entry), "pending").effect).toBe("deny")
   })
 
   it("lets a deny rule block one category", () => {
     const entry = method("drive", ["files"], "delete")
     const req = request(entry, { fileId: "x" })
-    expect(evaluatePolicy(config({ rules: [{ id: "no-delete", effect: "deny", categories: ["delete"] }] }), entry, "delete", req).effect).toBe("deny")
-    expect(evaluatePolicy(config({ rules: [{ id: "no-write", effect: "deny", categories: ["write"] }] }), method("gmail", ["users", "drafts"], "create"), "write", req).effect).toBe("deny")
+    expect(evaluatePolicy(config({ rules: [{ id: "no-delete", effect: "deny", categories: ["delete"] }] }), entry, "delete", req, "pending").effect).toBe("deny")
+    expect(evaluatePolicy(config({ rules: [{ id: "no-write", effect: "deny", categories: ["write"] }] }), method("gmail", ["users", "drafts"], "create"), "write", req, "pending").effect).toBe("deny")
   })
 
   it("rejects policy.defaults", () => {

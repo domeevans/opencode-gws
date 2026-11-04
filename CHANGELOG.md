@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Policy recipient rules no longer fail open. `allowedRecipientDomains`, `allowedRecipients`, `deniedRecipientDomains` and `allowExternalRecipients` now read every address in `to`, `cc` and `bcc`: comma- and semicolon-separated strings, `Name <address>`, quoted names and groups. They read the `To`, `Cc` and `Bcc` headers of a raw `gmail.users.messages.send`, and before the plan they read who a reply, reply-all, `gmail.users.drafts.send`, a notifying event change or a Drive permission update reaches. Calendar ACL scopes (by address, domain or rule id), Gmail delegates and forwarding addresses, Drive domain shares and the other share methods are read too. When a matching rule limits recipients and the plugin cannot tell who a send or share reaches, the plan is refused with the new code `RECIPIENTS_UNKNOWN`. A plan whose recipients were read is checked again at commit, and expires if someone was added.
+- `allowExternalRecipients: false` now compares each recipient with the account's own domain, not with the first recipient, so a send only to outside addresses is refused. The domain is the new `accounts.<alias>.domains` option, or the signed-in address's domain, read with Gmail, Drive or Calendar; when neither is known the plan is refused with the new code `ACCOUNT_DOMAIN_UNKNOWN`.
+
+### Added
+
+- `accounts.<alias>.domains`: the account's own email domains, for `allowExternalRecipients`.
+
 ## [0.0.2] - 2026-11-03
 
 ### Fixed

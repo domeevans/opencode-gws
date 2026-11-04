@@ -24,6 +24,7 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 | `access` | `"read"`; `"write"` on the implicit `default` account | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
 | `scopes` | none | Extra scope URLs or short names, always shown at sign-in. Interactive accounts only. |
 | `oauthClient` | none | `{ "clientId", "clientSecret" }` of a Desktop app client, or Google's downloaded client JSON (`{ "installed": … }` or `{ "web": … }`), for this account. Overrides the plugin client. Interactive accounts only. |
+| `domains` | the domain of the signed-in address | The account's own email domains, such as `["example.com", "example.org"]`. A policy rule with `allowExternalRecipients: false` treats a recipient outside them as external. Any mode. |
 
 An account whose config sets `access` to read, with no write service, does not offer write on the sign-in form. With no explicit `access`, the form defaults to read and still offers write, which needs the acknowledgment. The implicit `default` account defaults to write and still offers Read-only.
 
@@ -47,7 +48,7 @@ An account whose config sets `access` to read, with no write service, does not o
 
 ## Policy
 
-Policy rules are deny-only content constraints. They do not ask, and they cannot allow. A rule with no constraint denies whatever it matches. A rule with a constraint denies only when that constraint is violated. A deny is final (`POLICY_DENIED`).
+Policy rules are deny-only content constraints. They do not ask, and they cannot allow. A rule with no constraint denies whatever it matches. A rule with a constraint denies only when that constraint is violated. A deny is final (`POLICY_DENIED`, or `RECIPIENTS_UNKNOWN` and `ACCOUNT_DOMAIN_UNKNOWN` below).
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -71,6 +72,19 @@ A rule may match `categories`, `accounts`, `services`, and `operations` (wildcar
   }
 }
 ```
+
+### Recipients
+
+The recipient constraints (`allowedRecipientDomains`, `allowedRecipients`, `deniedRecipientDomains`, `allowExternalRecipients: false`) check everyone a send or share reaches:
+
+- Every address in `to`, `cc` and `bcc`, whether a list, a comma- or semicolon-separated string, `Name <address>`, or a group.
+- The `To`, `Cc` and `Bcc` headers of a raw message (`gmail.users.messages.send`).
+- What the request does not carry, read before the plan: the sender (or `Reply-To`) of the message a reply answers, and for reply-all its other recipients; a draft's stored recipients (`gmail.users.drafts.send`); an event's guests for a notifying change; a Drive permission's grantee. Each read needs `gws.read` on that method, and the commit reads them again: a plan whose recipients changed expires.
+- A domain share (a Drive or Calendar ACL for a whole domain) counts as `*@<domain>`.
+
+The check fails closed. When a matching rule limits recipients and the plugin cannot tell who the call reaches, the plan is refused with `RECIPIENTS_UNKNOWN`: a raw message without readable headers, a read that failed, an address it cannot read (such as a quoted local part), or a method whose recipients it does not know (Chat messages, Drive approvals). Scope such rules with `services` or `operations` when that is too broad. A share that only removes access reaches no one new.
+
+"External" means outside the account's own domains: `accounts.<alias>.domains`, or else the domain of the signed-in address, which the plugin reads with Gmail, Drive or Calendar. A subdomain is a different domain. When neither is available the plan is refused with `ACCOUNT_DOMAIN_UNKNOWN`.
 
 Deploy and watch are never committable, whatever a rule says. Admin is the admin gate, not a policy allow. See [admin.md](admin.md).
 
@@ -184,6 +198,8 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
 | `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
 | `POLICY_DENIED` | Plugin policy refused the call: the category, the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it. If the message says to use gws_plan, plan the change; otherwise tell the user, who can change the plugin policy. |
+| `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |
+| `ACCOUNT_DOMAIN_UNKNOWN` | A policy rule sets allowExternalRecipients to false, and the account's own email domain is unknown: accounts.<alias>.domains is unset and the signed-in address could not be read. Nothing ran. | Ask the user to set accounts.<alias>.domains to the account's email domains, or to enable Gmail, Drive or Calendar for the account so the plugin can read its address. |
 | `PLAN_NOT_FOUND` | No plan has this planId, or it was removed. | Create a plan with gws_plan, then commit its planId. |
 | `PLAN_ALREADY_USED` | The plan was committed, or is being committed. Plans are single-use. | Check the result of the earlier commit with gws_read before planning the change again. |
 | `PLAN_EXPIRED` | The plan's time limit passed, or a failed commit expired it. | Check the current state with gws_read, then plan again and show the new preview. |

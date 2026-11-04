@@ -226,7 +226,10 @@ describe("helper planning", () => {
     for (const id of mutating) {
       writeFileSync(log, "")
       const planned = await runtime!.plan(requestFor(id, { input: samples[id] }), call)
-      const ran = readFileSync(log, "utf8").split("\n").filter(Boolean)
+      const lines = readFileSync(log, "utf8").split("\n").filter(Boolean)
+      // A reply also reads the message it answers, to show and check its recipients.
+      const ran = lines.filter((line) => line.split(" ")[1]?.startsWith("+"))
+      expect(lines.some((line) => line.startsWith("gmail users messages get ")), id).toBe(id.startsWith("gmail.reply"))
       expect(ran, id).toHaveLength(1)
       expect(ran[0]!.endsWith(" --dry-run"), id).toBe(true)
       const plan = runtime!.inspectPlan(planned.category, { planId: planned.planId }, call)

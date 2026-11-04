@@ -15,6 +15,9 @@
  * - FAKE_GWS_FAIL=<kind> makes every account-scoped call fail the way gws
  *   does: an API error object on stdout and gws's exit code for the class.
  *   Kinds: api, auth, scope, disabled, validation.
+ * - FAKE_GWS_RESPONSES, a JSON object keyed by method id (for example
+ *   "gmail.users.messages.get"), answers that method with its value. A
+ *   value of null fails the call with a 404 API error.
  */
 import { appendFileSync, existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -79,7 +82,16 @@ const method = (flags < 0 ? argv : argv.slice(0, flags)).at(-1)
 const output = argv.indexOf("--output")
 if (output !== -1 && !argv.includes("--dry-run")) writeFileSync(argv[output + 1], "fake export\n")
 
-if (argv.includes("--dry-run")) {
+const responses = process.env.FAKE_GWS_RESPONSES ? JSON.parse(process.env.FAKE_GWS_RESPONSES) : {}
+const id = (flags < 0 ? argv : argv.slice(0, flags)).join(".")
+
+if (!argv.includes("--dry-run") && Object.hasOwn(responses, id)) {
+  if (responses[id] === null) {
+    out({ error: FAILURES.api[1] })
+    process.exit(1)
+  }
+  out(responses[id])
+} else if (argv.includes("--dry-run")) {
   out({ dryRun: true, method: "POST", url: `https://gmail.googleapis.com/fake/${method}`, body: { raw: "fake" } })
 } else if (method === "send") {
   out({ id: "sent-fake-1", threadId: "thread-fake-1", labelIds: ["SENT"] })

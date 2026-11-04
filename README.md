@@ -108,6 +108,7 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | `HOST_UNTESTED` | Use OpenCode 2.2.3 or a later 2.2.x, or set `"allowUntestedHost": true`. |
 | `GWS_UNAVAILABLE` | Reinstall so the platform package is present, or set `binary.path` to a `gws` executable of the pinned version ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). |
 | `POLICY_DENIED` | A policy rule or the admin gate refused the call. A deny is final. |
+| `RECIPIENTS_UNKNOWN` | A recipient rule applies, and the plugin could not tell who the send or share reaches. |
 
 `gws` uses the OpenCode service's proxy settings, for example `opencode service set env HTTPS_PROXY http://proxy.example:8080`. All codes: [Errors](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#errors).
 

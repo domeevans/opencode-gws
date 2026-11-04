@@ -8,7 +8,8 @@ import { hasFiles, type FileLimits, type FileSpecs, type PlannedFiles, type Stag
 import { helperAdapter, type HelperAdapter } from "../domain/helpers.js"
 import { commandIndex, HELPER_ALTERNATIVES, helperInput, resolveOperation } from "../domain/manifest.js"
 import type { PlanStore } from "../domain/plans.js"
-import { evaluatePolicy, type PolicyDecision } from "../domain/policy.js"
+import { evaluatePolicy, needsAccountDomains, type PolicyDecision, type PolicyFacts } from "../domain/policy.js"
+import { ACCOUNT_ADDRESS_READS, domainOf, recipientPlan, withLookup, type RecipientLookup, type RecipientPlan, type Recipients } from "../domain/recipients.js"
 import { capPageItems, inlineCap, isApiError, parseResult, processError, redactDryRun } from "../domain/result.js"
 import type { BuiltCommand, Category, CommitCategory, HelperEntry, MethodEntry, Plan, PluginConfig, Request } from "../domain/types.js"
 import type { SchemaClient } from "../process/schema.js"
@@ -27,6 +28,8 @@ export interface Target {
   operation: string
   service: string
   category: Category
+  /** Reads a plan makes to find recipients the request does not carry; each needs gws.read. */
+  reads?: string[]
 }
 
 /** A resolved schema request: what the gws.schema permission prompt names. */
@@ -58,7 +61,24 @@ const METHOD_FIELDS = ["params", "body", "fields", "pagination", "upload", "down
 
 const PLAN_INSTEAD = "Call gws_plan with the same request, then commit with the tool named by the plan's category."
 
+/** How long the account's own address, once read, is trusted. */
+const ADDRESS_TTL_MS = 10 * 60 * 1000
+
+/** The error a policy deny raises: its code, and for an unknown domain, the account's option. */
+function policyError(decision: PolicyDecision, account: string): GwsError {
+  const detail = decision.violations.join("; ")
+  if (decision.code === "ACCOUNT_DOMAIN_UNKNOWN") {
+    return new GwsError("ACCOUNT_DOMAIN_UNKNOWN", detail, {
+      next: `Ask the user to set accounts.${account}.domains to the account's email domains, or to enable Gmail, Drive or Calendar for '${account}' so the plugin can read its address.`,
+    })
+  }
+  return new GwsError(decision.code, detail)
+}
+
 export class Operations {
+  /** Each account's own address, once read. */
+  private readonly addresses = new Map<string, { address: string; at: number }>()
+
   constructor(
     private readonly runtime: OperationsContext,
     private readonly accounts: Accounts,
@@ -140,8 +160,9 @@ export class Operations {
           throw new GwsError("POLICY_DENIED", `'${entry.id}' is ${category}; use gws_plan and the matching commit tool`, { next: PLAN_INSTEAD })
         }
       }
-      const decision = evaluatePolicy(this.runtime.config, entry, "read", request)
-      if (decision.effect === "deny") throw new GwsError("POLICY_DENIED", decision.violations.join("; "))
+      const facts = { recipients: recipientPlan(entry.id, "read", request).known, accountDomains: this.runtime.config.accounts[request.account]?.domains }
+      const decision = evaluatePolicy(this.runtime.config, entry, "read", request, facts)
+      if (decision.effect === "deny") throw policyError(decision, request.account)
       return { category: "read", decision }
     }
     const category = helper ? helper.category : effectiveCategory(entry, request)
@@ -150,8 +171,9 @@ export class Operations {
         next: category === "read" ? "Run it with gws_read." : "Tell the user the plugin never runs it.",
       })
     }
-    const decision = evaluatePolicy(this.runtime.config, entry, category, request)
-    if (decision.effect === "deny") throw new GwsError("POLICY_DENIED", decision.violations.join("; "))
+    // The recipient constraints need reads; plan() evaluates again with them.
+    const decision = evaluatePolicy(this.runtime.config, entry, category, request, "pending")
+    if (decision.effect === "deny") throw policyError(decision, request.account)
     // Defense in depth: the policy decision above already enforces both
     // fences, but admin planning must never proceed on an allow alone.
     if (category === "admin" && (!this.runtime.config.admin.enabled || decision.effect !== "allow")) {
@@ -167,11 +189,13 @@ export class Operations {
   inspect(input: RequestInput, mode: "read" | "plan"): Target {
     const resolved = this.resolve(input)
     const { category } = this.gate(resolved, mode)
+    const reads = mode === "plan" ? recipientPlan(resolved.entry.id, category, resolved.request).lookups.map((lookup) => lookup.operation) : []
     return {
       account: resolved.request.account,
       operation: resolved.entry.id,
       service: resolved.entry.service,
       category,
+      ...(reads.length > 0 ? { reads } : {}),
     }
   }
 
@@ -271,8 +295,12 @@ export class Operations {
     const resolved = this.resolve(input)
     const { entry, helper, request } = resolved
     const started = Date.now()
-    const { category, decision } = this.gate(resolved, "plan")
+    const { category } = this.gate(resolved, "plan")
     const commitCategory = category as CommitCategory
+    const recipientsPlan = recipientPlan(entry.id, category, request)
+    const facts = await this.policyFacts(resolved, category, recipientsPlan, ctx)
+    const decision = evaluatePolicy(this.runtime.config, entry, category, request, facts)
+    if (decision.effect === "deny") throw policyError(decision, request.account)
     const limits = fileLimits(decision)
 
     let dryRunArgv: string[]
@@ -329,6 +357,8 @@ export class Operations {
       argv: commitArgv,
       preview: planPreview,
       files: planned,
+      // Recipients read at plan time can change before the commit (a draft, an event's guests): the commit reads them again.
+      ...(recipientsPlan.lookups.length > 0 ? { recheck: { request, recipients: facts.recipients.addresses.concat(facts.recipients.domains) } } : {}),
       ttlSeconds: this.runtime.config.policy.planTtlSeconds,
     })
     this.runtime.audit.emit({
@@ -368,6 +398,7 @@ export class Operations {
     let stage: Stage | undefined
     let receipt: CommitOutput | undefined
     try {
+      if (plan.recheck) await this.recheck(plan, ctx)
       if (plan.files) stage = await Stage.create(this.runtime.workDir, ctx.signal)
       if (stage && plan.files) {
         const staged = await stage.stageInputs(plan.files.inputs, plan.files.limits)
@@ -417,6 +448,89 @@ export class Operations {
     } finally {
       try { await stage?.dispose() } catch { if (receipt) receipt.cleanupDegraded = true }
     }
+  }
+  /**
+   * The recipient facts for a plan: what the request carries, the reads
+   * that find the rest, and the account's own domains when a rule needs them.
+   * A read that fails leaves the recipients unknown, which a recipient rule refuses.
+   */
+  private async policyFacts(resolved: Resolved, category: Category, plan: RecipientPlan, ctx: CallContext): Promise<PolicyFacts> {
+    const { entry, request } = resolved
+    let recipients: Recipients = plan.known
+    if (plan.lookups.length > 0) {
+      const self = plan.needsSelf ? await this.ownAddress(request.account, entry.service, ctx) : undefined
+      for (const lookup of plan.lookups) recipients = withLookup(recipients, await this.lookup(lookup, request.account, ctx, self), lookup.what)
+    }
+    const configured = this.runtime.config.accounts[request.account]?.domains
+    const reaches = recipients.addresses.length > 0 || recipients.domains.length > 0 || recipients.unknown !== undefined
+    if (configured || !reaches || !needsAccountDomains(this.runtime.config, entry, category, request)) return { recipients, accountDomains: configured }
+    const address = await this.ownAddress(request.account, entry.service, ctx)
+    return { recipients, accountDomains: address ? [domainOf(address)] : undefined }
+  }
+
+  /** Read the recipients again before a commit whose plan read them, and refuse when the policy now denies or someone was added. */
+  private async recheck(plan: Plan, ctx: CallContext): Promise<void> {
+    const recheck = plan.recheck!
+    const resolved = this.resolve(recheck.request)
+    const category = plan.category
+    const facts = await this.policyFacts(resolved, category, recipientPlan(resolved.entry.id, category, resolved.request), ctx)
+    const decision = evaluatePolicy(this.runtime.config, resolved.entry, category, resolved.request, facts)
+    if (decision.effect === "deny") throw policyError(decision, plan.account)
+    const planned = new Set(recheck.recipients)
+    const added = [...facts.recipients.addresses, ...facts.recipients.domains].filter((recipient) => !planned.has(recipient))
+    if (added.length > 0) {
+      throw new GwsError("PLAN_EXPIRED", `the recipients changed after the plan was created (added: ${added.join(", ")})`, { next: "Plan again and show the new preview." })
+    }
+  }
+
+  /** One recipient read; undefined when it fails or answers in an unexpected shape. */
+  private async lookup(lookup: RecipientLookup, account: string, ctx: CallContext, self: string | undefined): Promise<ReturnType<RecipientLookup["extract"]>> {
+    try {
+      return lookup.extract(await this.readJson(lookup.operation, lookup.params, account, ctx), self)
+    } catch (error) {
+      throwIfCancelled(ctx.signal)
+      this.runtime.assertActive(ctx.signal)
+      if (GwsError.from(error) === undefined) throw error
+      return undefined
+    }
+  }
+
+  /** The account's own address, read with the operation's service first; undefined when no read gives it. */
+  private async ownAddress(account: string, service: string, ctx: CallContext): Promise<string | undefined> {
+    const cached = this.addresses.get(account)
+    if (cached && Date.now() - cached.at < ADDRESS_TTL_MS) return cached.address
+    const enabled = this.runtime.config.accounts[account]?.enabledServices ?? []
+    const services = [...new Set([service, ...Object.keys(ACCOUNT_ADDRESS_READS)])].filter((name) => Object.hasOwn(ACCOUNT_ADDRESS_READS, name) && enabled.includes(name))
+    for (const name of services) {
+      const read = ACCOUNT_ADDRESS_READS[name]!
+      try {
+        const address = read.extract(await this.readJson(read.operation, read.params, account, ctx))
+        if (address) {
+          this.addresses.set(account, { address, at: Date.now() })
+          return address
+        }
+      } catch (error) {
+        throwIfCancelled(ctx.signal)
+        this.runtime.assertActive(ctx.signal)
+        if (GwsError.from(error) === undefined) throw error
+      }
+    }
+    return undefined
+  }
+
+  /** A field-masked read the plugin makes for itself, under the read policy; its parsed JSON. */
+  private async readJson(operation: string, params: Record<string, unknown>, account: string, ctx: CallContext): Promise<unknown> {
+    const entry = commandIndex().methods.get(operation)
+    if (!entry) throw new GwsError("OPERATION_UNKNOWN", `'${operation}' is not in the gws manifest`)
+    const request: Request = { account, operation, params }
+    const decision = evaluatePolicy(this.runtime.config, entry, "read", request, { recipients: recipientPlan(operation, "read", request).known })
+    if (decision.effect === "deny") throw policyError(decision, account)
+    const argv = buildCommand(entry, request, this.runtime.config, { dryRun: false, category: "read" }).argv
+    const result = await this.accounts.run(argv, account, operation, ctx, { scopes: entry.scopes })
+    this.runtime.assertActive(ctx.signal)
+    const parsed = parseResult(result, { maxInlineBytes: this.runtime.config.execution.maxInlineBytes })
+    if (!parsed.ok) throw processError(result, parsed, this.accounts.remediation(account, entry.scopes, entry.service))
+    return parsed.data
   }
 }
 

@@ -59,6 +59,11 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   top-level ones); `gws_status` gives the model only their count.
 - Plugin policy is deny-only content constraints plus the admin gate.
   `deploy` and `watch` are never committable.
+- Recipient rules fail closed (`src/domain/recipients.ts`): a send or
+  share whose recipients cannot all be determined is refused when a rule
+  limits recipients. A plan that reads recipients (a reply's message, a
+  draft, an event's guests) asserts `gws.read` on each read, and its commit
+  reads them again.
 
 ## Security
 

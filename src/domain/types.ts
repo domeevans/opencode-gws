@@ -76,6 +76,11 @@ export interface AccountProfile {
   mode: "interactive" | "credentials_file" | "access_token"
   enabledServices: string[]
   /**
+   * The account's own email domains, lowercased: for allowExternalRecipients,
+   * a recipient outside them is external. Unset: the signed-in address's domain.
+   */
+  domains?: string[]
+  /**
    * Interactive accounts: the access the sign-in form offers by default,
    * as one level or per service (unlisted services are read). Read unless
    * configured; a sign-in never gets write without an explicit choice.
@@ -210,6 +215,12 @@ export interface Plan {
   preview: BuiltCommand["preview"]
   /** Files the commit re-stages (and must match by fingerprint) and delivers. */
   files?: PlannedFiles
+  /**
+   * For a plan that read recipients (a draft, a message being replied to,
+   * an event's guests): the request, to read them again at commit, and the
+   * recipients the preview showed.
+   */
+  recheck?: { request: Request; recipients: string[] }
 }
 
 /** A finished `gws` child process, as reported by the process layer. */

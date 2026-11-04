@@ -43,6 +43,16 @@ export const ErrorCode = {
       "Plugin policy refused the call: the category, the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",
     next: "Do not work around it. If the message says to use gws_plan, plan the change; otherwise tell the user, who can change the plugin policy.",
   },
+  RECIPIENTS_UNKNOWN: {
+    meaning:
+      "A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, or a method whose recipients it does not know. Nothing ran.",
+    next: "Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method.",
+  },
+  ACCOUNT_DOMAIN_UNKNOWN: {
+    meaning:
+      "A policy rule sets allowExternalRecipients to false, and the account's own email domain is unknown: accounts.<alias>.domains is unset and the signed-in address could not be read. Nothing ran.",
+    next: "Ask the user to set accounts.<alias>.domains to the account's email domains, or to enable Gmail, Drive or Calendar for the account so the plugin can read its address.",
+  },
 
   // ── Plans ─────────────────────────────────────────────────────────────
   PLAN_NOT_FOUND: {

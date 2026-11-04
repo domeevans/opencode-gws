@@ -60,6 +60,8 @@ function defaultAccounts(): Record<string, { mode: "interactive"; enabledService
 }
 
 const enabledServices = z.array(z.string().min(1)).min(1)
+/** The account's own email domains: recipients outside them are external. */
+const domains = z.array(z.string().regex(/^[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+$/u, "must be a domain such as example.com")).min(1)
 
 /** `mode` may be omitted: an account is interactive unless it names a headless mode. */
 const accountProfile = z.preprocess(
@@ -68,6 +70,7 @@ const accountProfile = z.preprocess(
     z.strictObject({
       mode: z.literal("interactive"),
       enabledServices,
+      domains: domains.optional(),
       access: z.union([accessLevel, z.record(z.string().min(1), accessLevel)]).optional(),
       scopes: z.array(z.string().min(1)).optional(),
       oauthClient: OAuthClientSchema.optional(),
@@ -75,11 +78,13 @@ const accountProfile = z.preprocess(
     z.strictObject({
       mode: z.literal("credentials_file"),
       enabledServices,
+      domains: domains.optional(),
       credentialsFileEnv: envVarName,
     }),
     z.strictObject({
       mode: z.literal("access_token"),
       enabledServices,
+      domains: domains.optional(),
       tokenEnv: envVarName,
     }),
   ]),
@@ -222,6 +227,7 @@ export function loadConfig(raw: unknown): PluginConfig {
     accounts[alias] = {
       mode: profile.mode,
       enabledServices: enabled,
+      ...(profile.domains ? { domains: [...new Set(profile.domains.map((domain) => domain.toLowerCase()))] } : {}),
       access,
       ...(accessSpecified ? { accessSpecified } : {}),
       scopes: [...new Set(scopes)],

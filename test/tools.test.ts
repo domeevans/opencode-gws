@@ -501,6 +501,17 @@ describe("commit permission assertions", () => {
     expect(h.runtime.plans.get(planId)?.state).toBe("ready")
   })
 
+  it("asks gws.read for a read a plan makes to find recipients, and stops when it is refused", async () => {
+    const reply = request("gmail.reply", { input: { messageId: "m1", body: "Thanks" } })
+    const h = await setup({}, (request) => request.action === "gws.read")
+    await expect(tool(h, "plan").execute(reply, context())).rejects.toThrow(/PermissionRejected: gws.read/)
+    expect(h.calls.map((call) => [call.action, call.resources])).toEqual([
+      ["gws.plan", ["personal:gmail.reply"]],
+      ["gws.read", ["personal:gmail.users.messages.get"]],
+    ])
+    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["--version"])
+  })
+
   it("refuses the wrong commit tool before asking", async () => {
     const h = await setup({})
     const planId = await plan(h)
