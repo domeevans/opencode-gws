@@ -56,7 +56,7 @@ export const ErrorCode = {
 
   // ── Plans ─────────────────────────────────────────────────────────────
   PLAN_NOT_FOUND: {
-    meaning: "No plan has this planId, or it was removed.",
+    meaning: "No plan has this planId: it never existed, or its time limit passed and it was removed.",
     next: "Create a plan with gws_plan, then commit its planId.",
   },
   PLAN_ALREADY_USED: {
