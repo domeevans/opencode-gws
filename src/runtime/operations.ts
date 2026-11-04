@@ -10,7 +10,7 @@ import { commandIndex, HELPER_ALTERNATIVES, helperInput, resolveOperation } from
 import type { PlanStore } from "../domain/plans.js"
 import { evaluatePolicy, needsAccountDomains, type PolicyDecision, type PolicyFacts } from "../domain/policy.js"
 import { ACCOUNT_ADDRESS_READS, domainOf, recipientPlan, withLookup, type RecipientLookup, type RecipientPlan, type Recipients } from "../domain/recipients.js"
-import { capPageItems, inlineCap, isApiError, parseResult, processError, redactDryRun } from "../domain/result.js"
+import { capPageItems, inlineCap, isApiError, parseResult, processError, redactDryRun, withoutSavedBody } from "../domain/result.js"
 import type { BuiltCommand, Category, CommitCategory, HelperEntry, MethodEntry, Plan, PluginConfig, Request } from "../domain/types.js"
 import type { SchemaClient } from "../process/schema.js"
 import { Stage, checkDestination } from "../process/staging.js"
@@ -60,6 +60,9 @@ interface Resolved {
 const METHOD_FIELDS = ["params", "body", "fields", "pagination", "upload", "download"] as const
 
 const PLAN_INSTEAD = "Call gws_plan with the same request, then commit with the tool named by the plan's category."
+
+/** What a read whose body is not JSON says to do to save it. */
+const SAVE_INSTEAD = "Google answered with a body that is not JSON. To save it, plan the same request with download.path, then commit it with gws_export."
 
 /** How long the account's own address, once read, is trusted. */
 const ADDRESS_TTL_MS = 10 * 60 * 1000
@@ -279,7 +282,7 @@ export class Operations {
         ok: true,
         operation: entry.id,
         category: "read",
-        data: helper ? (parsed.data ?? parsed.raw ?? result.stdout.toString("utf8")) : pages ? pages.data : parsed.data,
+        data: helper ? (parsed.data ?? parsed.raw ?? result.stdout.toString("utf8")) : pages ? pages.data : withoutSavedBody(parsed.data, SAVE_INSTEAD),
         truncated,
         diagnostics: parsed.diagnostics,
         pagination: pages ? { pages: pages.pages, items: pages.items, capped: pages.capped } : undefined,
@@ -424,7 +427,8 @@ export class Operations {
         operation: plan.operation,
         durationMs: Date.now() - started,
       })
-      receipt = { ok: true, planId: plan.id, category, operation: plan.operation, result: parsed.data ?? parsed.raw, file, ...(delivered?.cleanupDegraded ? { cleanupDegraded: true } : {}) }
+      const answer = plan.files?.output ? parsed.data : withoutSavedBody(parsed.data)
+      receipt = { ok: true, planId: plan.id, category, operation: plan.operation, result: answer ?? parsed.raw, file, ...(delivered?.cleanupDegraded ? { cleanupDegraded: true } : {}) }
       return receipt
     } catch (error) {
       this.runtime.plans.release(plan.id)

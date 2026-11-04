@@ -77,6 +77,29 @@ export function parseResult(
   }
 }
 
+/**
+ * gws's answer for a 2xx body that is not JSON, when no --output names a
+ * file: it saves the body as `download.<ext>` in its working directory and
+ * prints `{bytes, mimeType, saved_file, status}`. The runtime removes that
+ * directory, so the call reports the body itself: an empty result for an
+ * empty body (a delete's 204), else its type and size and, for a read,
+ * how to save it.
+ */
+export function withoutSavedBody(data: unknown, next?: string): unknown {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data
+  const record = data as Record<string, unknown>
+  const keys = Object.keys(record)
+  if (typeof record["saved_file"] !== "string" || typeof record["bytes"] !== "number" || record["status"] !== "success") return data
+  if (!keys.every((key) => ["bytes", "mimeType", "saved_file", "status"].includes(key))) return data
+  if (record["bytes"] === 0) return ""
+  return {
+    ...(typeof record["mimeType"] === "string" ? { mimeType: record["mimeType"] } : {}),
+    bytes: record["bytes"],
+    saved: false,
+    ...(next ? { next } : {}),
+  }
+}
+
 interface PagedData {
   /** One element per page. */
   data: unknown[]

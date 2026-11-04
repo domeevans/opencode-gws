@@ -1,3 +1,4 @@
+import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { doctorTarget, probeArgv, probeOutcome, skipDetail, type DoctorOutcome, type DoctorTarget } from "../auth/doctor.js"
 import { signInScopes } from "../auth/form.js"
@@ -77,7 +78,7 @@ interface RunOptions {
   scopes?: readonly string[]
   /** A --dry-run never contacts Google, so its success says nothing about the credential. */
   dryRun?: boolean
-  /** Run gws in this staging directory (calls with local files). */
+  /** Run gws in this staging directory (calls with local files); otherwise in a private directory removed after the call. */
   cwd?: string
 }
 
@@ -154,7 +155,15 @@ export class Accounts {
     this.runtime.assertActive(ctx.signal)
     const env = buildChildEnv(profile, this.accountDir(account), this.runtime.workDir, credential?.access)
     report(ctx, { status: "running", operation })
-    const result = await this.spawn(argv, env, operation, ctx, options.paged === true, options.cwd ?? this.runtime.workDir)
+    // gws saves a body that is not JSON to a file in its working directory:
+    // a call without its own staging directory runs in a private one, removed after.
+    const scratch = options.cwd ? undefined : await mkdtemp(join(this.runtime.workDir, "call-"))
+    let result: ProcessResult
+    try {
+      result = await this.spawn(argv, env, operation, ctx, options.paged === true, options.cwd ?? scratch!)
+    } finally {
+      if (scratch) await rm(scratch, { recursive: true, force: true }).catch(() => undefined)
+    }
     // Only a call that used the integration credential says anything about
     // that connection; headless credentials have no connection to mark.
     if (credential) {
