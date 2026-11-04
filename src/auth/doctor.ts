@@ -94,10 +94,10 @@ const DISABLED = /accessNotConfigured|SERVICE_DISABLED|has not been used in proj
 export function probeOutcome(target: DoctorTarget, result: ProcessResult): DoctorOutcome {
   const parsed = parseResult(result, { maxInlineBytes: 64 * 1024 })
   if (parsed.ok) return { ...target, status: "OK" }
-  if (privilegeRefused(result, parsed)) {
+  if (privilegeRefused(result, target.service, parsed)) {
     return { ...target, status: "ADMIN_PRIVILEGE_REQUIRED", detail: "Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs" }
   }
-  const problem = authProblem(result, parsed)
+  const problem = authProblem(result, target.service, parsed)
   if (problem === "AUTH_REQUIRED") return { ...target, status: problem, detail: "Google rejected the sign-in" }
   if (problem === "AUTH_SCOPE_MISSING") return { ...target, status: problem, detail: "Google says the sign-in lacks a scope for this service" }
   const error = apiError(parsed.data)

@@ -167,7 +167,7 @@ export class Accounts {
     // Only a call that used the integration credential says anything about
     // that connection; headless credentials have no connection to mark.
     if (credential) {
-      const problem = authProblem(result)
+      const problem = authProblem(result, serviceOf(operation))
       if (problem) this.observeAuth(account, { status: "needs_auth", code: problem, message: this.authMessage(account, problem, options.scopes) })
       else if (result.exitCode === 0 && options.dryRun !== true) this.observeAuth(account, { status: "ok" })
     }
@@ -341,6 +341,11 @@ function delegationField(profile: AccountProfile): { delegationRequired?: string
   if (profile.mode !== "interactive") return {}
   const services = delegationRequired(profile.enabledServices, profile.scopes)
   return services.length > 0 ? { delegationRequired: services } : {}
+}
+
+/** The service of an operation id: its first part, as in `admin-reports.activities.list`. */
+function serviceOf(operation: string): string {
+  return operation.slice(0, operation.indexOf("."))
 }
 
 function capitalize(text: string): string {

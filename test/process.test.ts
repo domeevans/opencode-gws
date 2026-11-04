@@ -77,7 +77,7 @@ describe("runProcess", () => {
   it("reports a timeout as TIMEOUT, not an API error", async () => {
     const result = await runProcess(options(sleeper, { timeoutMs: 100 }))
     expect(result.timedOut).toBe(true)
-    expect(errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }))).toMatch(/^TIMEOUT:/)
+    expect(errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), "drive")).toMatch(/^TIMEOUT:/)
   })
 })
 
@@ -115,7 +115,7 @@ describe("fake gws fixture", () => {
     expect(result.exitCode).toBe(exit)
     const parsed = parseResult(result, { maxInlineBytes: 64 * 1024 })
     expect(isApiError(parsed.data)).toBe(true)
-    expect(errorFromProcess(result, parsed)).toMatch(new RegExp(`^${code}: `))
+    expect(errorFromProcess(result, parsed, "drive")).toMatch(new RegExp(`^${code}: `))
     const version = await gws(["--version"], { FAKE_GWS_FAIL: kind })
     expect(version.exitCode).toBe(0)
   })

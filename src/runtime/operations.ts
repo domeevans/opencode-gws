@@ -265,7 +265,7 @@ export class Operations {
       // Text helpers (+triage, +read in text mode) are valid output, not
       // JSON parse failures; a helper fails only on exit code or API error.
       const failed = helper ? result.exitCode !== 0 || isApiError(parsed.data) : !parsed.ok
-      if (failed) throw processError(result, parsed, this.accounts.remediation(request.account, entry.scopes, entry.service))
+      if (failed) throw processError(result, parsed, entry.service, this.accounts.remediation(request.account, entry.scopes, entry.service))
       const pages = paged ? capPageItems(parsed.data, itemCap(request, limits)) : undefined
       const cap = inlineCap(this.runtime.config.execution.maxInlineBytes, request.response?.mode, request.response?.maxInlineBytes)
       const truncated = pages ? Buffer.byteLength(JSON.stringify(pages.data)) > cap : parsed.truncated
@@ -338,7 +338,7 @@ export class Operations {
       const dry = await this.accounts.run(dryRunArgv, request.account, entry.id, ctx, { scopes: entry.scopes, dryRun: true, cwd: stage?.dir })
       report(ctx, { status: "parsing", operation: entry.id })
       parsed = parseResult(dry, { maxInlineBytes: this.runtime.config.execution.maxInlineBytes })
-      if (dry.exitCode !== 0 || !parsed.ok) throw processError(dry, parsed, this.accounts.remediation(request.account, entry.scopes, entry.service))
+      if (dry.exitCode !== 0 || !parsed.ok) throw processError(dry, parsed, entry.service, this.accounts.remediation(request.account, entry.scopes, entry.service))
     } finally {
       await stage?.dispose()
     }
@@ -419,7 +419,7 @@ export class Operations {
       const result = await this.accounts.run(plan.argv, plan.account, plan.operation, ctx, { scopes, cwd: stage?.dir })
       report(ctx, { status: "parsing", operation: plan.operation })
       const parsed = parseResult(result, { maxInlineBytes: this.runtime.config.execution.maxInlineBytes })
-      if (!parsed.ok) throw processError(result, parsed, this.accounts.remediation(plan.account, scopes, method?.service))
+      if (!parsed.ok) throw processError(result, parsed, plan.service, this.accounts.remediation(plan.account, scopes, plan.service))
       // The change is applied once gws succeeds; a delivery failure after
       // that is reported but cannot be retried with the same plan.
       const delivered = stage && plan.files?.output ? await stage.deliver(plan.files.output, plan.files.limits) : undefined
@@ -539,7 +539,7 @@ export class Operations {
     const result = await this.accounts.run(argv, account, operation, ctx, { scopes: entry.scopes })
     this.runtime.assertActive(ctx.signal)
     const parsed = parseResult(result, { maxInlineBytes: this.runtime.config.execution.maxInlineBytes })
-    if (!parsed.ok) throw processError(result, parsed, this.accounts.remediation(account, entry.scopes, entry.service))
+    if (!parsed.ok) throw processError(result, parsed, entry.service, this.accounts.remediation(account, entry.scopes, entry.service))
     return parsed.data
   }
 }
