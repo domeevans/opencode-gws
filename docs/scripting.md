@@ -21,6 +21,8 @@ The commit tools are not methods. A script can plan a change but never commit it
 
 Every call names a session, and the session must name an agent. The script runs as that agent: each call asserts the same action and resource as the tool, against the agent's permission rules and the session's own. So any agent that has the plugin can script it, with exactly the access it already has.
 
+`opencode api` calls run in the service's default location, your home directory, not in the directory where you run the command. To target a project, call the HTTP API with `?location[directory]=<dir>`, or create the session with `"location":{"directory":"<dir>"}`. The plugin's accounts and sign-ins are the same in every location.
+
 Create the session once, with the agent the script should run as, and keep its id:
 
 ```sh
@@ -49,7 +51,7 @@ opencode api post /api/rpc/google-workspace.gws.tools/read -d '{"input":{
 }}'
 ```
 
-A result is `{"output": <the tool's output>}`, as plain JSON. Workspace content in it is untrusted data.
+A result is `{"output": <the tool's output>}`, as plain JSON. A read's `data` is the parsed JSON response, or a string when the call returns text: a helper run with `format` `table`, `yaml` or `csv`, `gmail.triage` (a table unless `format` is `json`), or `gmail.read` (text unless `format` is `json`). Workspace content in it is untrusted data.
 
 ## Errors
 
@@ -62,6 +64,8 @@ A refusal or failure is the RPC error `failed`, with `data: { code, next }` from
 | `PERMISSION_DENIED` | The agent's or the session's rules deny the call, or ask for an approval. |
 
 OpenCode itself answers `rpc.invalid_input` for a body without `sessionID` or `input`, and `rpc.method_not_found` for a method that does not exist, such as a commit tool.
+
+`opencode api` exits with status 1 on any RPC error, and prints the error body, so a shell script can test `$?` and read `data.code`.
 
 ## Plans
 
