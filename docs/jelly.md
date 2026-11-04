@@ -34,7 +34,8 @@ skill ids collide with another plugin's or the agent's own.
   It draws `gmail.users.threads.get`: the subject, then each message's sender, time and text part
   (or Gmail's snippet). For any other read it declines, and the call keeps its ordinary look. It
   carries Jelly's bridge helper inline (`views/jelly-view.js`, the text of `@jelly/contracts`
-  `VIEW_HELPER`) and loads nothing by URL.
+  `VIEW_HELPER`) and loads nothing by URL. Its types, for a page checked with TypeScript, are in
+  the repository's `views/jelly-view.d.ts`; the package ships no `.d.ts`.
 
   `gws_read` is a direct tool for this: Jelly sees the result of a direct call, and not of a call
   made inside a Code Mode script. A thread read with `fields` narrow enough to stay under Jelly's

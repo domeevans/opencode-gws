@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs"
+import { globSync, readFileSync } from "node:fs"
+import { matchesGlob } from "node:path"
 import { describe, expect, it } from "vitest"
 import { GWS_TARGETS, gwsPackage } from "../src/domain/backend.js"
 
@@ -39,7 +40,7 @@ describe("main package", () => {
   })
 
   it("whitelists the published files", () => {
-    expect(pkg.files).toEqual(["dist", "skills", "manifest/generated.json", "views", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
+    expect(pkg.files).toEqual(["dist", "skills", "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
   })
 
   it("pins every dev dependency exactly, with the OpenCode SDKs at 2.2.3", () => {
@@ -84,5 +85,13 @@ describe("gws package template", () => {
       expect(template[field], field).toBeUndefined()
     }
     expect(readFileSync(new URL("../packages/gws-bin/LICENSE", import.meta.url), "utf8")).toMatch(/^\s*Apache License\s+Version 2\.0, January 2004/)
+  })
+
+  it("ships no type declarations: files names no directory that holds a .d.ts (S6)", () => {
+    const declarations = globSync("**/*.d.{ts,mts,cts}", { cwd: new URL("../", import.meta.url), exclude: (name) => name === "node_modules" || name.startsWith(".") })
+    expect(declarations).toContain("views/jelly-view.d.ts")
+    for (const declaration of declarations) {
+      expect(pkg.files.some((entry: string) => declaration === entry || declaration.startsWith(`${entry}/`) || matchesGlob(declaration, entry))).toBe(false)
+    }
   })
 })

@@ -57,7 +57,7 @@ const MAIN = "@joe-broadhead/opencode-gws"
 const PLUGIN_ID = "google-workspace.gws"
 const MAX_PACKED_BYTES = 1024 * 1024
 const TUI_MAX_BYTES = 30 * 1024
-const MAIN_FILES = /^(package\.json|README\.md|LICENSE|NOTICE|CHANGELOG\.md|manifest\/generated\.json|views\/(gmail-thread\.html|jelly-view\.js|jelly-view\.d\.ts)|skills\/[^/]+\/SKILL\.md)$/
+const MAIN_FILES = /^(package\.json|README\.md|LICENSE|NOTICE|CHANGELOG\.md|manifest\/generated\.json|views\/(gmail-thread\.html|jelly-view\.js)|skills\/[^/]+\/SKILL\.md)$/
 // The two entries the host loads, each one self-contained file; nothing else ships in dist/.
 const DIST_FILES = ["dist/index.js", "dist/tui.js"]
 const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare"]
@@ -144,10 +144,12 @@ function checkMainTarball(main) {
   const paths = main.files.map((file) => file.path).sort()
   equal(paths.filter((path) => path.startsWith("dist/")), DIST_FILES, "main tarball dist/ files")
   equal(paths.filter((path) => !path.startsWith("dist/") && !MAIN_FILES.test(path)), [], "main tarball files outside the whitelist")
-  for (const required of ["package.json", ...DIST_FILES, "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "views/jelly-view.d.ts", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]) {
+  for (const required of ["package.json", ...DIST_FILES, "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]) {
     check(paths.includes(required), `main tarball lacks ${required}`)
   }
   check(!paths.some((path) => /(^|\/)gws$/.test(path)), "main tarball contains a gws binary")
+  // S6: no type declarations ship.
+  equal(paths.filter((path) => /\.d\.[cm]?ts$/.test(path)), [], "main tarball .d.ts files")
   check(main.size <= MAX_PACKED_BYTES, `main tarball is ${main.size} bytes, over ${MAX_PACKED_BYTES}`)
   console.log(`ok main tarball: ${main.entryCount} files, ${main.size} bytes packed`)
 }

@@ -36,7 +36,7 @@ describe("the Gmail thread view", () => {
     expect(manifest.jelly.views).toEqual([
       { v: 1, id: "gmail-thread", place: "tool-result", tools: ["gws_read"], title: "Gmail thread", page: "views/gmail-thread.html", grants: ["data"] },
     ])
-    expect(manifest.files).toContain("views")
+    expect(manifest.files).toContain("views/gmail-thread.html")
     expect(existsSync(new URL("views/gmail-thread.html", root))).toBe(true)
   })
 
