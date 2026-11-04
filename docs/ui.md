@@ -15,7 +15,7 @@ The palette command **Google Workspace: Status**, or `/gws` in the prompt, opens
 | Access | `read-only` or `read and write`, then the client, services, and granted and missing scopes |
 | Tools | the services whose gws tools the model sees |
 | Agents without default rules | their names and the block to put first in each agent's own `permissions` |
-| OpenCode | the version, `(tested)` or `(host untested: …)` |
+| OpenCode | the version, then `(tested)`, or `(host untested; supported range >=2.2.3 <2.3.0)` |
 | Next step | exactly one; `Nothing to do.` when nothing is needed |
 
 The key hint reads `r refresh · esc close`. The dialog listens for server reconnects and integration, credential and agent changes only while it is open. It loads nothing while closed, and it reads only the `status` RPC.
@@ -35,19 +35,20 @@ Each command posts a message and does not start a model turn.
 
 Contract: `src/rpc.ts`, id `google-workspace.gws`, method `status` only. It is internal: the build inlines it into both `dist/index.js` and `dist/tui.js`, and the package exports only `.` and `./tui`.
 
-`status` returns:
+`status` returns the fields every plugin's status RPC shares (`version`, `host`, `state`, `unguardedAgents`, `nextStep`), with the plugin's own beside them:
 
 | Field | Meaning |
 | --- | --- |
-| `pluginVersion`, `hostVersion` | This package and the OpenCode version. |
-| `hostWarning` | Present when the host is outside `>=2.2.3 <2.3.0` and `allowUntestedHost` is set. |
+| `version` | This package's version. |
+| `host` | `{ version, range, tested }`: the OpenCode version (`null` when unknown), the supported range `>=2.2.3 <2.3.0`, and `true` only for a tested release (2.2.3, 2.2.4, 2.2.5). |
+| `state` | `sign_in_required` when an interactive account needs signing in, `not_configured` when a headless account's variable is unset, `host_untested` on an untested OpenCode, else `connected`. |
 | `gws` | `{ path, version }` of the resolved binary. |
 | `services` | Model-facing services. |
 | `accounts` | One entry per account, below. |
 | `auditDegraded` | Present when the audit sink has failed. Omitted means false. |
 | `unguardedAgents` | Agents that missed the default ask rules, so a commit there runs without asking. |
 | `permissionsBlock` | The JSON block to add first in each of those agents' own `permissions`. Present when `unguardedAgents` is not empty. |
-| `nextStep` | The one thing to do next: an account's sign-in step, then the unguarded agents. Absent when nothing is needed. |
+| `nextStep` | The one thing to do next, as one sentence: an account's sign-in step, then the unguarded agents. `Nothing to do.` when nothing is needed. |
 
 An account entry is `{ alias, mode, services, integrationID?, connected, needsAuth?, access?, clientSource?, grantedScopes?, missingScopes?, delegationRequired?, nextStep? }`. `delegationRequired` names the enabled services that need domain-wide delegation (Keep) when the interactive account's scopes do not add them; the dialog and `/gws-status` show it as **Needs domain-wide delegation**.
 
@@ -55,7 +56,7 @@ An account entry is `{ alias, mode, services, integrationID?, connected, needsAu
 - `needsAuth` is `true` or absent.
 - `access` is the signed-in level, or the form's default before sign-in.
 - `clientSource` is `account`, `plugin`, or `pasted` (entered in the sign-in form).
-- `nextStep` is one sentence, absent when nothing is needed.
+- An account's `nextStep` is one sentence, absent when nothing is needed.
 
 The RPC cannot approve or commit. A commit happens only when the agent calls a commit tool and the permission prompt allows it.
 

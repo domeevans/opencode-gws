@@ -121,8 +121,8 @@ describe("tool execution", () => {
     const read = await direct("read", request("gmail.users.messages.list", { params: { userId: "me" }, fields: "messages(id)" }))
 
     expect(status).toMatchObject({
-      pluginVersion: packageJson.version,
-      hostVersion: host.hostVersion,
+      version: packageJson.version,
+      host: { version: host.hostVersion, range: ">=2.2.3 <2.3.0" },
       gws: { path: realpathSync(FAKE_GWS), version: "gws 0.22.5" },
       services: [...SERVICES].sort(),
       accounts: [{ alias: ACCOUNT, mode: "interactive", services: SERVICES }],

@@ -14,6 +14,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - `ADMIN_PRIVILEGE_REQUIRED` applies only to Admin SDK services (`admin-reports`, and any later `admin-*`). A Chat, Drive, Classroom or other refusal worded "not authorized to access" is now that service's own error (`GWS_API_ERROR`, or `AUTH_REQUIRED` for a 401), not a pointer to a Workspace admin account. Reads, plans, commits and `/gws-doctor` agree.
 - The package no longer ships `views/jelly-view.d.ts`: no type declarations ship (it stays in the repository for view authors), and the pack test refuses any `.d.ts`.
 
+### Changed
+
+- The status RPC (`google-workspace.gws/status`) and `gws_status` use the field names every plugin shares. `pluginVersion` is now `version`; `hostVersion` and `hostWarning` are now `host: { version, range, tested }`; the new `state` is `connected`, `sign_in_required`, `not_configured` or `host_untested`; and `nextStep` is always present, `Nothing to do.` when nothing is needed (before, it was absent).
+- OpenCode 2.2.5 is a tested host. Status calls only 2.2.3, 2.2.4 and 2.2.5 tested: another release inside `>=2.2.3 <2.3.0` starts as before, and now shows as host untested, with the supported range, in `/gws-status` and the dialog. `HOST_UNTESTED` says the range is supported, not tested.
+
 ### Added
 
 - `accounts.<alias>.domains`: the account's own email domains, for `allowExternalRecipients`.

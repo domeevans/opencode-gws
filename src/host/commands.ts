@@ -1,4 +1,4 @@
-import { BLOCK_PLACEMENT, DELEGATION_LABEL, NOTHING_TO_DO, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
+import { BLOCK_PLACEMENT, DELEGATION_LABEL, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
 import type { PluginContext } from "./context.js"
 import type { DoctorOutcome, DoctorTarget } from "../auth/doctor.js"
 import { GOOGLE_LINKS, enableApisUrl } from "../auth/setup.js"
@@ -129,7 +129,7 @@ export function formatStatus(status: GwsStatus, plans: readonly PlanSummary[] = 
     lines.push(`Agents without default rules: ${status.unguardedAgents.join(", ")}`, status.permissionsBlock ?? "", BLOCK_PLACEMENT)
   }
   if (status.auditDegraded) lines.push("Audit: some records could not be saved, so the audit log may be incomplete.")
-  lines.push(`OpenCode: ${openCodeLabel(status)}`, `Next step: ${status.nextStep ?? NOTHING_TO_DO}`)
+  lines.push(`OpenCode: ${openCodeLabel(status)}`, `Next step: ${status.nextStep}`)
   return lines.join("\n")
 }
 

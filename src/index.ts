@@ -1,7 +1,8 @@
 import { Plugin } from "@opencode/plugin"
 import { loadConfig } from "./domain/config.js"
 import { GwsError } from "./domain/errors.js"
-import { HOST_RANGE, PLUGIN_ID, PLUGIN_VERSION, checkHost } from "./domain/version.js"
+import { HOST_RANGE, checkHost } from "./domain/host.js"
+import { PLUGIN_ID, PLUGIN_VERSION } from "./domain/version.js"
 import { agentLister, registerApprovalRules } from "./host/agents.js"
 import { planSummary, registerCommands } from "./host/commands.js"
 import { integrationAuthReporter, integrationConnection, integrationIds, integrationTokenProvider, registerIntegrations } from "./host/integrations.js"
@@ -38,8 +39,7 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
 
   const runtime = await Runtime.create(config, {
     pluginVersion: PLUGIN_VERSION,
-    hostVersion: host.version,
-    hostWarning: host.warning,
+    host,
     projectDirectory: ctx.location.directory,
     tokenProvider: integrationTokenProvider(ctx, config, ids),
     connection: integrationConnection(ctx, ids),

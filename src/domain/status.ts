@@ -26,17 +26,26 @@ const AccountStatus = z.object({
   nextStep: z.string().optional().describe("What to do next; absent when nothing is needed"),
 })
 
+const Host = z.object({
+  version: z.string().nullable().describe("The OpenCode version; null when unknown"),
+  range: z.string().describe("The supported range, as in package.json opencode.host"),
+  tested: z.boolean().describe("True only for a release the plugin is tested on"),
+})
+
+/** The plugin's state, in the shared status names. */
+export const STATES = ["connected", "sign_in_required", "not_configured", "host_untested"] as const
+
 export const StatusOutput = z.object({
-  pluginVersion: z.string(),
-  hostVersion: z.string(),
-  hostWarning: z.string().optional().describe("Present when the OpenCode host is outside the tested range and allowUntestedHost is set"),
+  version: z.string().describe("The plugin's version"),
+  host: Host,
+  state: z.enum(STATES).describe("connected; sign_in_required or not_configured when an account needs it; host_untested on an untested OpenCode"),
   gws: z.object({ path: z.string(), version: z.string() }),
   services: z.array(z.string()).describe("Model-facing services"),
   accounts: z.array(AccountStatus),
   auditDegraded: z.boolean().describe("Audit records were dropped, failed, or exceeded the sink deadline; sticky until reload"),
   unguardedAgents: z.number().int().describe("How many agents missed the default ask rules"),
   permissions: z.string().optional().describe("Present when an agent missed the ask rules: where to find the fix"),
-  nextStep: z.string().optional().describe("The one thing to do next; absent when nothing is needed"),
+  nextStep: z.string().describe('The one thing to do next; "Nothing to do." when nothing is needed'),
 })
 
 export type StatusOutput = z.infer<typeof StatusOutput>
@@ -46,9 +55,8 @@ export type AccountStatus = z.infer<typeof AccountStatus>
 /** What the runtime knows without OpenCode: versions, the binary, and the accounts. */
 export interface RuntimeStatus {
   auditDegraded: boolean
-  pluginVersion: string
-  hostVersion: string
-  hostWarning?: string
+  version: string
+  host: z.infer<typeof Host>
   binary: { path: string; version: string }
   services: string[]
   accounts: AccountStatus[]

@@ -113,6 +113,9 @@ async function setup(
 
 const run = (h: Harness, name: string, delivery = "steer") => h.commands.get(name)!.execute({ sessionID: "ses_1", prompt: { text: "" }, delivery })
 
+/** A tested host, as status reports it. */
+const TESTED = { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }
+
 describe("commands", () => {
   it("registers only /gws-status and /gws-doctor", async () => {
     const h = await setup()
@@ -132,7 +135,7 @@ describe("commands", () => {
 
 describe("/gws-status", () => {
   it("names a config-only agent and gives the per-agent block, first in its own permissions", () => {
-    const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: ["notes"], permissionsBlock: '{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}' }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: ["notes"], permissionsBlock: '{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}' }
     const text = formatStatus(status)
     expect(text).toContain("Agents without default rules: notes")
     expect(text).toContain('"action":"gws.write","resource":"*"')
@@ -143,7 +146,7 @@ describe("/gws-status", () => {
     const granted = requestedScopes(["gmail", "drive"], "read").filter((scope) => !scope.endsWith("drive.readonly"))
     const h = await setup(
       { accounts: { personal: account({ services: ["gmail", "drive"] }), work: account({ oauthClient: TEST_CLIENT }) } },
-      { credentials: { "gws-personal": storedSignIn("read", granted) }, hostVersion: "2.2.3" },
+      { credentials: { "gws-personal": storedSignIn("read", granted) }, host: TESTED },
     )
     await run(h, "gws-status")
     expect(h.synthetic[0]).toMatchObject({ description: "Google Workspace: sign-in required for work" })
@@ -169,14 +172,14 @@ describe("/gws-status", () => {
   })
 
   it("says Nothing to do. and marks an untested host", () => {
-    const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.3.0", hostWarning: "outside >=2.2.3 <2.3.0", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "host_untested", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     const text = formatStatus(status)
-    expect(text).toContain("OpenCode: 2.3.0 (host untested: outside >=2.2.3 <2.3.0)")
+    expect(text).toContain("OpenCode: 2.3.0 (host untested; supported range >=2.2.3 <2.3.0)")
     expect(text).toMatch(/Next step: Nothing to do\.$/)
   })
 
   it("summarises status in one transcript line", () => {
-    const base = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], unguardedAgents: [] }
+    const base = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], unguardedAgents: [] }
     const ready = { alias: "a", mode: "interactive" as const, services: [], integrationID: "gws-a", connected: true, missingScopes: [] }
     expect(summarizeStatus({ ...base, accounts: [] })).toBe("Google Workspace: no accounts configured")
     expect(summarizeStatus({ ...base, accounts: [ready] })).toBe("Google Workspace: 1 account connected")
@@ -187,13 +190,13 @@ describe("/gws-status", () => {
 
   it("shows the services that need domain-wide delegation, and how to add their scopes", () => {
     const notes = { alias: "notes", mode: "interactive" as const, services: ["keep"], integrationID: "gws-notes", connected: true, missingScopes: [], delegationRequired: ["keep"] }
-    const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [notes], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [notes], unguardedAgents: [] }
     expect(formatStatus(status)).toContain("Services: keep\nNeeds domain-wide delegation: keep (a Workspace admin sets it up; then add the scopes to accounts.notes.scopes)")
   })
 
   it("shows a headless account as connected or not configured, never as signed in", () => {
     const headless = { alias: "ci", mode: "credentials_file" as const, services: ["drive"], connected: false }
-    const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [headless], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [headless], unguardedAgents: [] }
     expect(formatStatus(status)).toContain("Connection: not configured\nAccount: ci (credentials file)\nServices: drive")
     expect(formatStatus({ ...status, accounts: [{ ...headless, connected: true }] })).toContain("Connection: connected\nAccount: ci (credentials file)")
   })
@@ -220,7 +223,7 @@ describe("/gws-status pending plans", () => {
   })
 
   it("formats an empty plan list and every preview field", () => {
-    const status: GwsStatus = { pluginVersion: "1", hostVersion: "2.2.3", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     expect(formatStatus(status)).toContain("No pending plans in this session.")
     expect(summarizeStatus(status)).toBe("Google Workspace: no accounts configured")
     const text = formatStatus(

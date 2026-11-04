@@ -25,8 +25,10 @@ const G = (scope) => `https://www.googleapis.com/auth/${scope}`
 const SERVICES = ["gmail", "drive", "calendar", "docs", "sheets"]
 const base = { alias: "default", mode: "interactive", services: SERVICES, integrationID: "gws-default" }
 const status = (account, extra = {}) => ({
-  pluginVersion: "1.2.3",
-  hostVersion: "2.2.3",
+  version: "1.2.3",
+  host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true },
+  state: "connected",
+  nextStep: "Nothing to do.",
   gws: { path: "/fixture/gws", version: "gws 0.22.5" },
   services: SERVICES,
   accounts: [account],
@@ -185,10 +187,10 @@ try {
   handlers.get("agent.updated")({ type: "agent.updated", data: {} })
   assert.equal(requests[3].signal.aborted, true)
   const block = '{ "agents": { "notes": { "permissions": [] } } }'
-  requests[4].resolve(status(SIGNED_IN.accounts[0], { hostVersion: "2.3.0", hostWarning: "outside the tested range", unguardedAgents: ["notes"], permissionsBlock: block }))
+  requests[4].resolve(status(SIGNED_IN.accounts[0], { host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "host_untested", unguardedAgents: ["notes"], permissionsBlock: block }))
   requests[3].resolve(SIGNED_OUT)
   text = await frame()
-  assert.match(text, /OpenCode\s+2\.3\.0 \(host untested: outside the tested range\)/)
+  assert.match(text, /OpenCode\s+2\.3\.0 \(host untested; supported range\s+>=2\.2\.3\s+<2\.3\.0\)/)
   assert.match(text, /Agents without default rules\s+notes/)
   assert.ok(text.includes(block))
   assert.doesNotMatch(text, /sign-in required/)

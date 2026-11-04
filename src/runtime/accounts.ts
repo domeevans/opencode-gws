@@ -11,6 +11,7 @@ import { authProblem, privilegeName, type AuthRemediation } from "../domain/resu
 import { delegationRequired, restriction } from "../domain/restricted.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
+import { HOST_RANGE, type HostCheck } from "../domain/host.js"
 import type { AccountProfile, PluginConfig, ProcessResult } from "../domain/types.js"
 import { buildChildEnv } from "../process/env.js"
 import { ownedDir, type PluginPaths } from "../process/paths.js"
@@ -50,9 +51,8 @@ export interface AccountCredential {
 
 export interface RuntimeOptions {
   pluginVersion: string
-  hostVersion?: string
-  /** Why setup continued on an untested host; shown in status. */
-  hostWarning?: string
+  /** The OpenCode host setup checked; unknown in a runtime made without one. */
+  host?: HostCheck
   projectDirectory?: string
   /** Plugin-owned directories; the platform defaults unless given. */
   paths?: PluginPaths
@@ -126,9 +126,8 @@ export class Accounts {
     )
     return {
       auditDegraded: this.runtime.audit.degraded,
-      pluginVersion: options.pluginVersion,
-      hostVersion: options.hostVersion ?? "unknown",
-      ...(options.hostWarning ? { hostWarning: options.hostWarning } : {}),
+      version: options.pluginVersion,
+      host: options.host ?? { version: null, range: HOST_RANGE, tested: false },
       binary: { path: this.runtime.binary, version: this.runtime.version },
       services: [...this.runtime.visibleServices()].sort(),
       accounts,

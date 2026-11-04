@@ -194,8 +194,8 @@ export const ErrorCode = {
 
   // ── Setup: these stop the plugin from loading ────────────────────────
   HOST_UNTESTED: {
-    meaning: "The OpenCode version is outside the tested range in package.json opencode.host.",
-    next: "Use a tested OpenCode release, or set allowUntestedHost to true to run anyway with a status warning.",
+    meaning: "The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0).",
+    next: "Use OpenCode 2.2.3, 2.2.4 or 2.2.5 (tested) or another release in the range, or set allowUntestedHost to true to run anyway; status then shows the host as untested.",
   },
   OPTIONS_INVALID: {
     meaning: "The plugin options are not valid: an unknown key, a wrong type, an unknown service, or access or scopes that name something the account does not enable.",

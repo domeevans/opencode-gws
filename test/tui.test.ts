@@ -85,7 +85,7 @@ const ACCOUNTS = {
 } satisfies Record<string, GwsAccount>
 
 function status(accounts: readonly GwsAccount[], extra: Partial<GwsStatus> = {}): GwsStatus {
-  return { pluginVersion: "1.2.3", hostVersion: "2.2.3", gws: { path: "/fixture/gws", version: "gws 0.22.5" }, services: SERVICES, accounts: [...accounts], auditDegraded: false, unguardedAgents: [], ...extra }
+  return { version: "1.2.3", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/fixture/gws", version: "gws 0.22.5" }, services: SERVICES, accounts: [...accounts], auditDegraded: false, unguardedAgents: [], ...extra }
 }
 
 function fake({ location }: { readonly location: Location | undefined } = { location: LOCATION }) {
@@ -302,8 +302,8 @@ describe("status dialog", () => {
   })
 
   it("shows an untested host in the OpenCode row, and degraded audit", async () => {
-    const view = (await open(status([ACCOUNTS.signedIn], { hostVersion: "2.3.0", hostWarning: "outside >=2.2.3 <2.3.0", auditDegraded: true }))).view()
-    expect(view).toContain("OpenCode\n2.3.0 (host untested: outside >=2.2.3 <2.3.0)")
+    const view = (await open(status([ACCOUNTS.signedIn], { host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, auditDegraded: true }))).view()
+    expect(view).toContain("OpenCode\n2.3.0 (host untested; supported range >=2.2.3 <2.3.0)")
     expect(view).toContain("Audit\nsome records could not be saved, so the audit log may be incomplete")
   })
 
