@@ -74,6 +74,22 @@ describe("runProcess", () => {
     expect(chunks.join("")).toBe('{"p":1}\n{"p":2}\n')
   })
 
+  // A gws that floods its output is killed with its whole group, and the call is OUTPUT_LIMIT.
+  it.each(["stdout", "stderr"])("kills gws and its children when %s passes its cap, and reports OUTPUT_LIMIT", async (stream) => {
+    const flood = join(dir, `flood-${stream}`)
+    const childPid = join(dir, `flood-${stream}.pid`)
+    const redirect = stream === "stderr" ? " 1>&2" : ""
+    writeFileSync(flood, `#!/bin/sh\nsleep 30 &\necho $! > '${childPid}'\nwhile :; do printf '%s' 0123456789abcdef${redirect}; done\n`)
+    chmodSync(flood, 0o755)
+    const result = await runProcess(options(flood))
+    expect(result.outputCapped).toBe(true)
+    expect(result.timedOut).toBe(false)
+    expect((stream === "stdout" ? result.stdout : result.stderr).length).toBe(1024)
+    expect(errorFromProcess(result, parseResult(result, { maxInlineBytes: 1024 }), "drive")).toMatch(/^OUTPUT_LIMIT:/)
+    const grandchild = Number(readFileSync(childPid, "utf8").trim())
+    await waitFor(() => !alive(grandchild))
+  })
+
   it("reports a timeout as TIMEOUT, not an API error", async () => {
     const result = await runProcess(options(sleeper, { timeoutMs: 100 }))
     expect(result.timedOut).toBe(true)
