@@ -56,7 +56,8 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   and export offer Always.
 - Agents defined only in user config miss the rules. The status model names
   them and carries the block for that agent's own `permissions` (never the
-  top-level ones); `gws_status` gives the model only their count.
+  top-level ones); `gws_status` gives the model only their count
+  (`unguardedAgentCount`). `unguardedAgents` is always a list of names.
 - Plugin policy is deny-only content constraints plus the admin gate.
   `deploy` and `watch` are never committable.
 - Recipient rules fail closed (`src/domain/recipients.ts`): a send or
@@ -69,8 +70,9 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 
 - With no `accounts` option, the `default` account enables every manifest
   service at Read and write except the domain-wide-delegation services
-  (Keep), and that level requests every scope a person's sign-in can use,
-  under Google's 64-scope cap. No access level ever requests an app-only or
+  (Keep), `admin-reports` (it needs an admin) and `modelarmor` (nothing
+  runs), and that level requests every scope those services can use, under
+  Google's 64-scope cap. No level requests `cloud-platform`. No access level ever requests an app-only or
   a delegation scope (`src/domain/restricted.ts`): Google refuses the whole
   consent for a delegation scope. The
   form still offers Read-only, shows the exact scopes before consent, and
@@ -94,7 +96,8 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 - Errors read `CODE: What happened. Next step: What to do.` One `ErrorCode`
   table feeds the runtime, the audit and the Errors section of
   `docs/configuration.md`.
-- At most three skills, with real tool and parameter names. Nothing the model
+- At most three skills (today two), with real tool and parameter names; each
+  SKILL.md's frontmatter is the one place its description lives. Nothing the model
   sees contains test status or internal jargon.
 
 ## Packaging
