@@ -49,7 +49,7 @@ export const RequestInput = z
     pagination: z
       .strictObject({
         all: z.boolean().optional().describe("Follow nextPageToken; data becomes one array element per page"),
-        maxPages: z.number().int().min(1).max(1000).optional().describe("Page cap; clamped to execution.maxPages and policy maxPages"),
+        maxPages: z.number().int().min(1).max(1000).optional().describe("Page cap; clamped to execution.maxPages (10 by default) and policy maxPages"),
         maxItems: z
           .number()
           .int()
@@ -57,13 +57,13 @@ export const RequestInput = z
           .max(1_000_000)
           .optional()
           .describe(
-            "Item cap across pages (follows pages); clamped to execution.maxItems and policy maxItems. " +
+            "Item cap across pages (follows pages); clamped to execution.maxItems (1000 by default) and policy maxItems. " +
               "Counts each page's `items` array, or its only top-level array",
           ),
-        delayMs: z.number().int().min(0).max(60_000).optional().describe("Delay between page requests in ms"),
+        delayMs: z.number().int().min(0).max(60_000).optional().describe("Delay between page requests in ms; 100 by default"),
       })
       .optional()
-      .describe("Auto-pagination for list methods"),
+      .describe("Auto-pagination for list methods; without it a read returns one page"),
     upload: z
       .strictObject({
         path: z.string().min(1).describe("Absolute local file path inside an allowed read root"),

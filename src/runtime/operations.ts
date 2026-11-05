@@ -130,7 +130,7 @@ export class Operations {
     const adapter = helperAdapter(helper.id)
     if (!adapter) {
       const alternative = HELPER_ALTERNATIVES[helper.id]
-      throw new GwsError("HELPER_UNSUPPORTED", `'${helper.id}' has no adapter yet; it is cataloged but not executable`, {
+      throw new GwsError("HELPER_UNSUPPORTED", `'${helper.id}' cannot run in this plugin`, {
         ...(alternative ? { next: `Use the method "${alternative}" instead; gws_schema shows its parameters.` } : {}),
       })
     }

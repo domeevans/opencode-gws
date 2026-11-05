@@ -645,7 +645,7 @@ describe("helpers", () => {
   it("names the method to use for a helper that cannot run", async () => {
     const h = await setup({}, undefined, { accounts: { personal: account({ services: ["gmail", "calendar"] }) } })
     await expect(tool(h, "plan").execute(request("calendar.insert", { input: { summary: "x" } }), context())).rejects.toThrow(
-      /^HELPER_UNSUPPORTED: 'calendar.insert' has no adapter yet; it is cataloged but not executable\. Next step: Use the method "calendar.events.insert" instead/,
+      /^HELPER_UNSUPPORTED: 'calendar.insert' cannot run in this plugin\. Next step: Use the method "calendar.events.insert" instead/,
     )
     const schema = await tool(h, "schema").execute({ operation: "calendar.insert" }, context())
     expect((schema.output["helper"] as Record<string, unknown>)["input"]).toBeUndefined()

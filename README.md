@@ -109,7 +109,7 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 | `AUTH_SCOPE_MISSING` | Sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` (`restriction: "app-only"`) needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in. A Keep method (`restriction: "domain-wide-delegation"`) needs domain-wide delegation that a Workspace admin sets up. Nothing ran. |
 | `AUTH_CLIENT_REQUIRED` | Run `/connect` and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
 | `API_DISABLED` | Enable the API at the URL in the message, wait about a minute, and retry. `/gws-doctor` checks every service. |
-| `HOST_UNTESTED` | Use OpenCode 2.2.3, 2.2.4 or 2.2.5, or another 2.2.x release, or set `"allowUntestedHost": true`. |
+| `HOST_UNTESTED` | The plugin does not start. Use OpenCode 2.2.3 or a later 2.2.x release, or set `"allowUntestedHost": true`. |
 | `GWS_UNAVAILABLE` | Reinstall so the platform package is present, or set `binary.path` to a `gws` executable of the pinned version ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). |
 | `POLICY_DENIED` | A policy rule or the admin gate refused the call. A deny is final. |
 | `RECIPIENTS_UNKNOWN` | A recipient rule applies, and the plugin could not tell who the send or share reaches. |

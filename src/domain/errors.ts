@@ -135,7 +135,7 @@ export const ErrorCode = {
   },
   GWS_API_ERROR: {
     meaning: "Google returned an error; the message carries Google's text.",
-    next: "Fix the ids or parameters once from the message; if it fails again, report it.",
+    next: "Fix the ids or parameters once from the message; if it fails again, tell the user Google's message.",
   },
   GWS_DISCOVERY_ERROR: {
     meaning: "gws could not load the API description (the Discovery document) it builds requests from.",
@@ -185,7 +185,7 @@ export const ErrorCode = {
   },
   DOWNLOAD_INVALID: {
     meaning: "The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file.",
-    next: "Fix the destination path; if gws wrote no file, report it.",
+    next: "Fix the destination path; if gws wrote no file, tell the user.",
   },
   DOWNLOAD_LIMIT: {
     meaning: "The download is larger than execution.maxDownloadBytes; nothing was written to the destination.",
@@ -195,7 +195,7 @@ export const ErrorCode = {
   // ── Setup: these stop the plugin from loading ────────────────────────
   HOST_UNTESTED: {
     meaning: "The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0).",
-    next: "Use OpenCode 2.2.3, 2.2.4 or 2.2.5 (tested) or another release in the range, or set allowUntestedHost to true to run anyway; status then shows the host as untested.",
+    next: 'Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true.',
   },
   OPTIONS_INVALID: {
     meaning: "The plugin options are not valid: an unknown key, a wrong type, an unknown service, or access or scopes that name something the account does not enable.",
