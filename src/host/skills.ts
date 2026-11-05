@@ -31,8 +31,43 @@ export function shadowedSkills(listed: readonly { readonly id: string; readonly 
     .map((skill) => ({ id: skill.id, path: skill.path }))
 }
 
+/** A skill as OpenCode lists it: its id, its file and its body. */
+export interface ListedSkill {
+  readonly id: string
+  readonly path: string
+  readonly content?: string
+}
+
+/** A command line that starts with `gws `, after optional indentation and a `$ ` prompt. */
+const SHELL_LINE = /^\s*(?:\$\s+)?gws\s+\S/
+/** An inline code span that starts with `gws `, such as `gws gmail +triage`. */
+const SHELL_SPAN = /`gws\s+[^`\s][^`]*`/
+
+/**
+ * Skills, other than the plugin's own, that teach agents to run gws in a
+ * shell, such as the gws CLI's own `gws-*` skills. A skill counts when a
+ * line in one of its fenced code blocks, or one of its inline code spans,
+ * starts with `gws ` and a word. Prose that only names gws, or tells the
+ * agent not to run it, does not count.
+ */
+export function shellSkills(listed: readonly ListedSkill[]): { id: string; path: string }[] {
+  return listed
+    .filter((skill) => skill.path !== ownSkillPath(skill.id) && teachesShell(skill.content ?? ""))
+    .map((skill) => ({ id: skill.id, path: skill.path }))
+}
+
+function teachesShell(content: string): boolean {
+  if (SHELL_SPAN.test(content)) return true
+  let fenced = false
+  for (const line of content.split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced
+    else if (fenced && SHELL_LINE.test(line)) return true
+  }
+  return false
+}
+
 /** The skills OpenCode lists for the plugin's directory. */
-export function skillLister(ctx: Pick<PluginContext, "skill" | "location">): () => Promise<readonly { readonly id: string; readonly path: string }[]> {
+export function skillLister(ctx: Pick<PluginContext, "skill" | "location">): () => Promise<readonly ListedSkill[]> {
   return async () => {
     const directory = ctx.location?.directory
     return (await ctx.skill.list(directory ? { location: { directory } } : {})).data

@@ -38,6 +38,10 @@ export const ErrorCode = {
       "The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected.",
     next: "Fix the request as the message says; gws_schema shows the parameters and request body.",
   },
+  FIELDS_INVALID: {
+    meaning: "The fields mask's parentheses do not balance, so gws was not called.",
+    next: "Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry.",
+  },
   POLICY_DENIED: {
     meaning:
       "Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",

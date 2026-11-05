@@ -39,7 +39,7 @@ If `gws_catalog` returns `unavailable`, or finds nothing for a service, this set
 ## Change: plan, then commit
 
 1. `gws_plan` with the same request shape as a read. Nothing changes yet. It returns `planId`, a redacted `preview` and `category`.
-2. Show the preview. If the user only asked to see what would happen, stop here and say nothing changed.
+2. Show the preview. If the user only asked to see what would happen, stop here: say nothing changed, and name the tool that would commit it, where the user would approve it.
 3. Commit with the tool for the plan's category, passing only `{"planId": "..."}`.
 
 | Category | Tool | Asks |
@@ -77,4 +77,4 @@ If `gws_status` shows `unguardedAgentCount` above 0, tell the user once to run `
 
 ## Scripts
 
-For a job that runs without you, such as a cron job, a script can call the RPC `google-workspace.gws.tools`. Its methods `status`, `catalog`, `schema`, `read` and `plan` take the same input as the tools, and `describe` lists them. It runs as a session that names an agent, under that agent's rules. Create the session once with `opencode api post /api/session` and a body such as `{"title":"digest","agent":"build"}`, then call `opencode api post /api/rpc/google-workspace.gws.tools/read` with `{"input": {"sessionID": "...", "input": {...}}}`. A script can plan but never commit. A call its rules would ask about is refused with `PERMISSION_DENIED`, because no one is there to answer.
+For a job that runs without you, such as a cron job, a script can call the RPC `google-workspace.gws.tools`. Its methods `status`, `catalog`, `schema`, `read` and `plan` take the same input as the tools, and `describe` lists them. It runs as a session that names an agent, under that agent's rules. Create a session for the script once with `opencode api post /api/session` and a body such as `{"title":"digest","agent":"build"}`, and keep its `data.id`. Never borrow a session found through history or a session list: the script would run as that session's agent, under its rules. Then call `opencode api post /api/rpc/google-workspace.gws.tools/read` with `{"input": {"sessionID": "...", "input": {...}}}`. A script can plan but never commit. A call its rules would ask about is refused with `PERMISSION_DENIED`, because no one is there to answer.

@@ -1,5 +1,6 @@
+import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { Gws, isStatus, packageJson } from "./package.js"
+import { Gws, REPO, isStatus, packageJson } from "./package.js"
 import { ACCOUNT, PLUGIN_ID, startHost, type Harness } from "./harness.js"
 
 /**
@@ -10,8 +11,11 @@ import { ACCOUNT, PLUGIN_ID, startHost, type Harness } from "./harness.js"
 
 let host: Harness
 
+/** A user's skill folder holding one skill that runs gws in a shell. */
+const SKILLS = join(REPO, "test", "fixtures", "skills")
+
 beforeAll(async () => {
-  host = await startHost()
+  host = await startHost({ skills: [SKILLS] })
 })
 
 afterAll(async () => {
@@ -46,5 +50,12 @@ describe("rpc through client.rpc", () => {
       expect.objectContaining({ alias: ACCOUNT, mode: "interactive", services: ["gmail", "drive"], integrationID: `gws-${ACCOUNT}`, access: expect.stringMatching(/^(read|write)$/) }),
     ])
     expect(JSON.stringify(status)).not.toMatch(/ya29\.|client_secret|clientSecret/)
+  })
+
+  // The skill comes from OpenCode's own skill list, through the public ctx.skill.list().
+  it("names a user's skill that runs gws in a shell, with its file", async () => {
+    const status = await gws().status({}, at())
+    if (!isStatus(status)) throw new Error(`not a status: ${JSON.stringify(status)}`)
+    expect(status.shellSkills).toEqual([{ id: "gws-mail-cli", path: join(SKILLS, "gws-mail-cli", "SKILL.md") }])
   })
 })

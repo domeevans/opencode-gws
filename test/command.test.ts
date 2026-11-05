@@ -86,6 +86,22 @@ describe("argv builder", () => {
     expect(maskExample({ id: "chat.spaces.messages.search", service: "chat" })).toBe("messages(id),nextPageToken")
   })
 
+  // Google's 400 for a bad mask names no argument, so the plugin checks the parentheses itself.
+  it("refuses a field mask whose parentheses do not balance, before gws runs", () => {
+    const docs = entry({ id: "docs.documents.get", service: "docs", path: ["documents"], method: "get" })
+    const build = (fields: string, where: "fields" | "params" = "fields") =>
+      buildCommand(docs, requestFor("docs.documents.get", where === "fields" ? { params: { documentId: "d" }, fields } : { params: { documentId: "d", fields } }), config, {
+        dryRun: false,
+        category: "read",
+      })
+    const extra = "title,body(content(paragraph(elements(textRun(content)))))),table(rows)"
+    expect(() => build(extra)).toThrow(`FIELDS_INVALID: '${extra}' has an extra ')' at character 59.`)
+    expect(() => build("files(id,name", "params")).toThrow("FIELDS_INVALID: 'files(id,name' leaves 1 '(' unclosed.")
+    expect(() => build(")(")).toThrow("has an extra ')' at character 1")
+    expect(() => build("a(b")).toThrow(/Next step: Give each '\(' one '\)'/)
+    expect(paramsOf(build("title,body/content(paragraph/elements/textRun/content,table/tableRows/tableCells/content/paragraph/elements/textRun/content)").argv).fields).toMatch(/^title,/)
+  })
+
   it("refuses a persistent download on a read", () => {
     expect(() =>
       buildCommand(entry(), request({ fields: "messages(id)", download: { path: "/tmp/x" } }), config, { dryRun: false, category: "read" }),

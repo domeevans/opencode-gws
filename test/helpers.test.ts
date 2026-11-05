@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
@@ -249,11 +249,32 @@ describe("helper adapters match gws's own flags", () => {
   /** Adapter keys that are not the flag's camelCase. */
   const RENAMED: Record<string, string> = { attach: "attachments" }
 
+  /** A proxy nothing listens on: a gws that reaches for the network fails at once instead of depending on Google. */
+  const NO_NETWORK = Object.fromEntries(["HTTPS_PROXY", "HTTP_PROXY", "https_proxy", "http_proxy", "ALL_PROXY"].map((key) => [key, "http://127.0.0.1:9"]))
+  /** The Discovery version gws loads for each helper service; the workflow helpers load none. */
+  const DISCOVERY: Record<string, string> = { gmail: "v1", calendar: "v3", sheets: "v4" }
+
+  /**
+   * gws reads Discovery from `<config dir>/cache/<service>_<version>.json`
+   * while the file is fresh, and a helper's flags are gws's own code, so an
+   * empty document gives the same --help as Google's. Written now, it is fresh.
+   */
+  function offlineConfig(home: string): string {
+    const dir = join(home, "gws")
+    mkdirSync(join(dir, "cache"), { recursive: true })
+    for (const [name, version] of Object.entries(DISCOVERY)) {
+      const doc = { kind: "discovery#restDescription", name, version, rootUrl: `https://${name}.googleapis.com/`, servicePath: "", resources: {} }
+      writeFileSync(join(dir, "cache", `${name}_${version}.json`), JSON.stringify(doc))
+    }
+    return dir
+  }
+
   it.each(adaptedHelpers())("%s takes every flag gws 0.22.5 has for it", (id) => {
     const [service, name] = id.split(".") as [string, string]
     const home = mkdtempSync(join(tmpdir(), "gws-help-"))
     try {
-      const help = execFileSync(resolvePackagedBinary(), [service, `+${name}`, "--help"], { env: { HOME: home, PATH: "" }, encoding: "utf8" })
+      const env = { HOME: home, PATH: "", GOOGLE_WORKSPACE_CLI_CONFIG_DIR: offlineConfig(home), ...NO_NETWORK }
+      const help = execFileSync(resolvePackagedBinary(), [service, `+${name}`, "--help"], { env, encoding: "utf8" })
       // Option lines only: the flag, its value name, then its description after two or more spaces.
       const flags = [...new Set([...help.matchAll(/^\s+(?:-\w, )?--([a-z-]+)(?: <[^>]+>)? {2,}\S/gm)].map((match) => match[1]!))]
       const expected = flags

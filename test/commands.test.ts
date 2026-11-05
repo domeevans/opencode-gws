@@ -175,6 +175,11 @@ describe("/gws-status", () => {
     expect(formatStatus(status)).toMatch(/\nHidden skills: opencode-gws \(hidden by \/u\/skills\/opencode-gws\/SKILL\.md\)\nTools: /)
   })
 
+  it("names the skills that run gws in a shell, before Tools", () => {
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Remove it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shellSkills: [{ id: "gws-gmail", path: "/u/skills/gws-gmail/SKILL.md" }, { id: "gws-drive", path: "/u/skills/gws-drive/SKILL.md" }], unguardedAgents: [] }
+    expect(formatStatus(status)).toMatch(/\nShell gws skills: gws-gmail \(\/u\/skills\/gws-gmail\/SKILL\.md\), gws-drive \(\/u\/skills\/gws-drive\/SKILL\.md\)\nTools: /)
+  })
+
   it("says Nothing to do. and marks an untested host", () => {
     const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     const text = formatStatus(status)

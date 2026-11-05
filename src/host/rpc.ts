@@ -1,8 +1,8 @@
-import { Gws, NOTHING_TO_DO, UNGUARDED_NEXT_STEP, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
+import { Gws, NOTHING_TO_DO, SHELL_LABEL, UNGUARDED_NEXT_STEP, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
 import type { Runtime } from "../runtime/index.js"
 import { permissionsBlock, unguardedAgents, type Rule } from "./agents.js"
 import type { PluginContext } from "./context.js"
-import { shadowedSkills } from "./skills.js"
+import { shadowedSkills, shellSkills, type ListedSkill } from "./skills.js"
 
 /**
  * The plugin's one status model and the `google-workspace.gws` RPC that
@@ -14,14 +14,19 @@ import { shadowedSkills } from "./skills.js"
 export type StatusSource = (signal?: AbortSignal) => Promise<GwsStatus>
 
 type AgentList = () => Promise<readonly { readonly id: string; readonly permissions: readonly Rule[] }[]>
-type SkillList = () => Promise<readonly { readonly id: string; readonly path: string }[]>
+type SkillList = () => Promise<readonly ListedSkill[]>
 
-/** The first thing to do: an account's sign-in, then a skill that hides the plugin's own, then the unguarded agents. */
-function nextStep(accounts: readonly GwsAccount[], shadowed: readonly { id: string; path: string }[], agents: readonly string[]): string | undefined {
+type Skills = readonly { id: string; path: string }[]
+
+/** The first thing to do: an account's sign-in, then a skill that hides the plugin's own, then skills that run gws in a shell, then the unguarded agents. */
+function nextStep(accounts: readonly GwsAccount[], shadowed: Skills, shell: Skills, agents: readonly string[]): string | undefined {
   const account = accounts.find((entry) => entry.nextStep)
   if (account?.nextStep) return accounts.length > 1 ? `${account.alias}: ${account.nextStep}` : account.nextStep
   const [skill] = shadowed
   if (skill) return `Move or rename the skill at ${skill.path}: its id ${skill.id} hides the plugin's own skill.`
+  const why = "run gws in a shell, which skips plans, approvals and policy."
+  if (shell.length === 1) return `Remove the skill at ${shell[0]!.path}, or move it out of its skills folder: it tells agents to ${why}`
+  if (shell.length > 1) return `Remove the ${shell.length} skills listed under ${SHELL_LABEL}, or move them out of their skills folders: they tell agents to ${why}`
   if (agents.length > 0) return UNGUARDED_NEXT_STEP
   return undefined
 }
@@ -43,8 +48,10 @@ export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills
   return async (signal) => {
     const base = await runtime.status(signal)
     const agents = unguardedAgents(await runtime.wait(() => listAgents(), signal))
-    const shadowed = shadowedSkills(await runtime.wait(() => listSkills(), signal))
-    const next = nextStep(base.accounts, shadowed, agents)
+    const skills = await runtime.wait(() => listSkills(), signal)
+    const shadowed = shadowedSkills(skills)
+    const shell = shellSkills(skills)
+    const next = nextStep(base.accounts, shadowed, shell, agents)
     return {
       version: base.version,
       host: base.host,
@@ -54,6 +61,7 @@ export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills
       accounts: base.accounts,
       auditDegraded: base.auditDegraded,
       ...(shadowed.length > 0 ? { shadowedSkills: shadowed } : {}),
+      ...(shell.length > 0 ? { shellSkills: shell } : {}),
       unguardedAgents: agents,
       ...(agents.length > 0 ? { permissionsBlock: permissionsBlock(agents) } : {}),
       nextStep: next ?? NOTHING_TO_DO,
