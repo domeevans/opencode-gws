@@ -101,13 +101,19 @@ describe("scope table against the manifest", () => {
     for (const forbidden of ["script.deployments", "drive.scripts", "chat.app.", "chat.admin."]) expect(all.join(" ")).not.toContain(forbidden)
   })
 
-  it("asks for Gmail's full-mailbox, settings, and cloud-platform scopes only at Read and write", () => {
+  it("asks for Gmail's full-mailbox and settings scopes only at Read and write", () => {
     const read = Object.values(ACCESS_SCOPES).flatMap((sets) => sets.read)
-    for (const scope of ["https://mail.google.com/", `${SCOPE_PREFIX}gmail.settings.basic`, `${SCOPE_PREFIX}gmail.settings.sharing`, `${SCOPE_PREFIX}cloud-platform`]) {
+    for (const scope of ["https://mail.google.com/", `${SCOPE_PREFIX}gmail.settings.basic`, `${SCOPE_PREFIX}gmail.settings.sharing`]) {
       expect(read, scope).not.toContain(scope)
     }
     expect(ACCESS_SCOPES.gmail!.write).toEqual(expect.arrayContaining(["https://mail.google.com/", `${SCOPE_PREFIX}gmail.settings.basic`, `${SCOPE_PREFIX}gmail.settings.sharing`]))
-    expect(ACCESS_SCOPES.modelarmor).toEqual({ read: [], write: [`${SCOPE_PREFIX}cloud-platform`] })
+  })
+
+  // No Model Armor helper can run, and cloud-platform grants the whole Cloud project.
+  it("never requests cloud-platform", () => {
+    expect(ACCESS_SCOPES.modelarmor).toEqual({ read: [], write: [] })
+    const every = Object.values(ACCESS_SCOPES).flatMap((sets) => [...sets.read, ...sets.write])
+    expect(every).not.toContain(`${SCOPE_PREFIX}cloud-platform`)
   })
 
   it("keeps the read sets read-only for Gmail, Drive, Calendar, Docs, Sheets, and Slides", () => {
@@ -128,33 +134,35 @@ describe("the no-options install", () => {
   const config = loadConfig(undefined)
   const profile = config.accounts.default!
   const requested = requestedScopes(profile.enabledServices, profile.access, profile.scopes)
+  const defaultMethods = () => methods().filter((method) => profile.enabledServices.includes(method.service))
 
-  it("enables every manifest service but the delegation services at Read and write, with the admin gate on", () => {
+  it("enables every manifest service but the delegation services, Model Armor and admin-reports at Read and write, with the admin gate on", () => {
     expect(Object.keys(config.accounts)).toEqual(["default"])
     expect(profile).toMatchObject({ mode: "interactive", access: "write" })
     expect([...profile.enabledServices].sort()).toEqual(
       loadManifest()
         .services.map((service) => service.alias)
-        .filter((service) => !DELEGATION_SERVICES.includes(service))
+        .filter((service) => !DELEGATION_SERVICES.includes(service) && service !== "modelarmor" && service !== "admin-reports")
         .sort(),
     )
-    expect(profile.enabledServices).not.toContain("keep")
+    for (const service of ["keep", "modelarmor", "admin-reports"]) expect(profile.enabledServices).not.toContain(service)
     expect(config.admin.enabled).toBe(true)
   })
 
   it("requests every scope it can use in one consent, under Google's cap", () => {
     expect(requested.length).toBeLessThanOrEqual(MAX_SCOPES)
-    expect(requested.length).toBe(45)
-    expect(requested).toEqual(expect.arrayContaining([...IDENTITY_SCOPES, "https://mail.google.com/", `${SCOPE_PREFIX}cloud-platform`, `${SCOPE_PREFIX}directory.readonly`]))
+    expect(requested.length).toBe(42)
+    expect(requested).toEqual(expect.arrayContaining([...IDENTITY_SCOPES, "https://mail.google.com/", `${SCOPE_PREFIX}directory.readonly`]))
+    for (const scope of ["cloud-platform", "admin.reports.audit.readonly", "admin.reports.usage.readonly"]) expect(requested).not.toContain(`${SCOPE_PREFIX}${scope}`)
     for (const scope of NEVER_REQUESTED) expect(requested).not.toContain(scope)
   })
 
   it("runs on a Read-only sign-in every read that accepts a read-only scope, apart from the app-only and delegation methods", () => {
     const read = requestedScopes(profile.enabledServices, "read")
     expect(read.length).toBeLessThanOrEqual(MAX_SCOPES)
-    expect(read.length).toBe(37)
+    expect(read.length).toBe(35)
     for (const scope of NEVER_REQUESTED) expect(read).not.toContain(scope)
-    const blocked = methods()
+    const blocked = defaultMethods()
       .filter((method) => method.category === "read" && method.scopes.some((scope) => scope.endsWith(".readonly")) && !restriction(method.id))
       .filter((method) => !grants(acceptedScopes(method.id), read))
       .map((method) => method.id)
@@ -175,13 +183,13 @@ describe("the no-options install", () => {
   })
 
   it("covers every method once granted, except watch, deploy, deny, and the app-only and delegation methods", () => {
-    const blocked = methods()
+    const blocked = defaultMethods()
       .filter((method) => !NEVER_RUN.has(method.category) && !grants(acceptedScopes(method.id), requested))
       .map((method) => method.id)
-    expect(blocked.sort()).toEqual([...RESTRICTED].sort())
-    const runnable = methods().filter((method) => !NEVER_RUN.has(method.category) && grants(acceptedScopes(method.id), requested))
-    expect(runnable).toHaveLength(methods().length - methods().filter((method) => NEVER_RUN.has(method.category)).length - RESTRICTED.length)
-    expect(runnable).toHaveLength(404)
+    expect(blocked.sort()).toEqual([...RESTRICTED].filter((id) => !id.startsWith("keep.")).sort())
+    const runnable = defaultMethods().filter((method) => !NEVER_RUN.has(method.category) && grants(acceptedScopes(method.id), requested))
+    expect(runnable).toHaveLength(defaultMethods().length - defaultMethods().filter((method) => NEVER_RUN.has(method.category)).length - blocked.length)
+    expect(runnable).toHaveLength(398)
     for (const helper of commandIndex().helpers.values()) {
       if (!NEVER_RUN.has(helper.category)) expect(grants(acceptedScopes(helper.id), requested), helper.id).toBe(true)
     }
@@ -269,7 +277,7 @@ describe("granted scopes and the preflight rule", () => {
     expect(acceptedScopes("gmail.users.messages.list")).toContain(`${SCOPE_PREFIX}gmail.readonly`)
     expect(acceptedScopes("gmail.triage")).toEqual([`${SCOPE_PREFIX}gmail.readonly`, ...ACCESS_SCOPES.gmail!.write])
     expect(acceptedScopes("gmail.send")).toEqual(ACCESS_SCOPES.gmail!.write)
-    expect(acceptedScopes("modelarmor.sanitize-prompt")).toEqual([`${SCOPE_PREFIX}cloud-platform`])
+    expect(acceptedScopes("modelarmor.sanitize-prompt")).toEqual([])
     expect(acceptedScopes("no.such.operation")).toEqual([])
   })
 

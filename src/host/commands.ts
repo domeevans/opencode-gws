@@ -4,7 +4,7 @@ import type { DoctorOutcome, DoctorTarget } from "../auth/doctor.js"
 import { GOOGLE_LINKS, enableApisUrl } from "../auth/setup.js"
 import { Lifecycle } from "../domain/lifecycle.js"
 import { redactedPreview, type RedactedPreview } from "../domain/plans.js"
-import { privilegeName } from "../domain/result.js"
+import { adminAccountStep } from "../domain/result.js"
 import { shortScope } from "../domain/scopes.js"
 import type { CommitCategory, Plan } from "../domain/types.js"
 
@@ -192,7 +192,7 @@ function nextFor(outcome: DoctorOutcome): string | undefined {
     case "DENIED":
       return "allow gws.read for this account in your permissions, or skip the check"
     case "ADMIN_PRIVILEGE_REQUIRED":
-      return `sign in with a Workspace admin account that has ${privilegeName(outcome.service)}, or remove ${outcome.service} from accounts.${outcome.account}.enabledServices`
+      return adminAccountStep(outcome.account, outcome.service)
     default:
       return undefined
   }

@@ -104,7 +104,7 @@ export const ErrorCode = {
   ADMIN_PRIVILEGE_REQUIRED: {
     meaning:
       "The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code.",
-    next: "Ask the user to sign in with a Workspace admin account that has the needed privilege (Reports for admin-reports), or to remove the service from enabledServices.",
+    next: "Ask the user to add a separate account alias for a Workspace admin who has the needed privilege (Reports for admin-reports) and sign in to it, or to remove the service from enabledServices.",
   },
   AUTH_CLIENT_REQUIRED: {
     meaning: "No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one.",

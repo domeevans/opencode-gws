@@ -45,10 +45,11 @@ describe("config", () => {
 })
 
 describe("accounts", () => {
-  it("creates one interactive default account with every service but Keep at Read and write when accounts is omitted", () => {
+  // Keep needs delegation, Model Armor has no helper that runs, and admin-reports needs an admin privilege most accounts lack.
+  it("creates one interactive default account with every service but Keep, Model Armor and admin-reports at Read and write when accounts is omitted", () => {
     const services = loadManifest()
       .services.map((service) => service.alias)
-      .filter((service) => service !== "keep")
+      .filter((service) => !["keep", "modelarmor", "admin-reports"].includes(service))
     for (const options of [undefined, {}]) {
       expect(loadConfig(options).accounts).toEqual({
         default: { mode: "interactive", enabledServices: services, access: "write", scopes: [] },

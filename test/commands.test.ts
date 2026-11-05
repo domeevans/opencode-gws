@@ -309,7 +309,7 @@ describe("/gws-doctor", () => {
     ])
     expect(h.synthetic[0]).toMatchObject({ description: "Google Workspace doctor: 1 OK · 1 needs attention" })
     expect(String(h.synthetic[0]!["text"]).split("\n").slice(2)).toEqual([
-      "- personal admin-reports: ADMIN_PRIVILEGE_REQUIRED · Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs. Next step: Sign in with a Workspace admin account that has the Reports privilege, or remove admin-reports from accounts.personal.enabledServices",
+      '- personal admin-reports: ADMIN_PRIVILEGE_REQUIRED · Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs. Next step: Add a separate account alias for a Workspace admin who has the Reports privilege, with enabledServices ["admin-reports"], and sign in to it from /connect, or remove admin-reports from accounts.personal.enabledServices',
       "- personal gmail: OK",
       "- personal keep: SKIPPED · keep needs domain-wide delegation, which a Workspace admin sets up; with it, add keep or keep.readonly to accounts.personal.scopes and sign in again",
     ])

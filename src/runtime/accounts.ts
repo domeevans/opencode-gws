@@ -7,7 +7,7 @@ import { accountSignInStatus, connectStep, type ConnectionView } from "../auth/s
 import type { Audit } from "../domain/audit.js"
 import type { AuthProblemCode, AuthState } from "../domain/auth-state.js"
 import { throwIfCancelled } from "../domain/errors.js"
-import { authProblem, privilegeName, type AuthRemediation } from "../domain/result.js"
+import { adminAccountStep, authProblem, privilegeName, type AuthRemediation } from "../domain/result.js"
 import { delegationRequired, restriction } from "../domain/restricted.js"
 import { acceptedScopes, grants, shortScope } from "../domain/scopes.js"
 import type { RuntimeStatus } from "../domain/status.js"
@@ -256,7 +256,7 @@ export class Accounts {
     return {
       signIn: `to sign in again, ${connect}`,
       consent: `to grant the scope, ${connect}, sign in again, and approve every scope, choosing Read and write for a change${extra}`,
-      privilege: `sign in with ${admin} (${connect}), or ${remove}`,
+      privilege: service ? adminAccountStep(account, service) : `sign in to a separate account alias for ${admin}, or ${remove}`,
     }
   }
 

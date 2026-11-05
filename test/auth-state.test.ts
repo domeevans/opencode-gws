@@ -111,7 +111,7 @@ describe("auth error classification", () => {
     )
     // Without the runtime's remediation, the generic next step.
     expect(errorFromProcess(SAMPLES.reportsRefusal, parseResult(SAMPLES.reportsRefusal, { maxInlineBytes: 1024 }), "admin-reports")).toMatch(
-      /Next step: Sign in with a Workspace admin account that has the admin privilege this operation needs, or remove the service from enabledServices\.$/,
+      /Next step: Add a separate account alias for a Workspace admin who has the admin privilege this operation needs, and sign in to it, or remove the service from enabledServices\.$/,
     )
   })
 })
@@ -307,7 +307,8 @@ describe("needs_auth reporting", () => {
     }
     expect(String(error)).toBe(
       "Error: ADMIN_PRIVILEGE_REQUIRED: Google accepted the sign-in but refused the call, because the account lacks a Workspace admin privilege; signing in again as the same account cannot help (gws: Access denied. You are not authorized to read activity records.). " +
-        "Next step: Sign in with a Workspace admin account that has the Reports privilege (run /connect and choose Google Workspace, or run opencode auth login gws-personal), or remove admin-reports from accounts.personal.enabledServices.",
+        // Signing in again as personal would replace its sign-in, so the step names a separate account.
+        'Next step: Add a separate account alias for a Workspace admin who has the Reports privilege, with enabledServices ["admin-reports"], and sign in to it from /connect, or remove admin-reports from accounts.personal.enabledServices.',
     )
     expect(error).toMatchObject({ code: "ADMIN_PRIVILEGE_REQUIRED" })
     // Neither status nor /connect hears of it: the sign-in is valid.

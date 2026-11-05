@@ -254,6 +254,18 @@ export function privilegeName(service?: string): string {
 }
 
 /**
+ * The fix for an interactive account without an admin privilege. Signing
+ * in again under the same alias replaces that account's sign-in, so the
+ * step names a separate alias for the admin.
+ */
+export function adminAccountStep(account: string, service: string): string {
+  return (
+    `add a separate account alias for a Workspace admin who has ${privilegeName(service)}, with enabledServices ["${service}"], ` +
+    `and sign in to it from /connect, or remove ${service} from accounts.${account}.enabledServices`
+  )
+}
+
+/**
  * Classify a failed gws process as a sign-in problem. `AUTH_REQUIRED`: the
  * credential is missing, expired, or revoked (401, UNAUTHENTICATED,
  * invalid_grant). `AUTH_SCOPE_MISSING`: the credential works but lacks a
@@ -292,7 +304,7 @@ export interface AuthRemediation {
 const GENERIC_REMEDIATION: AuthRemediation = {
   signIn: "sign in to the account again",
   consent: "sign in again and grant the scope this operation needs",
-  privilege: "sign in with a Workspace admin account that has the admin privilege this operation needs, or remove the service from enabledServices",
+  privilege: "add a separate account alias for a Workspace admin who has the admin privilege this operation needs, and sign in to it, or remove the service from enabledServices",
 }
 
 const DISABLED_REASONS = new Set(["accessNotConfigured", "SERVICE_DISABLED"])

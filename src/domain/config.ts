@@ -45,17 +45,23 @@ export const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema]
 const accessLevel = z.enum(["read", "write"])
 
 /**
+ * Services the default account leaves out: Model Armor, none of whose
+ * helpers can run, and admin-reports, which needs a Workspace admin
+ * privilege most accounts lack. An account that needs one names it.
+ */
+const NOT_DEFAULT: readonly string[] = ["modelarmor", "admin-reports"]
+
+/**
  * With no `accounts` option, one interactive account enables every manifest
  * service a person's sign-in can use at Read and write, so one consent
  * grants every scope the plugin can use. Services that need domain-wide
- * delegation (Keep) are left out: no ordinary sign-in can run them. Every
- * change still needs a plan, the ask, and a commit; the form still offers
- * Read-only.
+ * delegation (Keep) are left out, as are NOT_DEFAULT. Every change still
+ * needs a plan, the ask, and a commit; the form still offers Read-only.
  */
 function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
   const services = loadManifest()
     .services.map((service) => service.alias)
-    .filter((service) => !DELEGATION_SERVICES.includes(service))
+    .filter((service) => !DELEGATION_SERVICES.includes(service) && !NOT_DEFAULT.includes(service))
   return { default: { mode: "interactive", enabledServices: services, access: "write" } }
 }
 

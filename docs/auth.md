@@ -76,12 +76,13 @@ Google matches a non-loopback redirect exactly, character for character, so ever
 
 ## What the default consent asks for
 
-The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 45 scopes in one consent, under Google's limit of 64 per request. Read-only requests 37 for the same services, only read-only scopes, and runs every read that accepts a read-only scope; the few reads listed below as needing Read and write accept no read-only scope.
+The `default` account at Read and write requests every scope in the table below's Read and write column, plus the identity scopes: 42 scopes in one consent, under Google's limit of 64 per request. Read-only requests 35 for the same services, only read-only scopes, and runs every read that accepts a read-only scope; the few reads listed below as needing Read and write accept no read-only scope.
 
 - **Granular consent.** Google lists the scopes with a checkbox each. A scope you untick is not granted; `/gws-status` and `gws_status` list it under missing scopes, and the methods that need it fail with `AUTH_SCOPE_MISSING` until you sign in again and approve it.
 - **External client in Testing.** Many of these scopes are sensitive or restricted (Gmail, Drive, and others). An External client shows Google's unverified-app warning for them, only its test users can sign in, and in Testing status Google expires its refresh tokens after 7 days, so you sign in again every week. An Internal client in your own Workspace organisation avoids all three.
-- **APIs to enable** in the client's Cloud project, one per service: Gmail (`gmail.googleapis.com`), Drive (`drive.googleapis.com`), Calendar (`calendar-json.googleapis.com`), Docs (`docs.googleapis.com`), Sheets (`sheets.googleapis.com`), Slides (`slides.googleapis.com`), Tasks (`tasks.googleapis.com`), People (`people.googleapis.com`), Chat (`chat.googleapis.com`), Classroom (`classroom.googleapis.com`), Forms (`forms.googleapis.com`), Meet (`meet.googleapis.com`), Admin reports (`admin.googleapis.com`), Apps Script (`script.googleapis.com`), Workspace Events (`workspaceevents.googleapis.com`) and Model Armor (`modelarmor.googleapis.com`). `/gws-status` gives one link that enables them all for the account's services. A service whose API is off fails with `API_DISABLED`; the others still work.
-- **Account requirements.** Chat needs a Google Workspace account. Admin reports need a Workspace admin with the Reports privilege; any other account's sign-in is valid but its Reports calls fail with `ADMIN_PRIVILEGE_REQUIRED`, which never marks the sign-in as needing renewal. Model Armor needs a Cloud project with the Model Armor API. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
+- **APIs to enable** in the client's Cloud project, one per service: Gmail (`gmail.googleapis.com`), Drive (`drive.googleapis.com`), Calendar (`calendar-json.googleapis.com`), Docs (`docs.googleapis.com`), Sheets (`sheets.googleapis.com`), Slides (`slides.googleapis.com`), Tasks (`tasks.googleapis.com`), People (`people.googleapis.com`), Chat (`chat.googleapis.com`), Classroom (`classroom.googleapis.com`), Forms (`forms.googleapis.com`), Meet (`meet.googleapis.com`), Apps Script (`script.googleapis.com`) and Workspace Events (`workspaceevents.googleapis.com`), plus Admin reports (`admin.googleapis.com`) for an account that enables `admin-reports`. `/gws-status` gives one link that enables them all for the account's services. A service whose API is off fails with `API_DISABLED`; the others still work.
+- **Not in the default.** `admin-reports` needs a Workspace admin with the Reports privilege, and any other account's Reports calls fail with `ADMIN_PRIVILEGE_REQUIRED`, so the `default` account leaves it out; an admin adds a separate account for it ([admin.md](admin.md)). Model Armor is left out too: none of its helpers can run.
+- **Account requirements.** Chat needs a Google Workspace account. The Apps Script API also needs the user's own switch at <https://script.google.com/home/usersettings>.
 
 To ask for less, set `accounts` with only the services you use, or `access: "read"`, or choose Read-only in the form.
 
@@ -101,7 +102,7 @@ If your admin has set up domain-wide delegation, enable `keep` (and the Keep API
 
 Before a read or a plan, the plugin compares the operation's manifest scopes with the scopes Google granted. A miss fails with `AUTH_SCOPE_MISSING` and does not start `gws`. The next step is to sign in again and approve every scope Google lists, choosing Read and write when only that level requests the scope. A method only an app's own credentials can run, or one that needs domain-wide delegation (both listed below), fails with a next step that says why.
 
-Model Armor has no read-only scope: Read and write requests `https://www.googleapis.com/auth/cloud-platform`, which grants access to the whole Cloud project, and Read-only requests nothing for it. The Model Armor helpers still cannot run; `gws_catalog` marks them and names no alternative.
+No access level requests `https://www.googleapis.com/auth/cloud-platform`, Model Armor's only scope, which grants access to the whole Cloud project: none of the Model Armor helpers can run, and `gws_catalog` marks them not executable.
 
 <!-- generated:scopes -->
 
@@ -122,7 +123,7 @@ Every interactive sign-in also requests the identity scopes `openid`, `https://w
 | gmail | `https://www.googleapis.com/auth/gmail.readonly` | `https://www.googleapis.com/auth/gmail.modify`<br>`https://www.googleapis.com/auth/gmail.settings.basic`<br>`https://www.googleapis.com/auth/gmail.settings.sharing`<br>`https://mail.google.com/` |
 | keep | _(none)_ | _(none)_ |
 | meet | `https://www.googleapis.com/auth/meetings.space.readonly` | `https://www.googleapis.com/auth/meetings.space.created`<br>`https://www.googleapis.com/auth/meetings.space.readonly` |
-| modelarmor | _(none)_ | `https://www.googleapis.com/auth/cloud-platform` |
+| modelarmor | _(none)_ | _(none)_ |
 | people | `https://www.googleapis.com/auth/contacts.readonly`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` | `https://www.googleapis.com/auth/contacts`<br>`https://www.googleapis.com/auth/contacts.other.readonly`<br>`https://www.googleapis.com/auth/directory.readonly` |
 | script | `https://www.googleapis.com/auth/script.projects.readonly`<br>`https://www.googleapis.com/auth/script.processes`<br>`https://www.googleapis.com/auth/script.metrics` | `https://www.googleapis.com/auth/script.projects`<br>`https://www.googleapis.com/auth/script.processes`<br>`https://www.googleapis.com/auth/script.metrics` |
 | sheets | `https://www.googleapis.com/auth/spreadsheets.readonly` | `https://www.googleapis.com/auth/spreadsheets` |
