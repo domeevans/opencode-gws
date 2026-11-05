@@ -236,8 +236,6 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
 | `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
 | `GWS_UNAVAILABLE` | No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist. | Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable. |
-| `GWS_NOT_FOUND` | The packaged gws binary is missing. | Reinstall the plugin. |
-| `GWS_UNSUPPORTED_PLATFORM` | The packaged gws binary does not support this platform. | Set binary.path to a gws 0.22.5 executable for this platform. |
 | `GWS_VERSION_MISMATCH` | The gws version check failed, or gws is not the version the manifest was generated from. | Reinstall the plugin, or point binary.path at gws 0.22.5. |
 | `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Reinstall the plugin, or move the binary.path executable to a location only you can write. |
 

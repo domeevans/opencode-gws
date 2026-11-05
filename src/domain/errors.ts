@@ -213,14 +213,6 @@ export const ErrorCode = {
     meaning: "No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist.",
     next: "Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable.",
   },
-  GWS_NOT_FOUND: {
-    meaning: "The packaged gws binary is missing.",
-    next: "Reinstall the plugin.",
-  },
-  GWS_UNSUPPORTED_PLATFORM: {
-    meaning: "The packaged gws binary does not support this platform.",
-    next: "Set binary.path to a gws 0.22.5 executable for this platform.",
-  },
   GWS_VERSION_MISMATCH: {
     meaning: "The gws version check failed, or gws is not the version the manifest was generated from.",
     next: "Reinstall the plugin, or point binary.path at gws 0.22.5.",

@@ -28,6 +28,16 @@ describe("error code table", () => {
     expect([...raised].filter((code) => !isErrorCode(code)).sort()).toEqual([])
   })
 
+  // The other direction: the table, and so the documented Errors section, lists no code nothing raises.
+  it("lists only codes the source names", () => {
+    const source = files(join(ROOT, "src"))
+      .filter((file) => file !== TABLE)
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n")
+    const unused = Object.keys(ErrorCode).filter((code) => !new RegExp(`["\`']${code}\\b`).test(source))
+    expect(unused).toEqual([])
+  })
+
   it("gives every code a meaning and a next step written as sentences, without internal jargon", () => {
     for (const [code, entry] of Object.entries(ErrorCode)) {
       expect(code).toMatch(/^[A-Z][A-Z_]+$/)
