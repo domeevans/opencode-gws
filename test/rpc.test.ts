@@ -52,7 +52,7 @@ interface SetupOptions {
   /** The agents OpenCode lists. */
   agents?: Array<{ id: string; permissions: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }>
   /** The skills OpenCode lists. */
-  skills?: Array<{ id: string; path: string }>
+  skills?: Array<{ id: string; path: string; content?: string }>
 }
 
 async function setup(options: SetupOptions = {}): Promise<Harness> {
@@ -250,6 +250,25 @@ describe("status", () => {
     const output = await status(await setup({ accounts, skills: [own, shadow] }))
     expect(output["shadowedSkills"]).toEqual([shadow])
     expect(output["nextStep"]).toBe("Move or rename the skill at /u/.claude/skills/opencode-gws-recipes/SKILL.md: its id opencode-gws-recipes hides the plugin's own skill.")
+  })
+
+  it("names skills that run gws in a shell, and makes removing them the next step", async () => {
+    vi.stubEnv("GWS_CREDENTIALS", "/dev/null")
+    const accounts = { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } }
+    const prose = { id: "notes", path: "/u/.claude/skills/notes/SKILL.md", content: "Never run a `gws` command in a shell." }
+    const clear = await status(await setup({ accounts, skills: [prose] }))
+    expect(clear).not.toHaveProperty("shellSkills")
+    const triage = { id: "gws-gmail-triage", path: "/u/.claude/skills/gws-gmail-triage/SKILL.md", content: "```bash\ngws gmail +triage\n```" }
+    const one = await status(await setup({ accounts, skills: [prose, triage] }))
+    expect(one["shellSkills"]).toEqual([{ id: triage.id, path: triage.path }])
+    expect(one["nextStep"]).toBe(
+      "Remove the skill at /u/.claude/skills/gws-gmail-triage/SKILL.md, or move it out of its skills folder: it tells agents to run gws in a shell, which skips plans, approvals and policy.",
+    )
+    const upload = { id: "gws-drive-upload", path: "/u/.claude/skills/gws-drive-upload/SKILL.md", content: "Run `gws drive +upload ./a.pdf`." }
+    const two = await status(await setup({ accounts, skills: [triage, upload] }))
+    expect(two["nextStep"]).toBe(
+      "Remove the 2 skills listed under Shell gws skills, or move them out of their skills folders: they tell agents to run gws in a shell, which skips plans, approvals and policy.",
+    )
   })
 
   it("says Nothing to do. when every account is ready and every agent guarded", async () => {

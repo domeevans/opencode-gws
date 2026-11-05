@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import { helperAdapter } from "../src/domain/helpers.js"
 import { loadManifest, resolveHelper, resolveMethod } from "../src/domain/manifest.js"
-import { parseSkill, registerSkills } from "../src/host/skills.js"
+import { ownSkillPath, parseSkill, registerSkills, shellSkills } from "../src/host/skills.js"
 import { toolSpecs } from "../src/host/tools.js"
 import { testConfig } from "./support/config.js"
 
@@ -89,6 +89,33 @@ describe("two skills", () => {
     for (const raw of ["# No frontmatter", "---\nname: x\n---\nBody", "---\ndescription: Use it.\n---\nBody"]) {
       expect(() => parseSkill(raw, "skills/x/SKILL.md")).toThrow(/^SKILLS_INVALID: The skill file skills\/x\/SKILL\.md has no name and description frontmatter\./)
     }
+  })
+})
+
+// A CLI skill that runs gws in a shell skips plans, approvals and policy, so status names it.
+describe("skills that run gws in a shell", () => {
+  const fixture = join(ROOT, "test", "fixtures", "skills", "gws-mail-cli", "SKILL.md")
+  const listed = (id: string, content: string, path = `/u/.claude/skills/${id}/SKILL.md`) => ({ id, path, content })
+
+  it("names a skill with a gws command in a code block or an inline code span", () => {
+    const cli = { id: "gws-mail-cli", path: fixture, content: parseSkill(readFileSync(fixture, "utf8"), fixture).content }
+    const inline = listed("gws-drive-upload", "Upload a file with `gws drive +upload ./report.pdf`.")
+    expect(shellSkills([cli, inline])).toEqual([
+      { id: "gws-mail-cli", path: fixture },
+      { id: "gws-drive-upload", path: "/u/.claude/skills/gws-drive-upload/SKILL.md" },
+    ])
+  })
+
+  it("ignores prose about gws, other commands, and the plugin's own skills", () => {
+    const own = readFileSync(ownSkillPath("opencode-gws"), "utf8")
+    expect(
+      shellSkills([
+        listed("notes", "Never run a `gws` command in a shell; gws is Google's CLI.\ngws gmail +triage is how the CLI does it."),
+        listed("deploy", "```bash\necho gws ready\nnpm run gws\n```\n"),
+        listed("opencode-gws", parseSkill(own, "own").content, ownSkillPath("opencode-gws")),
+        listed("opencode-gws-recipes", "```\ngws gmail +triage\n```", ownSkillPath("opencode-gws-recipes")),
+      ]),
+    ).toEqual([])
   })
 })
 

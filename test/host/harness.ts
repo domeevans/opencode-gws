@@ -83,6 +83,8 @@ interface HarnessOptions {
   policy?: Record<string, unknown>
   /** Plugin options over the harness defaults; an undefined value removes that option. */
   options?: Record<string, unknown>
+  /** Skill folders in opencode.json `skills`, as a user's own skills. */
+  skills?: string[]
 }
 
 export interface Harness {
@@ -185,6 +187,7 @@ export async function startHost(options: HarnessOptions = {}): Promise<Harness> 
     model: "scripted/turns",
     permissions: options.permissions ?? [],
     ...(options.agents ? { agents: options.agents } : {}),
+    ...(options.skills ? { skills: options.skills } : {}),
   }
 
   const hostVersion = sdkVersion()

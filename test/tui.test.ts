@@ -302,6 +302,11 @@ describe("status dialog", () => {
     expect(view).toContain("Hidden skills\nopencode-gws (hidden by /u/skills/opencode-gws/SKILL.md)\nTools")
   })
 
+  it("names the skills that run gws in a shell, before Tools", async () => {
+    const view = (await open(status([ACCOUNTS.signedIn], { shellSkills: [{ id: "gws-gmail", path: "/u/skills/gws-gmail/SKILL.md" }] }))).view()
+    expect(view).toContain("Shell gws skills\ngws-gmail (/u/skills/gws-gmail/SKILL.md)\nTools")
+  })
+
   it("says when no account is configured", async () => {
     expect((await open(status([]))).view()).toContain("Connection\nnot configured")
   })

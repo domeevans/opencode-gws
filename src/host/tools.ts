@@ -101,7 +101,7 @@ const COMMIT_CATEGORIES: readonly { category: CommitCategory; description: strin
 
 /** The status model, compact: the unguarded agents become a count and a pointer to /gws-status. */
 async function compactStatus(status: StatusSource, signal?: AbortSignal): Promise<z.output<typeof StatusOutput>> {
-  const { unguardedAgents, permissionsBlock: _block, shadowedSkills: _shadowed, auditDegraded, ...rest } = await status(signal)
+  const { unguardedAgents, permissionsBlock: _block, shadowedSkills: _shadowed, shellSkills: _shell, auditDegraded, ...rest } = await status(signal)
   const count = unguardedAgents.length
   return {
     ...rest,

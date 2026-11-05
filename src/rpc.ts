@@ -55,6 +55,8 @@ export interface GwsStatus {
   auditDegraded?: boolean
   /** Skills with one of the plugin's skill ids from another file, which hide the plugin's own; present when any does. */
   shadowedSkills?: { id: string; path: string }[]
+  /** Other skills that teach agents to run gws in a shell, which skips plans, approvals and policy; present when any does. */
+  shellSkills?: { id: string; path: string }[]
   /** Agents that missed the default ask rules, so a commit there runs without asking. */
   unguardedAgents: string[]
   /** The permission block to add first in each unguarded agent's own permissions; present when any is unguarded. */
@@ -100,6 +102,7 @@ const status = object(
     accounts: { type: "array", items: account },
     auditDegraded: { type: "boolean" },
     shadowedSkills: { type: "array", items: object({ id: text, path: text }, ["id", "path"]) },
+    shellSkills: { type: "array", items: object({ id: text, path: text }, ["id", "path"]) },
     unguardedAgents: texts,
     permissionsBlock: text,
     nextStep: text,
@@ -122,6 +125,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string")
 const optional = (value: unknown, check: (value: unknown) => boolean) => value === undefined || check(value)
 const isText = (value: unknown) => typeof value === "string"
+
+const isSkills = (value: unknown) => Array.isArray(value) && value.every((skill) => isRecord(skill) && isText(skill["id"]) && isText(skill["path"]))
 
 function isAccount(value: unknown): value is GwsAccount {
   return (
@@ -158,7 +163,8 @@ export function isStatus(value: unknown): value is GwsStatus {
     Array.isArray(value["accounts"]) &&
     value["accounts"].every(isAccount) &&
     optional(value["auditDegraded"], (entry) => typeof entry === "boolean") &&
-    optional(value["shadowedSkills"], (entry) => Array.isArray(entry) && entry.every((skill) => isRecord(skill) && isText(skill["id"]) && isText(skill["path"]))) &&
+    optional(value["shadowedSkills"], isSkills) &&
+    optional(value["shellSkills"], isSkills) &&
     isStrings(value["unguardedAgents"]) &&
     optional(value["permissionsBlock"], isText) &&
     isText(value["nextStep"])
@@ -190,6 +196,12 @@ export function openCodeLabel(status: GwsStatus): string {
 export const SHADOWED_LABEL = "Hidden skills"
 export function shadowedText(status: GwsStatus): string {
   return (status.shadowedSkills ?? []).map((skill) => `${skill.id} (hidden by ${skill.path})`).join(", ")
+}
+
+/** The row naming skills that run gws in a shell, and its value. */
+export const SHELL_LABEL = "Shell gws skills"
+export function shellText(status: GwsStatus): string {
+  return (status.shellSkills ?? []).map((skill) => `${skill.id} (${skill.path})`).join(", ")
 }
 
 /** The row naming services that need domain-wide delegation. */
