@@ -39,20 +39,22 @@ export interface GwsAccount {
 }
 
 /** The plugin's state, in the names every plugin's status RPC shares. */
-export type GwsState = "connected" | "sign_in_required" | "not_configured" | "host_untested"
+export type GwsState = "connected" | "sign_in_required" | "not_configured"
 
 export interface GwsStatus {
   /** The plugin's version. */
   version: string
   /** The OpenCode host: its version (null when unknown), the supported range, and whether that release is tested. */
   host: { version: string | null; range: string; tested: boolean }
-  /** sign_in_required or not_configured when an account needs it, host_untested on an untested host, else connected. */
+  /** sign_in_required or not_configured when an account needs it, else connected. */
   state: GwsState
   gws: { path: string; version: string }
   services: string[]
   accounts: GwsAccount[]
   /** Audit persistence has failed; omitted means false. */
   auditDegraded?: boolean
+  /** Skills with one of the plugin's skill ids from another file, which hide the plugin's own; present when any does. */
+  shadowedSkills?: { id: string; path: string }[]
   /** Agents that missed the default ask rules, so a commit there runs without asking. */
   unguardedAgents: string[]
   /** The permission block to add first in each unguarded agent's own permissions; present when any is unguarded. */
@@ -68,7 +70,7 @@ const object = (properties: Record<string, object>, required: readonly string[])
 const MODES: readonly unknown[] = ["interactive", "credentials_file", "access_token"]
 const ACCESS: readonly unknown[] = ["read", "write"]
 const CLIENT_SOURCES: readonly unknown[] = ["account", "plugin", "pasted"]
-const STATES: readonly unknown[] = ["connected", "sign_in_required", "not_configured", "host_untested"]
+const STATES: readonly unknown[] = ["connected", "sign_in_required", "not_configured"]
 
 const account = object(
   {
@@ -97,6 +99,7 @@ const status = object(
     services: texts,
     accounts: { type: "array", items: account },
     auditDegraded: { type: "boolean" },
+    shadowedSkills: { type: "array", items: object({ id: text, path: text }, ["id", "path"]) },
     unguardedAgents: texts,
     permissionsBlock: text,
     nextStep: text,
@@ -155,6 +158,7 @@ export function isStatus(value: unknown): value is GwsStatus {
     Array.isArray(value["accounts"]) &&
     value["accounts"].every(isAccount) &&
     optional(value["auditDegraded"], (entry) => typeof entry === "boolean") &&
+    optional(value["shadowedSkills"], (entry) => Array.isArray(entry) && entry.every((skill) => isRecord(skill) && isText(skill["id"]) && isText(skill["path"]))) &&
     isStrings(value["unguardedAgents"]) &&
     optional(value["permissionsBlock"], isText) &&
     isText(value["nextStep"])
@@ -182,6 +186,12 @@ export function openCodeLabel(status: GwsStatus): string {
   return status.host.tested ? `${version} (tested)` : `${version} (host untested; supported range ${status.host.range})`
 }
 
+/** The row naming skills that hide the plugin's own, and its value. */
+export const SHADOWED_LABEL = "Hidden skills"
+export function shadowedText(status: GwsStatus): string {
+  return (status.shadowedSkills ?? []).map((skill) => `${skill.id} (hidden by ${skill.path})`).join(", ")
+}
+
 /** The row naming services that need domain-wide delegation. */
 export const DELEGATION_LABEL = "Needs domain-wide delegation"
 
@@ -191,6 +201,6 @@ export function delegationText(account: GwsAccount): string {
   return `${services.join(", ")} (a Workspace admin sets it up; then add the scopes to accounts.${account.alias}.scopes)`
 }
 
-/** Where the permission block goes. */
-export const BLOCK_PLACEMENT =
-  "Put this block first in that agent's own permissions, followed by your top-level rules for gws actions. Never put it in the top-level permissions: that would loosen Explore."
+/** The Next step when an agent lacks the default rules: one fixed sentence, the same in every plugin. */
+export const UNGUARDED_NEXT_STEP =
+  "Put the default rules shown by /gws-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Google Workspace tools."

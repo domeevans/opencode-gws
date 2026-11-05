@@ -47,6 +47,22 @@ describe("recipientPlan", () => {
     expect(recipientPlan("calendar.events.patch", "write", req).lookups).toEqual([])
   })
 
+  it("reads a Chat member's email, and fails closed on a member named by id", () => {
+    const member = (name: unknown) => recipientPlan("chat.spaces.members.create", "share", request("chat.spaces.members.create", { params: { parent: "spaces/s" }, body: { member: { name } } })).known
+    expect(member("users/ann@example.com")).toMatchObject({ addresses: ["ann@example.com"] })
+    expect(member("users/ann@example.com").unknown).toBeUndefined()
+    for (const name of ["users/123456789", undefined, 42]) expect(member(name).unknown, String(name)).toBe("the member is not named by email (users/<email>)")
+  })
+
+  it("reads every Keep share's email, and fails closed on a share without one or a body it cannot read", () => {
+    const share = (body: unknown) => recipientPlan("keep.notes.permissions.batchCreate", "share", request("keep.notes.permissions.batchCreate", { params: { parent: "notes/n" }, body })).known
+    const both = share({ requests: [{ permission: { email: "ann@example.com" } }, { permission: { email: "Bob <bob@other.com>" } }] })
+    expect(both.addresses).toEqual(["ann@example.com", "bob@other.com"])
+    expect(both.unknown).toBeUndefined()
+    expect(share({ requests: [{ permission: { email: "ann@example.com" } }, { permission: { role: "WRITER" } }] }).unknown).toBe("a permission names no email")
+    for (const body of [{}, { requests: [] }, { requests: "x" }]) expect(share(body).unknown, JSON.stringify(body)).toBe("the permission requests could not be read")
+  })
+
   it("scans recipient keys of a read without failing closed", () => {
     expect(recipientPlan("gmail.users.messages.list", "read", request("gmail.users.messages.list", { params: { q: "x" } })).known).toEqual({ addresses: [], domains: [] })
   })

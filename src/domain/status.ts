@@ -33,24 +33,24 @@ const Host = z.object({
 })
 
 /** The plugin's state, in the shared status names. */
-export const STATES = ["connected", "sign_in_required", "not_configured", "host_untested"] as const
+const STATES = ["connected", "sign_in_required", "not_configured"] as const
 
 export const StatusOutput = z.object({
   version: z.string().describe("The plugin's version"),
   host: Host,
-  state: z.enum(STATES).describe("connected; sign_in_required or not_configured when an account needs it; host_untested on an untested OpenCode"),
+  state: z.enum(STATES).describe("connected; sign_in_required or not_configured when an account needs it"),
   gws: z.object({ path: z.string(), version: z.string() }),
   services: z.array(z.string()).describe("Model-facing services"),
   accounts: z.array(AccountStatus),
   auditDegraded: z.boolean().describe("Audit records were dropped, failed, or exceeded the sink deadline; sticky until reload"),
-  unguardedAgents: z.number().int().describe("How many agents missed the default ask rules"),
-  permissions: z.string().optional().describe("Present when an agent missed the ask rules: where to find the fix"),
+  unguardedAgentCount: z.number().int().describe("How many agents lack the default ask rules; /gws-status names them"),
+  permissions: z.string().optional().describe("Present when an agent lacks the default rules: where to find the fix"),
   nextStep: z.string().describe('The one thing to do next; "Nothing to do." when nothing is needed'),
 })
 
 export type StatusOutput = z.infer<typeof StatusOutput>
 
-export type AccountStatus = z.infer<typeof AccountStatus>
+type AccountStatus = z.infer<typeof AccountStatus>
 
 /** What the runtime knows without OpenCode: versions, the binary, and the accounts. */
 export interface RuntimeStatus {

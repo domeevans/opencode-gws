@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
+import { ErrorCode } from "../src/domain/errors.js"
 import { HOST_RANGE, TESTED_HOSTS, checkHost } from "../src/domain/host.js"
 import { PLUGIN_VERSION } from "../src/domain/version.js"
 
@@ -38,7 +39,7 @@ describe("checkHost", () => {
 
   it("names the found version and the next step", () => {
     expect(() => checkHost("2.3.0", HOST_RANGE, false)).toThrow(
-      'HOST_UNTESTED: Supports OpenCode >=2.2.3 <2.3.0, found 2.3.0. Next step: Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true.',
+      `HOST_UNTESTED: Supports OpenCode >=2.2.3 <2.3.0, found 2.3.0. Next step: ${ErrorCode.HOST_UNTESTED.next}`,
     )
     expect(() => checkHost(undefined, HOST_RANGE, false)).toThrow("found unknown.")
   })

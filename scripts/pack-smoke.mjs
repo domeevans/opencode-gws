@@ -547,7 +547,7 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
 
       // Skills and the manifest are read from files beside the bundle, found from import.meta.url.
       const skills = (await api("GET", "/api/skill")).data.filter((skill) => String(skill.id).startsWith("opencode-gws"))
-      equal(skills.map((skill) => skill.id).sort(), ["opencode-gws", "opencode-gws-admin", "opencode-gws-recipes"], `opencode ${version}: skills`)
+      equal(skills.map((skill) => skill.id).sort(), ["opencode-gws", "opencode-gws-recipes"], `opencode ${version}: skills`)
       for (const skill of skills) check(insideRoot(skill.path, pluginDir) && existsSync(skill.path), `opencode ${version}: skill ${skill.id} is not read from the installed package (${skill.path})`)
 
       const { output } = await api("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })

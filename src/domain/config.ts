@@ -40,22 +40,28 @@ export const ClientJsonSchema = z.union([
 ])
 
 /** An OAuth client option: a Desktop client's ID and secret, or Google's client JSON. */
-export const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema])
+const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema])
 
 const accessLevel = z.enum(["read", "write"])
+
+/**
+ * Services the default account leaves out: Model Armor, none of whose
+ * helpers can run, and admin-reports, which needs a Workspace admin
+ * privilege most accounts lack. An account that needs one names it.
+ */
+const NOT_DEFAULT: readonly string[] = ["modelarmor", "admin-reports"]
 
 /**
  * With no `accounts` option, one interactive account enables every manifest
  * service a person's sign-in can use at Read and write, so one consent
  * grants every scope the plugin can use. Services that need domain-wide
- * delegation (Keep) are left out: no ordinary sign-in can run them. Every
- * change still needs a plan, the ask, and a commit; the form still offers
- * Read-only.
+ * delegation (Keep) are left out, as are NOT_DEFAULT. Every change still
+ * needs a plan, the ask, and a commit; the form still offers Read-only.
  */
 function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
   const services = loadManifest()
     .services.map((service) => service.alias)
-    .filter((service) => !DELEGATION_SERVICES.includes(service))
+    .filter((service) => !DELEGATION_SERVICES.includes(service) && !NOT_DEFAULT.includes(service))
   return { default: { mode: "interactive", enabledServices: services, access: "write" } }
 }
 
@@ -123,10 +129,8 @@ const configSchema = z.strictObject({
   execution: z
     .strictObject({
       timeoutMs: z.number().int().positive().optional(),
-      schemaTimeoutMs: z.number().int().positive().optional(),
       maxPages: z.number().int().positive().optional(),
       maxItems: z.number().int().positive().optional(),
-      pageDelayMs: z.number().int().nonnegative().optional(),
       maxStdoutBytes: z.number().int().positive().optional(),
       maxStderrBytes: z.number().int().positive().optional(),
       maxInlineBytes: z.number().int().positive().optional(),
@@ -139,15 +143,12 @@ const configSchema = z.strictObject({
   audit: z
     .strictObject({
       enabled: z.boolean().optional(),
-      sink: z.enum(["stderr", "jsonl"]).optional(),
       path: absolutePath.optional(),
     })
     .optional(),
   skills: z
     .strictObject({
       enabled: z.boolean().optional(),
-      include: z.array(z.string()).optional(),
-      exclude: z.array(z.string()).optional(),
     })
     .optional(),
   binary: z
@@ -168,7 +169,6 @@ const configSchema = z.strictObject({
 const DEFAULT_LIMITS = {
   maxPages: 10,
   maxItems: 1_000,
-  pageDelayMs: 100,
   maxStdoutBytes: 5 * 1024 * 1024,
   maxStderrBytes: 1 * 1024 * 1024,
   maxInlineBytes: 256 * 1024,
@@ -266,10 +266,8 @@ export function loadConfig(raw: unknown): PluginConfig {
     },
     execution: {
       timeoutMs: parsed.execution?.timeoutMs ?? 120_000,
-      schemaTimeoutMs: parsed.execution?.schemaTimeoutMs ?? 15_000,
       maxPages: parsed.execution?.maxPages ?? DEFAULT_LIMITS.maxPages,
       maxItems: parsed.execution?.maxItems ?? DEFAULT_LIMITS.maxItems,
-      pageDelayMs: parsed.execution?.pageDelayMs ?? DEFAULT_LIMITS.pageDelayMs,
       maxStdoutBytes: parsed.execution?.maxStdoutBytes ?? DEFAULT_LIMITS.maxStdoutBytes,
       maxStderrBytes: parsed.execution?.maxStderrBytes ?? DEFAULT_LIMITS.maxStderrBytes,
       maxInlineBytes: parsed.execution?.maxInlineBytes ?? DEFAULT_LIMITS.maxInlineBytes,
@@ -280,13 +278,10 @@ export function loadConfig(raw: unknown): PluginConfig {
     },
     audit: {
       enabled: parsed.audit?.enabled ?? true,
-      sink: parsed.audit?.sink ?? "jsonl",
       path: parsed.audit?.path,
     },
     skills: {
       enabled: parsed.skills?.enabled ?? true,
-      include: parsed.skills?.include ?? [],
-      exclude: parsed.skills?.exclude ?? [],
     },
     admin: {
       enabled: parsed.admin?.enabled ?? true,

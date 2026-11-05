@@ -1,10 +1,10 @@
-import { BLOCK_PLACEMENT, DELEGATION_LABEL, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
+import { DELEGATION_LABEL, SHADOWED_LABEL, shadowedText, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
 import type { PluginContext } from "./context.js"
 import type { DoctorOutcome, DoctorTarget } from "../auth/doctor.js"
 import { GOOGLE_LINKS, enableApisUrl } from "../auth/setup.js"
 import { Lifecycle } from "../domain/lifecycle.js"
 import { redactedPreview, type RedactedPreview } from "../domain/plans.js"
-import { privilegeName } from "../domain/result.js"
+import { adminAccountStep } from "../domain/result.js"
 import { shortScope } from "../domain/scopes.js"
 import type { CommitCategory, Plan } from "../domain/types.js"
 
@@ -122,11 +122,12 @@ export function formatStatus(status: GwsStatus, plans: readonly PlanSummary[] = 
   const setup = setupSteps(status)
   if (setup.length > 0) lines.push(...setup, "")
   lines.push(...planLines(plans, now), "")
+  if (status.shadowedSkills?.length) lines.push(`${SHADOWED_LABEL}: ${shadowedText(status)}`)
   lines.push(`Tools: gws tools for ${status.services.join(", ") || "no services"} (${status.gws.version})`)
   if (status.unguardedAgents.length === 0) {
     lines.push("Agents without default rules: none")
   } else {
-    lines.push(`Agents without default rules: ${status.unguardedAgents.join(", ")}`, status.permissionsBlock ?? "", BLOCK_PLACEMENT)
+    lines.push(`Agents without default rules: ${status.unguardedAgents.join(", ")}`, status.permissionsBlock ?? "")
   }
   if (status.auditDegraded) lines.push("Audit: some records could not be saved, so the audit log may be incomplete.")
   lines.push(`OpenCode: ${openCodeLabel(status)}`, `Next step: ${status.nextStep}`)
@@ -192,7 +193,7 @@ function nextFor(outcome: DoctorOutcome): string | undefined {
     case "DENIED":
       return "allow gws.read for this account in your permissions, or skip the check"
     case "ADMIN_PRIVILEGE_REQUIRED":
-      return `sign in with a Workspace admin account that has ${privilegeName(outcome.service)}, or remove ${outcome.service} from accounts.${outcome.account}.enabledServices`
+      return adminAccountStep(outcome.account, outcome.service)
     default:
       return undefined
   }

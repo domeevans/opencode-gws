@@ -16,10 +16,16 @@ The host then asks, on `gws.admin`, for that exact `<account>:<operation>`. Admi
 
 Plugin policy cannot allow an admin call. A policy rule can only deny. Deploy and watch never run, including when admin is enabled.
 
+The `default` account leaves out `admin-reports`, because only a Workspace admin with the Reports privilege can call it. Add the admin as a separate account alias, so its sign-in does not replace your own. Setting `accounts` replaces the implicit `default` account, and an account you configure is read-only unless it sets `access`, so list your own account too:
+
 ```jsonc
 {
   "accounts": {
-    "work": {
+    "default": {
+      "enabledServices": ["gmail", "calendar", "drive", "docs", "sheets"],
+      "access": "write"
+    },
+    "admin": {
       "enabledServices": ["admin-reports"],
       "access": "read"
     }
@@ -32,10 +38,12 @@ Plugin policy cannot allow an admin call. A policy rule can only deny. Deploy an
 }
 ```
 
+Sign in to it with `/connect` and **Google Workspace (`admin`)**. With two accounts, every call names one with `account`.
+
 Allow the prompt in noninteractive `opencode run` with a user rule, not a policy rule. The rule includes `resource`:
 
 ```json
-{ "action": "gws.admin", "resource": "work:*", "effect": "allow" }
+{ "action": "gws.admin", "resource": "admin:*", "effect": "allow" }
 ```
 
 ## Plan and commit
@@ -51,6 +59,4 @@ A read on an admin-class service is still a read: `gws_read`, no admin gate. A w
 
 ## Services
 
-The default allowlist follows the manifest. It includes every service with an admin-class method or helper: `admin-reports`, `drive`, and `modelarmor`. Model Armor helpers cannot run; catalog marks them not executable. Apps Script deployments and Workspace Events subscriptions are deploy or watch, so they never run.
-
-High-risk services (`admin-reports`, `script`, `events`, `modelarmor`, `workflow`) are documented in the `opencode-gws-admin` skill, which is not loaded automatically. Enabling the skill does not enable the gate.
+The default allowlist follows the manifest. It includes every service with an admin-class method or helper: `admin-reports`, `drive`, and `modelarmor`. No Model Armor helper can run, and no account enables Model Armor by default. Apps Script deployments and Workspace Events subscriptions are deploy or watch, so they never run.

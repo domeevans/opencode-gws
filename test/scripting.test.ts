@@ -198,7 +198,7 @@ describe("a script's call", () => {
 
   it("answers status, catalog and schema through the same specs as the tools", async () => {
     const h = await setup()
-    expect(await call(h, "status", {})).toMatchObject({ accounts: [expect.objectContaining({ alias: "personal" })], unguardedAgents: 0 })
+    expect(await call(h, "status", {})).toMatchObject({ accounts: [expect.objectContaining({ alias: "personal" })], unguardedAgentCount: 0 })
     expect(await call(h, "catalog", { query: "send email", service: "gmail" })).toMatchObject({ entries: expect.arrayContaining([expect.objectContaining({ id: "gmail.users.messages.send" })]) })
     expect(await call(h, "schema", { operation: "gmail.users.messages.get" })).toMatchObject({ ok: true, account: "personal" })
     expect(h.asserts.map((request) => request.action)).toEqual(["gws.status", "gws.catalog", "gws.schema"])
@@ -242,9 +242,9 @@ describe("refusals", () => {
     expect(h.asserts).toEqual([])
   })
 
-  it("refuses a change through read with POLICY_DENIED", async () => {
+  it("refuses a change through read with CATEGORY_MISMATCH", async () => {
     const h = await setup()
-    expect(await call(h, "read", { ...get, operation: "gmail.users.messages.trash" })).toMatchObject(failure("POLICY_DENIED"))
+    expect(await call(h, "read", { ...get, operation: "gmail.users.messages.trash" })).toMatchObject(failure("CATEGORY_MISMATCH"))
     expect(invocations(h.runtime)).toEqual([])
   })
 

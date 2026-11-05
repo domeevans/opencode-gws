@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-11-05
+
+### Added
+
+- `gws_catalog` finds the usual method for natural phrasings such as "search email", "find file by name", "read document" or "trash file" (which now lists `drive.files.update` before the permanent `drive.files.delete`). When no entry matches every word, it returns the entries that match the most, with `relaxed: true`. When a query or `service` names a service this setup leaves out, `unavailable` lists it with the reason, such as Keep's domain-wide delegation.
+- Status names a skill of your own that uses one of the plugin's skill ids (for example `~/.claude/skills/opencode-gws`), which hides the plugin's skill: the status RPC's new `shadowedSkills`, a **Hidden skills** row in `/gws-status` and the dialog, and a next step to move or rename it.
+
+### Changed
+
+- The `default` account no longer enables `admin-reports` or Model Armor, and no access level requests `cloud-platform`: the default consent asks for 42 scopes (35 for Read-only). Only a Workspace admin with the Reports privilege can call `admin-reports`; add a separate account alias for that admin ([docs/admin.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/admin.md)). No Model Armor helper could run.
+- `gmail.send`, `gmail.reply`, `gmail.reply-all` and `gmail.forward` with `draft: true` plan as `write`, commit with `gws_write`, and list no recipients, because a draft reaches no one. `gmail.users.drafts.send` stays a `send`, with the recipient rules.
+- A change sent to `gws_read`, or a read sent to `gws_plan`, is now `CATEGORY_MISMATCH` with a next step that names the right tool, not `POLICY_DENIED`. `POLICY_DENIED` now means only a deny. Committing with the wrong tool names the plan's tool too: `Commit it with gws_send, passing only {planId}.`
+- `ADMIN_PRIVILEGE_REQUIRED`'s next step, in errors and `/gws-doctor`, says to add a separate account alias for an admin and sign in to it. Before, it said to sign in again, which would replace this account's own sign-in.
+- The unguarded-agent next step is one fixed sentence: "Put the default rules shown by /gws-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Google Workspace tools." The **Agents without default rules** row lists names, then the rules, with no extra sentence.
+- `gws_status` and the tools RPC's `status` report the count as `unguardedAgentCount` (it was `unguardedAgents`, a number). `unguardedAgents` is always the list of names, as in the status RPC.
+- The status RPC's `state` loses `host_untested`. An untested OpenCode release inside `>=2.2.3 <2.3.0` keeps the working state (`connected`, `sign_in_required` or `not_configured`); `host.tested` and the OpenCode row still mark it. Outside the range the plugin still refuses to start with `HOST_UNTESTED`, whose next step now reads the same everywhere.
+- The `gws` namespace tells the model to use these tools, never a `gws` command in a shell, and names the two skills. Both skills are rewritten to load on everyday requests (mail, calendar, Drive, Docs, Sheets, the standup report) and to teach upcoming-event times, Drive search and trash, reading a Doc's text, drafts, paging and exact counts.
+- `HELPER_UNSUPPORTED` reads `'<id>' cannot run in this plugin`, and `GWS_API_ERROR`'s next step says to tell the user Google's message.
+
+### Removed
+
+- The `opencode-gws-admin` skill. Its lessons (the admin gate, Reports, the workflow helpers) are in `opencode-gws` and `opencode-gws-recipes`.
+- The options `skills.include` and `skills.exclude` (use `skills.enabled`), `execution.schemaTimeoutMs` and `execution.pageDelayMs` (now fixed at 15 seconds and 100 ms; a read can still set `pagination.delayMs`), and `audit.sink` (audit records always go to `audit.path`). A config that still sets one is refused with `OPTIONS_INVALID`: delete the key.
+- The error codes `GWS_NOT_FOUND` and `GWS_UNSUPPORTED_PLATFORM`, which nothing raised; a missing binary is `GWS_UNAVAILABLE`.
+- `views/jelly-view.d.ts` from the repository; the view's types come with `@jelly/contracts`.
+
+### Fixed
+
+- `gws_read`'s description says a read returns one page unless `pagination` is set, that a text helper returns a string, and how to get a cut result in full; the pagination fields name their defaults.
+
 ## [0.0.4] - 2026-11-04
 
 ### Added

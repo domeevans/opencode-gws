@@ -49,7 +49,7 @@ export const RequestInput = z
     pagination: z
       .strictObject({
         all: z.boolean().optional().describe("Follow nextPageToken; data becomes one array element per page"),
-        maxPages: z.number().int().min(1).max(1000).optional().describe("Page cap; clamped to execution.maxPages and policy maxPages"),
+        maxPages: z.number().int().min(1).max(1000).optional().describe("Page cap; clamped to execution.maxPages (10 by default) and policy maxPages"),
         maxItems: z
           .number()
           .int()
@@ -57,13 +57,13 @@ export const RequestInput = z
           .max(1_000_000)
           .optional()
           .describe(
-            "Item cap across pages (follows pages); clamped to execution.maxItems and policy maxItems. " +
+            "Item cap across pages (follows pages); clamped to execution.maxItems (1000 by default) and policy maxItems. " +
               "Counts each page's `items` array, or its only top-level array",
           ),
-        delayMs: z.number().int().min(0).max(60_000).optional().describe("Delay between page requests in ms"),
+        delayMs: z.number().int().min(0).max(60_000).optional().describe("Delay between page requests in ms; 100 by default"),
       })
       .optional()
-      .describe("Auto-pagination for list methods"),
+      .describe("Auto-pagination for list methods; without it a read returns one page"),
     upload: z
       .strictObject({
         path: z.string().min(1).describe("Absolute local file path inside an allowed read root"),
@@ -119,7 +119,7 @@ export const CatalogInput = z
       .string()
       .max(200)
       .optional()
-      .describe('Words that must all appear in an entry\'s id or description, case-insensitive, e.g. "send email" or "drive files list"'),
+      .describe('Words from operation ids work best, e.g. "gmail messages list" or "drive files update"; every word must match, else the best partial matches come back with relaxed'),
     service: z.string().min(1).optional().describe('Limit to one service, e.g. "gmail"'),
     category: Category.optional(),
     include: z
@@ -161,7 +161,7 @@ const CatalogEntry = z.object({
   id: z.string().describe("Pass a method or helper id as operation"),
   service: z.string(),
   description: z.string(),
-  category: Category.optional().describe("The manifest category; a request can raise it, and the plan's category is final"),
+  category: Category.optional().describe("The manifest category; a request can change it (a notifying event write is send, a trash is delete, a draft is write), and the plan's category is final"),
   httpMethod: z.string().optional(),
   path: z.string().optional(),
   executable: z.boolean().describe("The plugin can run it (a service: at least one of its operations); false for denied, deploy, and watch entries"),
@@ -174,6 +174,11 @@ const CatalogEntry = z.object({
 export const CatalogOutput = z.object({
   entries: z.array(CatalogEntry),
   total: z.number().describe("Matches before limit"),
+  relaxed: z.literal(true).optional().describe("No entry matched every word; these match the most words"),
+  unavailable: z
+    .array(z.object({ service: z.string(), reason: z.string() }))
+    .optional()
+    .describe("Services the query or service filter names that this setup does not offer, and why; tell the user the reason"),
 })
 
 export const ResolvedSchema = z.object({

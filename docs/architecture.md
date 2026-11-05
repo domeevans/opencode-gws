@@ -4,7 +4,7 @@ Unofficial plugin. Not affiliated with Google. Requires OpenCode 2.2.3 or a late
 
 ```
 OpenCode
-  agents ── load ──► three skills
+  agents ── load ──► two skills
      │
      └── call ─────► gws tools
                        ├─ manifest resolution (operation id)
@@ -40,7 +40,7 @@ src/
     agents.ts       default ask rules
     tools.ts        the 11 tool adapters
     permissions.ts  permission.assert inputs; no signal field
-    skills.ts       the three skills
+    skills.ts       the two skills
     integrations.ts sign-in
     commands.ts     /gws-status, /gws-doctor
     rpc.ts          status implementation

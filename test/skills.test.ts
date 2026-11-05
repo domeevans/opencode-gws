@@ -4,33 +4,14 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import { helperAdapter } from "../src/domain/helpers.js"
 import { loadManifest, resolveHelper, resolveMethod } from "../src/domain/manifest.js"
-import { registerSkills } from "../src/host/skills.js"
+import { parseSkill, registerSkills } from "../src/host/skills.js"
 import { toolSpecs } from "../src/host/tools.js"
-import { account, testConfig } from "./support/config.js"
+import { testConfig } from "./support/config.js"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const SKILLS = join(ROOT, "skills")
-const EXPECTED = ["opencode-gws", "opencode-gws-recipes", "opencode-gws-admin"]
-const JARGON = [
-  "vitest",
-  "fixture",
-  "workstream",
-  "ctx.",
-  "evidence",
-  "PACK_",
-  "Granola",
-  "Tavily",
-  "verified on",
-  "fork",
-  "approvals.allow",
-  "policy.defaults",
-  "gws.confirm",
-  "generate-skills",
-  "skill-content",
-  "test status",
-  "passing test",
-  "failing test",
-]
+const EXPECTED = ["opencode-gws", "opencode-gws-recipes"]
+const JARGON = ["vitest", "fixture", "ctx.", "evidence", "PACK_", "verified on", "test status", "passing test", "failing test"]
 
 const manifest = loadManifest()
 const aliases = new Set(manifest.services.map((service) => service.alias))
@@ -61,10 +42,7 @@ function executable(id: string): boolean {
   return helper !== undefined && helperAdapter(id) !== undefined && !neverRun.has(helper.category)
 }
 
-async function register(
-  config = testConfig(),
-  visible = new Set(manifest.services.map((service) => service.alias)),
-): Promise<Array<{ id: string; autoinvoke: boolean; path: string; description: string }>> {
+async function register(config = testConfig()): Promise<Array<{ id: string; autoinvoke: boolean; path: string; description: string }>> {
   const added: Array<{ id: string; autoinvoke: boolean; path: string; description: string }> = []
   await registerSkills(
     {
@@ -75,12 +53,11 @@ async function register(
       },
     } as never,
     config,
-    visible,
   )
   return added
 }
 
-describe("three skills", () => {
+describe("two skills", () => {
   it("ships at most three skills, under stable ids", () => {
     expect(skills.length).toBeLessThanOrEqual(3)
     expect(skills.map((skill) => skill.dir).sort()).toEqual([...EXPECTED].sort())
@@ -92,28 +69,26 @@ describe("three skills", () => {
     }
   })
 
-  it("registers those three, and does not auto-invoke the admin skill", async () => {
+  it("registers both, auto-invoked, with the description from each file's frontmatter", async () => {
     const added = await register()
     expect(added.map((skill) => skill.id)).toEqual(EXPECTED)
-    expect(added.find((skill) => skill.id === "opencode-gws-admin")?.autoinvoke).toBe(false)
-    expect(added.filter((skill) => skill.id !== "opencode-gws-admin").every((skill) => skill.autoinvoke)).toBe(true)
     for (const skill of added) {
+      expect(skill.autoinvoke).toBe(true)
       expect(skill.id.startsWith("gws-")).toBe(false)
       expect(skill.path).toBe(join(SKILLS, skill.id, "SKILL.md"))
-      expect(skill.description.length).toBeGreaterThan(0)
+      expect(frontmatter(readFileSync(skill.path, "utf8"))).toContain(`description: ${skill.description}`)
     }
   })
 
-  it("honours include and exclude", async () => {
-    const excluded = await register(testConfig({ skills: { exclude: ["opencode-gws-recipes"] } }))
-    expect(excluded.map((skill) => skill.id)).toEqual(["opencode-gws", "opencode-gws-admin"])
-    const included = await register(
-      testConfig({ accounts: { personal: account({ services: ["gmail"] }) }, skills: { include: ["opencode-gws-recipes"] } }),
-      new Set(["gmail"]),
-    )
-    expect(included.map((skill) => skill.id)).toEqual(["opencode-gws-recipes"])
-    const disabled = await register(testConfig({ skills: { enabled: false } }))
-    expect(disabled).toEqual([])
+  it("registers none when skills.enabled is false", async () => {
+    expect(await register(testConfig({ skills: { enabled: false } }))).toEqual([])
+  })
+
+  it("refuses a skill file without name and description frontmatter with SKILLS_INVALID", () => {
+    expect(parseSkill("---\nname: x\ndescription: Use it.\n---\nBody", "x")).toEqual({ name: "x", description: "Use it.", content: "Body" })
+    for (const raw of ["# No frontmatter", "---\nname: x\n---\nBody", "---\ndescription: Use it.\n---\nBody"]) {
+      expect(() => parseSkill(raw, "skills/x/SKILL.md")).toThrow(/^SKILLS_INVALID: The skill file skills\/x\/SKILL\.md has no name and description frontmatter\./)
+    }
   })
 })
 

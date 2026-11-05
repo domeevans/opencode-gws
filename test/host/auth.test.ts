@@ -15,10 +15,10 @@ import { prompt, startHost, type Harness } from "./harness.js"
  * the host's credential store: first a read-only one, then a write one.
  */
 
-// The default account: every manifest service except those that need domain-wide delegation (Keep).
+// The default account: every manifest service except Keep (domain-wide delegation), Model Armor and admin-reports.
 const SERVICES = loadManifest()
   .services.map((service) => service.alias)
-  .filter((service) => !DELEGATION_SERVICES.includes(service))
+  .filter((service) => !DELEGATION_SERVICES.includes(service) && service !== "modelarmor" && service !== "admin-reports")
 const READ = requestedScopes(SERVICES, "read")
 const WRITE = requestedScopes(SERVICES, "write")
 /** The services /gws-doctor probes; the rest have no read-only check. */

@@ -98,8 +98,8 @@ const DIRECT: Readonly<Record<string, { read: string[]; write: string[] }>> = {
   },
   // script.processes and script.metrics only view; deployments are never requested.
   script: { read: ["script.projects.readonly", "script.processes", "script.metrics"], write: ["script.projects", "script.processes", "script.metrics"] },
-  // Model Armor has no read-only scope; write requests cloud-platform.
-  modelarmor: { read: [], write: ["cloud-platform"] },
+  // No Model Armor helper can run, and its only scope, cloud-platform, grants the whole Cloud project: neither level requests it.
+  modelarmor: { read: [], write: [] },
 }
 
 /** Services whose operations call other services get the union of those services' sets. */

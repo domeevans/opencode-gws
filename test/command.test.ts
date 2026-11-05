@@ -21,10 +21,8 @@ const config = testConfig({
   policy: { rules: [] },
   execution: {
     timeoutMs: 1000,
-    schemaTimeoutMs: 1000,
     maxPages: 10,
     maxItems: 100,
-    pageDelayMs: 100,
     maxStdoutBytes: 1024,
     maxStderrBytes: 1024,
     maxInlineBytes: 1024,

@@ -40,8 +40,8 @@ export const ErrorCode = {
   },
   POLICY_DENIED: {
     meaning:
-      "Plugin policy refused the call: the category, the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",
-    next: "Do not work around it. If the message says to use gws_plan, plan the change; otherwise tell the user, who can change the plugin policy.",
+      "Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",
+    next: "Do not work around it; tell the user, who can change the plugin policy.",
   },
   RECIPIENTS_UNKNOWN: {
     meaning:
@@ -72,8 +72,8 @@ export const ErrorCode = {
     next: "Plan again from the session and agent that will commit it.",
   },
   CATEGORY_MISMATCH: {
-    meaning: "The commit tool does not match the plan's category.",
-    next: "Commit with the tool named by the plan's category.",
+    meaning: "The tool does not match the operation's or the plan's category: a change sent to gws_read, a read sent to gws_plan, or a plan committed with another category's tool.",
+    next: "Call the tool the message names.",
   },
 
   // ── Scripts (the tools RPC) ───────────────────────────────────────────
@@ -104,7 +104,7 @@ export const ErrorCode = {
   ADMIN_PRIVILEGE_REQUIRED: {
     meaning:
       "The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code.",
-    next: "Ask the user to sign in with a Workspace admin account that has the needed privilege (Reports for admin-reports), or to remove the service from enabledServices.",
+    next: "Ask the user to add a separate account alias for a Workspace admin who has the needed privilege (Reports for admin-reports) and sign in to it, or to remove the service from enabledServices.",
   },
   AUTH_CLIENT_REQUIRED: {
     meaning: "No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one.",
@@ -135,7 +135,7 @@ export const ErrorCode = {
   },
   GWS_API_ERROR: {
     meaning: "Google returned an error; the message carries Google's text.",
-    next: "Fix the ids or parameters once from the message; if it fails again, report it.",
+    next: "Fix the ids or parameters once from the message; if it fails again, tell the user Google's message.",
   },
   GWS_DISCOVERY_ERROR: {
     meaning: "gws could not load the API description (the Discovery document) it builds requests from.",
@@ -185,7 +185,7 @@ export const ErrorCode = {
   },
   DOWNLOAD_INVALID: {
     meaning: "The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file.",
-    next: "Fix the destination path; if gws wrote no file, report it.",
+    next: "Fix the destination path; if gws wrote no file, tell the user.",
   },
   DOWNLOAD_LIMIT: {
     meaning: "The download is larger than execution.maxDownloadBytes; nothing was written to the destination.",
@@ -195,7 +195,7 @@ export const ErrorCode = {
   // ── Setup: these stop the plugin from loading ────────────────────────
   HOST_UNTESTED: {
     meaning: "The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0).",
-    next: "Use OpenCode 2.2.3, 2.2.4 or 2.2.5 (tested) or another release in the range, or set allowUntestedHost to true to run anyway; status then shows the host as untested.",
+    next: 'Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true.',
   },
   OPTIONS_INVALID: {
     meaning: "The plugin options are not valid: an unknown key, a wrong type, an unknown service, or access or scopes that name something the account does not enable.",
@@ -212,14 +212,6 @@ export const ErrorCode = {
   GWS_UNAVAILABLE: {
     meaning: "No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist.",
     next: "Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable.",
-  },
-  GWS_NOT_FOUND: {
-    meaning: "The packaged gws binary is missing.",
-    next: "Reinstall the plugin.",
-  },
-  GWS_UNSUPPORTED_PLATFORM: {
-    meaning: "The packaged gws binary does not support this platform.",
-    next: "Set binary.path to a gws 0.22.5 executable for this platform.",
   },
   GWS_VERSION_MISMATCH: {
     meaning: "The gws version check failed, or gws is not the version the manifest was generated from.",
@@ -280,7 +272,7 @@ export class GwsError extends Error {
 }
 
 /** Starts `text` with a capital and ends it with a full stop unless it already ends a sentence. */
-export function sentence(text: string): string {
+function sentence(text: string): string {
   const trimmed = text.trim()
   const capital = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
   return /[.!?]$/.test(capital) ? capital : `${capital}.`

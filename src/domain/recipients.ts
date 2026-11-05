@@ -185,9 +185,10 @@ function plan(out: Collector, lookups: RecipientLookup[] = [], needsSelf = false
   return { known: out.result(), lookups, ...(needsSelf ? { needsSelf: true as const } : {}) }
 }
 
-/** The helper's own recipient flags; a send with none fails closed. */
+/** The helper's own recipient flags; a send with none fails closed. A draft (a write) reaches no one. */
 function helperSend(fields: readonly string[]): Spec {
-  return (request) => {
+  return (request, category) => {
+    if (category !== "send") return plan(new Collector())
     const input = record(request.input)
     const out = new Collector()
     for (const field of fields) out.text(input[field])
@@ -198,7 +199,8 @@ function helperSend(fields: readonly string[]): Spec {
 
 /** The message a reply answers: who it was from, and for reply-all who else it went to. */
 function replySpec(all: boolean): Spec {
-  return (request) => {
+  return (request, category) => {
+    if (category !== "send") return plan(new Collector())
     const input = record(request.input)
     const out = new Collector()
     for (const field of ["to", "cc", "bcc"]) out.text(input[field])

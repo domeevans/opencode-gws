@@ -294,7 +294,12 @@ describe("status dialog", () => {
   it("names the agents without default rules and shows the block to add first in their own permissions", async () => {
     const block = '{\n  "agents": {}\n}'
     const view = (await open(status([ACCOUNTS.signedIn], { unguardedAgents: ["notes", "docs"], permissionsBlock: block }))).view()
-    expect(view).toContain(`Agents without default rules\nnotes, docs\n${block}\nPut this block first in that agent's own permissions, followed by your top-level rules for gws actions.`)
+    expect(view).toContain(`Agents without default rules\nnotes, docs\n${block}\nOpenCode`)
+  })
+
+  it("names a skill that hides the plugin's own, before Tools", async () => {
+    const view = (await open(status([ACCOUNTS.signedIn], { shadowedSkills: [{ id: "opencode-gws", path: "/u/skills/opencode-gws/SKILL.md" }] }))).view()
+    expect(view).toContain("Hidden skills\nopencode-gws (hidden by /u/skills/opencode-gws/SKILL.md)\nTools")
   })
 
   it("says when no account is configured", async () => {

@@ -70,7 +70,9 @@ describe("agent ask rules", () => {
     expect(rpc.permissionsBlock).toContain('"resource":"*"')
     const status = await execute(call("status", {}))
     const value = (status["value"] ?? status) as Record<string, unknown>
-    expect(value["unguardedAgents"], String(status["error"])).toBe(1)
+    // unguardedAgents is always a list of names; the compact tool output carries only the count.
+    expect(value["unguardedAgentCount"], String(status["error"])).toBe(1)
+    expect(value).not.toHaveProperty("unguardedAgents")
     expect(String(value["permissions"])).toContain("/gws-status")
     expect(JSON.stringify(value)).not.toContain("notes")
   })

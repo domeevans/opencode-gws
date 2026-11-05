@@ -24,13 +24,11 @@ changes nothing in Jelly.
 
 `gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
 
-A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
-default. Keep `jelly.tools` in step with the known-tool list; `test/views.test.ts` checks
-each declared effect against the plugin's own default rules.
+`test/views.test.ts` checks each declared effect against the plugin's own default rules.
 
 ## Skills
 
-Declared: `opencode-gws`, `opencode-gws-recipes`, `opencode-gws-admin`. Jelly refuses an install whose
+Declared: `opencode-gws`, `opencode-gws-recipes`. Jelly refuses an install whose
 skill ids collide with another plugin's or the agent's own.
 
 ## Views
@@ -39,8 +37,7 @@ skill ids collide with another plugin's or the agent's own.
   It draws `gmail.users.threads.get`: the subject, then each message's sender, time and text part
   (or Gmail's snippet). For any other read it declines, and the call keeps its ordinary look. It
   carries Jelly's bridge helper inline (`views/jelly-view.js`, the text of `@jelly/contracts`
-  `VIEW_HELPER`) and loads nothing by URL. Its types, for a page checked with TypeScript, are in
-  the repository's `views/jelly-view.d.ts`; the package ships no `.d.ts`.
+  `VIEW_HELPER`) and loads nothing by URL. Its types come with `@jelly/contracts`.
 
   `gws_read` is a direct tool for this: Jelly sees the result of a direct call, and not of a call
   made inside a Code Mode script. A thread read with `fields` narrow enough to stay under Jelly's
@@ -55,5 +52,5 @@ Jelly folds the declared sign-ins into this plugin's one card, which shows each 
 
 ## Versions
 
-Jelly's curated catalogue pins an exact version. `latest` is `0.0.0`; publish each release
-under a new version so a review in Jelly can tell the two apart.
+Jelly's curated catalogue pins an exact version. Publish each release under a new version so a
+review in Jelly can tell the two apart.

@@ -137,9 +137,8 @@ describe("/gws-status", () => {
   it("names a config-only agent and gives the per-agent block, first in its own permissions", () => {
     const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: ["notes"], permissionsBlock: '{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}' }
     const text = formatStatus(status)
-    expect(text).toContain("Agents without default rules: notes")
-    expect(text).toContain('"action":"gws.write","resource":"*"')
-    expect(text).toContain("Put this block first in that agent's own permissions, followed by your top-level rules for gws actions.")
+    // The row lists names only, then the block; the one fixed sentence is the Next step.
+    expect(text).toContain('Agents without default rules: notes\n{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}\nOpenCode:')
   })
 
   it("renders the rows in the shared order, as plain text, with exactly one Next step", async () => {
@@ -171,8 +170,13 @@ describe("/gws-status", () => {
     for (const secret of [STORED_TOKEN, TEST_CLIENT.clientSecret]) expect(JSON.stringify(h.synthetic)).not.toContain(secret)
   })
 
+  it("names a skill that hides the plugin's own, before Tools", () => {
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Move it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shadowedSkills: [{ id: "opencode-gws", path: "/u/skills/opencode-gws/SKILL.md" }], unguardedAgents: [] }
+    expect(formatStatus(status)).toMatch(/\nHidden skills: opencode-gws \(hidden by \/u\/skills\/opencode-gws\/SKILL\.md\)\nTools: /)
+  })
+
   it("says Nothing to do. and marks an untested host", () => {
-    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "host_untested", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     const text = formatStatus(status)
     expect(text).toContain("OpenCode: 2.3.0 (host untested; supported range >=2.2.3 <2.3.0)")
     expect(text).toMatch(/Next step: Nothing to do\.$/)
@@ -309,7 +313,7 @@ describe("/gws-doctor", () => {
     ])
     expect(h.synthetic[0]).toMatchObject({ description: "Google Workspace doctor: 1 OK · 1 needs attention" })
     expect(String(h.synthetic[0]!["text"]).split("\n").slice(2)).toEqual([
-      "- personal admin-reports: ADMIN_PRIVILEGE_REQUIRED · Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs. Next step: Sign in with a Workspace admin account that has the Reports privilege, or remove admin-reports from accounts.personal.enabledServices",
+      '- personal admin-reports: ADMIN_PRIVILEGE_REQUIRED · Google accepted the sign-in, but the account lacks the Workspace admin privilege this service needs. Next step: Add a separate account alias for a Workspace admin who has the Reports privilege, with enabledServices ["admin-reports"], and sign in to it from /connect, or remove admin-reports from accounts.personal.enabledServices',
       "- personal gmail: OK",
       "- personal keep: SKIPPED · keep needs domain-wide delegation, which a Workspace admin sets up; with it, add keep or keep.readonly to accounts.personal.scopes and sign in again",
     ])

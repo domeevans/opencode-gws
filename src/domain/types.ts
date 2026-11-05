@@ -38,7 +38,7 @@ export interface MethodEntry {
   schemaError?: string
 }
 
-export interface ServiceEntry {
+interface ServiceEntry {
   alias: string
   methods: MethodEntry[]
   helpers: HelperEntry[]
@@ -118,18 +118,16 @@ export interface PolicyRule {
   maxItems?: number
 }
 
-export interface PolicyConfig {
+interface PolicyConfig {
   /** Plan lifetime. Approvals are host rules, not a policy effect. */
   planTtlSeconds: number
   rules: PolicyRule[]
 }
 
-export interface ExecutionConfig {
+interface ExecutionConfig {
   timeoutMs: number
-  schemaTimeoutMs: number
   maxPages: number
   maxItems: number
-  pageDelayMs: number
   maxStdoutBytes: number
   maxStderrBytes: number
   maxInlineBytes: number
@@ -139,20 +137,17 @@ export interface ExecutionConfig {
   allowedWriteRoots: string[]
 }
 
-export interface AuditConfig {
+interface AuditConfig {
   enabled: boolean
-  sink: "stderr" | "jsonl"
   /** The JSONL file; the runtime defaults it to `<stateDir>/audit.jsonl`. */
   path?: string
 }
 
-export interface SkillsConfig {
+interface SkillsConfig {
   enabled: boolean
-  include: string[]
-  exclude: string[]
 }
 
-export interface BinaryConfig {
+interface BinaryConfig {
   /** Absolute path to a system gws 0.22.5, used instead of the packaged binary. */
   path?: string
 }
@@ -163,7 +158,7 @@ export interface BinaryConfig {
  * manifest entry, and an explicit `allow` rule that names the `admin`
  * category is still required.
  */
-export interface AdminConfig {
+interface AdminConfig {
   enabled: boolean
   requireReason: boolean
   allowedServices: string[]
