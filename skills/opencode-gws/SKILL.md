@@ -17,6 +17,8 @@ Omit `account`; the only account is used. With several, `ACCOUNT_REQUIRED` lists
 
 ## Find the operation
 
+When a recipe in `opencode-gws-recipes` already gives the operation, use it and skip these steps.
+
 1. `gws_catalog` with words from operation ids, such as `gmail messages list`, `drive files update` or `calendar events list`. When nothing matches every word you get the closest matches and `relaxed: true`.
 2. Skip entries with `executable: false`; use `alternative` when there is one.
 3. `gws_schema` shows a method's parameters and request body, or a helper's input flags.
@@ -29,7 +31,7 @@ If `gws_catalog` returns `unavailable`, or finds nothing for a service, this set
 - A read returns one page. For more, pass `pagination: {"all": true, "maxItems": N}`. The plugin clamps this to its caps (10 pages and 1000 items by default), and `pagination.capped: true` means items were cut.
 - Gmail's `resultSizeEstimate` is an estimate. Count the ids you got, or read a label's `messagesUnread`.
 - `truncated: true` means the inline text was cut. Narrow `fields`, or set `response: {"mode": "full"}`.
-- Times are RFC 3339 with the user's offset, such as `2026-11-09T00:00:00+01:00`. Work out the current time and the user's time zone first (the shell's `date` is fine). Show the times you report in that zone.
+- Times are RFC 3339 with the user's offset, such as `2026-11-09T00:00:00+01:00`. When the request needs the current time ("today", "next week", "in the last day"), get it and the user's offset once, with one call such as `date +%Y-%m-%dT%H:%M:%S%z`. Skip it when the request names no relative time or the result already gives the date. Show the times you report in that zone.
 - Cite what you read: a message's sender, subject and date, or a doc's or event's title, and its `webViewLink` or `htmlLink` when you asked for it.
 
 ## Change: plan, then commit

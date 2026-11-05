@@ -34,12 +34,12 @@ Copy the shape and replace the ids. `opencode-gws` covers accounts, plan then co
 
 ## Calendar
 
-- **Next meetings.** Always set `timeMin` to now. Without it, `orderBy: "startTime"` returns the calendar's oldest events. `singleEvents: true` expands recurring meetings.
+- **Next meetings.** Always set `timeMin` to now. Without it, `orderBy: "startTime"` returns the calendar's oldest events. `timeMin` also returns events still running, such as all-day ones (`start.date`), so ask for more than you need (`maxResults: 10`) and skip those when the user means meetings. `singleEvents: true` expands recurring meetings.
 - **A range, such as next week.** Set `timeMin` to Monday 00:00 and `timeMax` to the next Monday 00:00, both with the user's offset. Put `timeZone` in `fields` to learn the calendar's zone without another call. Count each event on its local start date. All-day events have `start.date`, not `start.dateTime`.
 - **The helper.** `calendar.agenda` takes `today`, `tomorrow`, `week` or `days`, plus `timezone`. It is smaller than a full events list.
 
 ```json
-{ "operation": "calendar.events.list", "params": { "calendarId": "primary", "timeMin": "2026-11-05T14:30:00+01:00", "singleEvents": true, "orderBy": "startTime", "maxResults": 3 }, "fields": "timeZone,items(summary,start,end,htmlLink),nextPageToken" }
+{ "operation": "calendar.events.list", "params": { "calendarId": "primary", "timeMin": "2026-11-05T14:30:00+01:00", "singleEvents": true, "orderBy": "startTime", "maxResults": 10 }, "fields": "timeZone,items(summary,start,end,htmlLink),nextPageToken" }
 ```
 
 ```json
