@@ -119,7 +119,7 @@ export const CatalogInput = z
       .string()
       .max(200)
       .optional()
-      .describe('Words that must all appear in an entry\'s id or description, case-insensitive, e.g. "send email" or "drive files list"'),
+      .describe('Words from operation ids work best, e.g. "gmail messages list" or "drive files update"; every word must match, else the best partial matches come back with relaxed'),
     service: z.string().min(1).optional().describe('Limit to one service, e.g. "gmail"'),
     category: Category.optional(),
     include: z
@@ -174,6 +174,11 @@ const CatalogEntry = z.object({
 export const CatalogOutput = z.object({
   entries: z.array(CatalogEntry),
   total: z.number().describe("Matches before limit"),
+  relaxed: z.literal(true).optional().describe("No entry matched every word; these match the most words"),
+  unavailable: z
+    .array(z.object({ service: z.string(), reason: z.string() }))
+    .optional()
+    .describe("Services the query or service filter names that this setup does not offer, and why; tell the user the reason"),
 })
 
 export const ResolvedSchema = z.object({

@@ -33,9 +33,34 @@ describe("catalog search", () => {
     expect(ids("files list")[0]).toBe("drive.files.list")
   })
 
-  it("is case-insensitive and needs every word", () => {
+  it("is case-insensitive and needs every word, unless none match all of them", () => {
     expect(ids("SEND Email")).toEqual(ids("send email"))
-    expect(ids("send zzzz-nothing")).toEqual([])
+    expect(catalog({ query: "send email" })).not.toHaveProperty("relaxed")
+    // No entry has both words: the best partial matches come back, marked relaxed.
+    const relaxed = catalog({ query: "send zzzz-nothing", limit: 200 })
+    expect(relaxed.relaxed).toBe(true)
+    expect(relaxed.entries.map((item) => item.id)).toEqual(expect.arrayContaining(["gmail.users.messages.send", "gmail.send"]))
+    expect(catalog({ query: "zzzz-nothing" })).toEqual({ entries: [], total: 0 })
+  })
+
+  // Phrasings a model types that once found nothing, or found a permanent delete first for "trash".
+  it("finds the usual method for natural phrasings", () => {
+    expect(ids("search email").slice(0, 5)).toContain("gmail.users.messages.list")
+    expect(ids("find file by name").slice(0, 5)).toContain("drive.files.list")
+    expect(ids("read document").slice(0, 5)).toContain("docs.documents.get")
+    expect(ids("search files").slice(0, 5)).toContain("drive.files.list")
+    expect(ids("trash file").indexOf("drive.files.update")).toBeLessThan(ids("trash file").indexOf("drive.files.delete"))
+  })
+
+  it("says why a service it hides cannot be used, such as Keep without domain-wide delegation", () => {
+    const visible = new Set(["gmail", "drive"])
+    for (const input of [{ service: "keep" }, { query: "keep notes list" }, { query: "list my notes" }]) {
+      const result = catalog(input, visible)
+      expect(result.entries.filter((item) => item.service === "keep"), JSON.stringify(input)).toEqual([])
+      expect(result.unavailable, JSON.stringify(input)).toEqual([{ service: "keep", reason: expect.stringMatching(/^Needs domain-wide delegation, which a Workspace admin sets up/) }])
+    }
+    expect(catalog({ service: "sheets" }, visible).unavailable).toEqual([{ service: "sheets", reason: expect.stringMatching(/^Not enabled for any account/) }])
+    expect(catalog({ query: "files list" }, visible)).not.toHaveProperty("unavailable")
   })
 
   it("lists entries the plugin can run first, then the best matches", () => {

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import * as z from "zod"
-import { restrictionMarks } from "./restricted.js"
+import { DELEGATION_SERVICES, restrictionMarks } from "./restricted.js"
 import type { CatalogEntry, CatalogInput, CatalogOutput } from "./contract.js"
 import { helperAdapter } from "./helpers.js"
 import type { Category, HelperEntry, Manifest, MethodEntry } from "./types.js"
@@ -139,7 +139,28 @@ const SERVICE_WORDS: Readonly<Record<string, readonly string[]>> = {
   people: ["contact"],
   tasks: ["task", "todo"],
   meet: ["meeting", "call"],
+  keep: ["note"],
+  "admin-reports": ["report", "audit", "login", "activit"],
 }
+
+/** Verbs people type for what the ids call list, get or update; a synonym match scores one less. */
+const SYNONYMS: Readonly<Record<string, readonly string[]>> = {
+  search: ["list"],
+  find: ["list"],
+  look: ["list"],
+  read: ["get"],
+  open: ["get"],
+  show: ["get", "list"],
+  view: ["get"],
+  fetch: ["get"],
+  trash: ["update"],
+  rename: ["update"],
+  edit: ["update", "batchupdate"],
+  share: ["permissions"],
+}
+
+/** Words that carry no meaning in a query. */
+const STOP_WORDS = new Set(["a", "an", "the", "my", "me", "i", "by", "for", "of", "to", "in", "on", "with", "from", "all", "and", "or"])
 
 /** True when the plugin can run a manifest method. */
 function methodExecutable(method: MethodEntry): boolean {
@@ -164,7 +185,7 @@ function commitTool(category: Category): string | undefined {
 
 /** Lowercase query words; empty when there is no query. */
 function words(query: string | undefined): string[] {
-  return (query ?? "").toLowerCase().split(/\s+/).filter(Boolean)
+  return (query ?? "").toLowerCase().split(/\s+/).filter((word) => word && !STOP_WORDS.has(word))
 }
 
 /** True when `token` starts a word of `text`. */
@@ -175,46 +196,82 @@ function startsWord(text: string, token: string): boolean {
   return false
 }
 
+/** How well one word matches: a whole id segment counts most, then a word start, then any substring or the service's own words. */
+function wordScore(token: string, id: string, segments: readonly string[], description: string, serviceWords: readonly string[]): number {
+  if (token === segments.at(-1)) return 4
+  if (segments.includes(token)) return 3
+  if (startsWord(id, token) || startsWord(description, token)) return 2
+  if (id.includes(token) || description.includes(token)) return 1
+  if (serviceWords.some((word) => token.startsWith(word))) return 1
+  return 0
+}
+
 /**
- * How well an entry matches: every word must appear in its id or
- * description, or name its service. Whole id segments count most, then
- * word starts, then any substring. Undefined when a word does not match.
+ * How well an entry matches: the words that appear in its id or
+ * description, or name its service, and their score. A word may also match
+ * through a synonym, for one point less.
  */
-function rank(tokens: readonly string[], entry: Pick<CatalogEntry, "id" | "service" | "description">): number | undefined {
-  if (tokens.length === 0) return 0
+function rank(tokens: readonly string[], entry: Pick<CatalogEntry, "id" | "service" | "description">): { matched: number; score: number } {
   const id = entry.id.toLowerCase()
   const segments = id.split(".")
   const description = entry.description.toLowerCase()
   const serviceWords = SERVICE_WORDS[entry.service] ?? []
   let score = 0
+  let matched = 0
   for (const token of tokens) {
-    if (token === segments.at(-1)) score += 4
-    else if (segments.includes(token)) score += 3
-    else if (startsWord(id, token) || startsWord(description, token)) score += 2
-    else if (id.includes(token) || description.includes(token)) score += 1
-    else if (serviceWords.some((word) => token.startsWith(word))) score += 1
-    else return undefined
+    const direct = wordScore(token, id, segments, description, serviceWords)
+    const synonym = Math.max(0, ...(SYNONYMS[token] ?? []).map((word) => wordScore(word, id, segments, description, []) - 1))
+    const best = Math.max(direct, synonym)
+    if (best > 0) {
+      score += best
+      matched += 1
+    }
   }
-  return score
+  return { matched, score }
+}
+
+/** Why the model may not use a manifest service this setup leaves out. */
+function unavailableReason(service: string): string {
+  if (DELEGATION_SERVICES.includes(service)) {
+    return `Needs domain-wide delegation, which a Workspace admin sets up; then the user adds ${service} to accounts.<alias>.enabledServices and its scopes to accounts.<alias>.scopes.`
+  }
+  if (service.startsWith("admin-")) {
+    return `Needs a Workspace admin with the privilege it reads; the user adds a separate account alias for that admin with enabledServices ["${service}"].`
+  }
+  return `Not enabled for any account; the user can add ${service} to accounts.<alias>.enabledServices.`
+}
+
+/**
+ * Manifest services the model may not use that the service filter names,
+ * or that a query word names when the visible services matched it poorly.
+ */
+function unavailableServices(tokens: readonly string[], only: string | undefined, allowed: ReadonlySet<string> | undefined, weak: boolean): Array<{ service: string; reason: string }> {
+  if (!allowed) return []
+  const names = (service: string) => tokens.some((token) => token === service || (SERVICE_WORDS[service] ?? []).some((word) => token.startsWith(word)))
+  return loadManifest()
+    .services.map((service) => service.alias)
+    .filter((service) => !allowed.has(service) && (service === only || (weak && names(service))))
+    .map((service) => ({ service, reason: unavailableReason(service) }))
 }
 
 /**
  * Search the manifest. A query matches an entry when every word appears in
  * its id or description, or names its service; entries that can run come
- * first, then the best matches, then by id.
+ * first, then the best matches, then by id. When no entry matches every
+ * word, the entries that match the most words come back, with relaxed set.
  */
 export function catalog(input: CatalogInput = {}, services?: ReadonlySet<string>): CatalogOutput {
   const include = new Set(input.include ?? ["services", "methods", "helpers"])
   const tokens = words(input.query)
   const allowed = services ? new Set([...services].map(canonicalService)) : undefined
   const only = input.service ? canonicalService(input.service) : undefined
-  const ranked: Array<{ entry: CatalogEntry; score: number }> = []
+  const ranked: Array<{ entry: CatalogEntry; matched: number; score: number }> = []
   const consider = (entry: CatalogEntry): void => {
     if (allowed && !allowed.has(entry.service)) return
     if (only && entry.service !== only) return
     if (input.category && entry.category !== input.category) return
-    const score = rank(tokens, entry)
-    if (score !== undefined) ranked.push({ entry, score })
+    const { matched, score } = rank(tokens, entry)
+    if (tokens.length === 0 || matched > 0) ranked.push({ entry, matched, score })
   }
 
   if (include.has("services") && !input.category) {
@@ -263,9 +320,18 @@ export function catalog(input: CatalogInput = {}, services?: ReadonlySet<string>
     }
   }
 
-  ranked.sort((a, b) => Number(b.entry.executable) - Number(a.entry.executable) || b.score - a.score || a.entry.id.localeCompare(b.entry.id))
+  const best = Math.max(0, ...ranked.map((item) => item.matched))
+  const kept = ranked.filter((item) => item.matched === best)
+  kept.sort((a, b) => Number(b.entry.executable) - Number(a.entry.executable) || b.score - a.score || a.entry.id.localeCompare(b.entry.id))
   const limit = Math.min(input.limit ?? 50, 200)
-  return { entries: ranked.slice(0, limit).map(({ entry }) => entry), total: ranked.length }
+  const relaxed = tokens.length > 0 && kept.length > 0 && best < tokens.length
+  const unavailable = unavailableServices(tokens, only, allowed, kept.length === 0 || relaxed)
+  return {
+    entries: kept.slice(0, limit).map(({ entry }) => entry),
+    total: kept.length,
+    ...(relaxed ? { relaxed: true as const } : {}),
+    ...(unavailable.length > 0 ? { unavailable } : {}),
+  }
 }
 
 /** Services with at least one admin-class method or helper in the manifest. */
