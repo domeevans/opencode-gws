@@ -5,6 +5,7 @@ import * as z from "zod"
 import { DELEGATION_SERVICES, restrictionMarks } from "./restricted.js"
 import type { CatalogEntry, CatalogInput, CatalogOutput } from "./contract.js"
 import { helperAdapter } from "./helpers.js"
+import { adminServiceStep, isAdminService } from "./result.js"
 import type { Category, HelperEntry, Manifest, MethodEntry } from "./types.js"
 
 /**
@@ -235,9 +236,7 @@ function unavailableReason(service: string): string {
   if (DELEGATION_SERVICES.includes(service)) {
     return `Needs domain-wide delegation, which a Workspace admin sets up; then the user adds ${service} to accounts.<alias>.enabledServices and its scopes to accounts.<alias>.scopes.`
   }
-  if (service.startsWith("admin-")) {
-    return `Needs a Workspace admin with the privilege it reads; the user adds a separate account alias for that admin with enabledServices ["${service}"].`
-  }
+  if (isAdminService(service)) return adminServiceStep(service)
   return `Not enabled for any account; the user can add ${service} to accounts.<alias>.enabledServices.`
 }
 

@@ -240,7 +240,7 @@ export function privilegeRefused(result: ProcessResult, service: string, parsed?
 }
 
 /** True for an Admin SDK service (admin-reports, and any later admin-*): the only ones whose refusal needs an admin privilege. */
-function isAdminService(service: string): boolean {
+export function isAdminService(service: string): boolean {
   return service.startsWith("admin-")
 }
 
@@ -251,6 +251,19 @@ const ADMIN_PRIVILEGES: Readonly<Record<string, string>> = { "admin-reports": "R
 export function privilegeName(service?: string): string {
   const name = service ? ADMIN_PRIVILEGES[service] : undefined
   return name ? `the ${name} privilege` : "the admin privilege it needs"
+}
+
+/**
+ * Why an Admin SDK service no usable account enables can't run, and the
+ * fix: the catalog's `unavailable` reason and the refusal's next step.
+ * Adding it to an existing account widens that account's access and, for
+ * anyone who is not an admin, ends in ADMIN_PRIVILEGE_REQUIRED.
+ */
+export function adminServiceStep(service: string): string {
+  return (
+    `Only a Workspace admin's account with ${privilegeName(service)} can use ${service}: ` +
+    `the user adds a separate account alias for that admin with enabledServices ["${service}"], not the service to an existing account, and signs in to it from /connect.`
+  )
 }
 
 /**

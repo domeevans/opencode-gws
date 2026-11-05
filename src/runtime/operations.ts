@@ -10,7 +10,7 @@ import { commandIndex, HELPER_ALTERNATIVES, helperInput, resolveOperation } from
 import type { PlanStore } from "../domain/plans.js"
 import { evaluatePolicy, needsAccountDomains, type PolicyDecision, type PolicyFacts } from "../domain/policy.js"
 import { ACCOUNT_ADDRESS_READS, domainOf, recipientLabels, recipientPlan, withLookup, type RecipientLookup, type RecipientPlan, type Recipients } from "../domain/recipients.js"
-import { capPageItems, inlineCap, isApiError, parseResult, processError, redactDryRun, withoutSavedBody } from "../domain/result.js"
+import { adminServiceStep, capPageItems, inlineCap, isAdminService, isApiError, parseResult, processError, redactDryRun, withoutSavedBody } from "../domain/result.js"
 import type { BuiltCommand, Category, CommitCategory, HelperEntry, MethodEntry, Plan, PluginConfig, Request } from "../domain/types.js"
 import type { SchemaClient } from "../process/schema.js"
 import { Stage, checkDestination } from "../process/staging.js"
@@ -67,9 +67,12 @@ const SAVE_INSTEAD = "Google answered with a body that is not JSON. To save it, 
 /** How long the account's own address, once read, is trusted. */
 const ADDRESS_TTL_MS = 10 * 60 * 1000
 
-/** The error a policy deny raises: its code, and for an unknown domain, the account's option. */
-function policyError(decision: PolicyDecision, account: string): GwsError {
+/** The error a policy deny raises: its code, and for an unknown domain, the account's option, and for an Admin SDK service the account isn't enabled for, a separate admin account. */
+function policyError(decision: PolicyDecision, account: string, service?: string): GwsError {
   const detail = decision.violations.join("; ")
+  if (service && isAdminService(service) && decision.violations.includes("service-disabled")) {
+    return new GwsError(decision.code, detail, { next: adminServiceStep(service) })
+  }
   if (decision.code === "ACCOUNT_DOMAIN_UNKNOWN") {
     return new GwsError("ACCOUNT_DOMAIN_UNKNOWN", detail, {
       next: `Ask the user to set accounts.${account}.domains to the account's email domains, or to enable Gmail, Drive or Calendar for '${account}' so the plugin can read its address.`,
@@ -110,7 +113,7 @@ export class Operations {
   private visible(service: string): void {
     if (!this.runtime.isVisible(service)) {
       throw new GwsError("POLICY_DENIED", `service '${service}' is not in the model-facing services list`, {
-        next: "Tell the user; they can add the service to the plugin's services option.",
+        next: isAdminService(service) ? adminServiceStep(service) : "Tell the user; they can add the service to the plugin's services option.",
       })
     }
   }
@@ -166,7 +169,7 @@ export class Operations {
       }
       const facts = { recipients: recipientPlan(entry.id, "read", request).known, accountDomains: this.runtime.config.accounts[request.account]?.domains }
       const decision = evaluatePolicy(this.runtime.config, entry, "read", request, facts)
-      if (decision.effect === "deny") throw policyError(decision, request.account)
+      if (decision.effect === "deny") throw policyError(decision, request.account, entry.service)
       return { category: "read", decision }
     }
     const category = helper ? helperCategory(helper, request.input) : effectiveCategory(entry, request)
@@ -176,7 +179,7 @@ export class Operations {
     }
     // The recipient constraints need reads; plan() evaluates again with them.
     const decision = evaluatePolicy(this.runtime.config, entry, category, request, "pending")
-    if (decision.effect === "deny") throw policyError(decision, request.account)
+    if (decision.effect === "deny") throw policyError(decision, request.account, entry.service)
     // Defense in depth: the policy decision above already enforces both
     // fences, but admin planning must never proceed on an allow alone.
     if (category === "admin" && (!this.runtime.config.admin.enabled || decision.effect !== "allow")) {
@@ -217,7 +220,9 @@ export class Operations {
         : { account, operation: found.helper.id, service: found.helper.service, helper: found.helper }
     if (!profile.enabledServices.includes(target.service)) {
       throw new GwsError("POLICY_DENIED", `service '${target.service}' is not enabled for '${account}'`, {
-        next: `Use an account that enables ${target.service}, or ask the user to add it to accounts.${account}.enabledServices.`,
+        next: isAdminService(target.service)
+          ? adminServiceStep(target.service)
+          : `Use an account that enables ${target.service}, or ask the user to add it to accounts.${account}.enabledServices.`,
       })
     }
     this.visible(target.service)
@@ -303,7 +308,7 @@ export class Operations {
     const recipientsPlan = recipientPlan(entry.id, category, request)
     const facts = await this.policyFacts(resolved, category, recipientsPlan, ctx)
     const decision = evaluatePolicy(this.runtime.config, entry, category, request, facts)
-    if (decision.effect === "deny") throw policyError(decision, request.account)
+    if (decision.effect === "deny") throw policyError(decision, request.account, entry.service)
     const limits = fileLimits(decision)
 
     let dryRunArgv: string[]

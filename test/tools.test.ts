@@ -471,6 +471,38 @@ describe("tool permission assertions", () => {
   })
 })
 
+// The default account leaves admin-reports out. Adding it there widens that
+// account's access and, for anyone not an admin, ends in ADMIN_PRIVILEGE_REQUIRED.
+describe("an admin-only service no account here can use", () => {
+  const STEP =
+    'Only a Workspace admin\'s account with the Reports privilege can use admin-reports: the user adds a separate account alias for that admin with enabledServices ["admin-reports"], not the service to an existing account, and signs in to it from /connect.'
+  const activity = (account?: string) =>
+    request("admin-reports.activities.list", { ...(account ? { account } : {}), params: { userKey: "all", applicationName: "login", maxResults: 1 }, fields: "items(id)" })
+  const step = async (call: Promise<unknown>) => {
+    const error = await call.then(
+      () => undefined,
+      (caught: Error) => caught,
+    )
+    return / Next step: (.*)$/s.exec(error?.message ?? "")?.[1]
+  }
+
+  it("says a separate admin account is needed when no account enables it", async () => {
+    const h = await setup({})
+    expect(await step(tool(h, "read").execute(activity(), context()))).toBe(STEP)
+    expect(await step(tool(h, "schema").execute(request("admin-reports.activities.list"), context()))).toBe(STEP)
+    expect(await step(tool(h, "plan").execute(activity(), context()))).toBe(STEP)
+  })
+
+  it("says the same when another account enables it", async () => {
+    const accounts = { personal: account({ services: ["gmail"] }), admin: account({ services: ["admin-reports"] }) }
+    const h = await setup({}, undefined, { accounts })
+    expect(await step(tool(h, "read").execute(activity("personal"), context()))).toBe(STEP)
+    expect(await step(tool(h, "schema").execute(request("admin-reports.activities.list", { account: "personal" }), context()))).toBe(STEP)
+    // Any other service keeps the step that adds it to the account.
+    expect(await step(tool(h, "schema").execute(request("drive.files.list", { account: "personal" }), context()))).toMatch(/add it to accounts\.personal\.enabledServices/)
+  })
+})
+
 describe("commit permission assertions", () => {
   async function plan(h: Harness): Promise<string> {
     const result = await tool(h, "plan").execute(sendRequest, context())

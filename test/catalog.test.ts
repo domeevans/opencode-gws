@@ -59,6 +59,13 @@ describe("catalog search", () => {
       expect(result.entries.filter((item) => item.service === "keep"), JSON.stringify(input)).toEqual([])
       expect(result.unavailable, JSON.stringify(input)).toEqual([{ service: "keep", reason: expect.stringMatching(/^Needs domain-wide delegation, which a Workspace admin sets up/) }])
     }
+    expect(catalog({ service: "admin-reports" }, visible).unavailable).toEqual([
+      {
+        service: "admin-reports",
+        reason:
+          'Only a Workspace admin\'s account with the Reports privilege can use admin-reports: the user adds a separate account alias for that admin with enabledServices ["admin-reports"], not the service to an existing account, and signs in to it from /connect.',
+      },
+    ])
     expect(catalog({ service: "sheets" }, visible).unavailable).toEqual([{ service: "sheets", reason: expect.stringMatching(/^Not enabled for any account/) }])
     expect(catalog({ query: "files list" }, visible)).not.toHaveProperty("unavailable")
   })
