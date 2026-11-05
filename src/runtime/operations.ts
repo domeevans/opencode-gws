@@ -156,11 +156,11 @@ export class Operations {
     const { entry, helper, request } = resolved
     if (mode === "read") {
       if (helper) {
-        if (helper.category !== "read") throw new GwsError("POLICY_DENIED", `helper '${helper.id}' is ${helper.category}, not read`, { next: PLAN_INSTEAD })
+        if (helper.category !== "read") throw new GwsError("CATEGORY_MISMATCH", `helper '${helper.id}' is ${helper.category}, not read`, { next: PLAN_INSTEAD })
       } else {
         const category = effectiveCategory(entry, request)
         if (category !== "read") {
-          throw new GwsError("POLICY_DENIED", `'${entry.id}' is ${category}; use gws_plan and the matching commit tool`, { next: PLAN_INSTEAD })
+          throw new GwsError("CATEGORY_MISMATCH", `'${entry.id}' is ${category}, not read`, { next: PLAN_INSTEAD })
         }
       }
       const facts = { recipients: recipientPlan(entry.id, "read", request).known, accountDomains: this.runtime.config.accounts[request.account]?.domains }
@@ -169,10 +169,9 @@ export class Operations {
       return { category: "read", decision }
     }
     const category = helper ? helper.category : effectiveCategory(entry, request)
+    if (category === "read") throw new GwsError("CATEGORY_MISMATCH", `'${entry.id}' is read, so there is nothing to plan`, { next: "Run it with gws_read." })
     if (!isCommittable(category)) {
-      throw new GwsError("POLICY_DENIED", `'${entry.id}' is ${category} and cannot be planned for commit`, {
-        next: category === "read" ? "Run it with gws_read." : "Tell the user the plugin never runs it.",
-      })
+      throw new GwsError("POLICY_DENIED", `'${entry.id}' is ${category} and cannot be planned for commit`, { next: "Tell the user the plugin never runs it." })
     }
     // The recipient constraints need reads; plan() evaluates again with them.
     const decision = evaluatePolicy(this.runtime.config, entry, category, request, "pending")

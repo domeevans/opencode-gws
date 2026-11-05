@@ -40,8 +40,8 @@ export const ErrorCode = {
   },
   POLICY_DENIED: {
     meaning:
-      "Plugin policy refused the call: the category, the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",
-    next: "Do not work around it. If the message says to use gws_plan, plan the change; otherwise tell the user, who can change the plugin policy.",
+      "Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final.",
+    next: "Do not work around it; tell the user, who can change the plugin policy.",
   },
   RECIPIENTS_UNKNOWN: {
     meaning:
@@ -72,8 +72,8 @@ export const ErrorCode = {
     next: "Plan again from the session and agent that will commit it.",
   },
   CATEGORY_MISMATCH: {
-    meaning: "The commit tool does not match the plan's category.",
-    next: "Commit with the tool named by the plan's category.",
+    meaning: "The tool does not match the operation's or the plan's category: a change sent to gws_read, a read sent to gws_plan, or a plan committed with another category's tool.",
+    next: "Call the tool the message names.",
   },
 
   // ── Scripts (the tools RPC) ───────────────────────────────────────────

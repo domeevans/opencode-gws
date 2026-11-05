@@ -93,7 +93,7 @@ export class PlanStore {
       throw new GwsError("PLAN_CALLER_MISMATCH", "a plan is bound to the session and agent that created it")
     }
     if (plan.category !== binding.category) {
-      throw new GwsError("CATEGORY_MISMATCH", "use the commit tool that matches the plan category", { next: "Commit with the tool named by the plan's category, passing only {planId}." })
+      throw new GwsError("CATEGORY_MISMATCH", `this is a ${plan.category} plan`, { next: `Commit it with gws_${plan.category}, passing only {planId}.` })
     }
     return plan
   }

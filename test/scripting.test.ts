@@ -242,9 +242,9 @@ describe("refusals", () => {
     expect(h.asserts).toEqual([])
   })
 
-  it("refuses a change through read with POLICY_DENIED", async () => {
+  it("refuses a change through read with CATEGORY_MISMATCH", async () => {
     const h = await setup()
-    expect(await call(h, "read", { ...get, operation: "gmail.users.messages.trash" })).toMatchObject(failure("POLICY_DENIED"))
+    expect(await call(h, "read", { ...get, operation: "gmail.users.messages.trash" })).toMatchObject(failure("CATEGORY_MISMATCH"))
     expect(invocations(h.runtime)).toEqual([])
   })
 

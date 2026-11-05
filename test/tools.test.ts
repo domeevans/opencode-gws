@@ -515,8 +515,18 @@ describe("commit permission assertions", () => {
   it("refuses the wrong commit tool before asking", async () => {
     const h = await setup({})
     const planId = await plan(h)
-    await expect(tool(h, "write").execute({ planId }, context())).rejects.toThrow(/CATEGORY_MISMATCH/)
+    await expect(tool(h, "write").execute({ planId }, context())).rejects.toThrow(/^CATEGORY_MISMATCH: This is a send plan\. Next step: Commit it with gws_send, passing only \{planId\}\.$/)
     expect(h.calls.map((call) => call.action)).toEqual(["gws.plan"])
+  })
+
+  // A routing mistake is not a policy deny: the next step names the right tool, and the call can succeed there.
+  it("sends a change on gws_read and a read on gws_plan to the right tool with CATEGORY_MISMATCH, before asking", async () => {
+    const h = await setup({})
+    await expect(tool(h, "read").execute(sendRequest, context())).rejects.toThrow(/^CATEGORY_MISMATCH: .*Next step: Call gws_plan with the same request/)
+    await expect(tool(h, "read").execute(request("gmail.send", { input: { to: "a@example.com", subject: "s", body: "b" } }), context())).rejects.toThrow(/^CATEGORY_MISMATCH: .*Next step: Call gws_plan/)
+    await expect(tool(h, "plan").execute(listRequest, context())).rejects.toThrow(/^CATEGORY_MISMATCH: .*Next step: Run it with gws_read\.$/)
+    expect(h.calls).toEqual([])
+    expect(gwsInvocations()).toEqual([])
   })
 })
 
