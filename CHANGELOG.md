@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The `/connect` sign-in mark on an account now clears. The plugin read the mark back from
+  `integration.connection.active`, which returns the credential without its status, so it never saw its own report: after
+  Google rejected a sign-in, the account kept asking for a new one in `/gws-status`, the status RPC and `gws_status` once
+  it worked again. It now reads the status from `integration.get`, which projects it.
+
 ## [0.0.7] - 2026-11-05
 
 ### Added

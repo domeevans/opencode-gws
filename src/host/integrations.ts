@@ -190,6 +190,20 @@ export function integrationTokenProvider(
 }
 
 /**
+ * Whether /connect shows this credential as needing a sign-in. `connection.active` returns the credential alone, so
+ * the status the host keeps is read from the connection `integration.get` projects.
+ */
+async function showsNeedsAuth(ctx: PluginContext, integrationID: string, connectionID: string): Promise<boolean> {
+  try {
+    const { data } = await ctx.integration.get({ integrationID })
+    const shown = data.connections?.find((item) => item.type === "credential" && item.id === connectionID)
+    return shown?.type === "credential" && shown.status?.status === "needs_auth"
+  } catch {
+    return false
+  }
+}
+
+/**
  * An interactive account's connection for status: whether it exists,
  * whether the host marked it as needing sign-in, and the stored sign-in's
  * access, client source, and granted scopes. Never a token or secret.
@@ -204,7 +218,7 @@ export function integrationConnection(
     if (!id) return { connected: false, needsAuth: false }
     const connection = await lifetime.wait(() => ctx.integration.connection.active(id), signal)
     if (!connection) return { connected: false, needsAuth: false }
-    const needsAuth = connection.status?.status === "needs_auth"
+    const needsAuth = connection.type === "credential" && (await lifetime.wait(() => showsNeedsAuth(ctx, id, connection.id), signal))
     let credential: Credential.Value | undefined
     try {
       credential = await lifetime.wait(() => ctx.integration.connection.resolve(connection), signal)
