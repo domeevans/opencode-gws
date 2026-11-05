@@ -65,6 +65,7 @@ export function buildCommand(
       { next: "Retry with fields naming only what the user needs; gws_schema shows the response fields." },
     )
   }
+  if (typeof params["fields"] === "string") checkMask(params["fields"])
   if (request.upload && entry.httpMethod === "GET") {
     throw new GwsError("GWS_VALIDATION_ERROR", `${entry.id} is a read and cannot upload media`)
   }
@@ -126,6 +127,19 @@ export function buildCommand(
       category,
     },
   }
+}
+
+/**
+ * FIELDS_INVALID unless every `(` in a field mask has one `)` after it.
+ * Google answers an unbalanced mask with a 400 that names no argument.
+ */
+function checkMask(mask: string): void {
+  let open = 0
+  for (const [index, char] of [...mask].entries()) {
+    if (char === "(") open += 1
+    else if (char === ")" && --open < 0) throw new GwsError("FIELDS_INVALID", `'${mask}' has an extra ')' at character ${index + 1}`)
+  }
+  if (open > 0) throw new GwsError("FIELDS_INVALID", `'${mask}' leaves ${open} '(' unclosed`)
 }
 
 function redactParams(params: Record<string, unknown>): Record<string, unknown> {
