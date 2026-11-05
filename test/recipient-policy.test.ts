@@ -122,6 +122,22 @@ describe("recipients the request does not carry", () => {
     await expect(gws.plan({ operation: "gmail.reply", input: { messageId: "m1", body: "hi" } }, ctx)).rejects.toThrow(/^RECIPIENTS_UNKNOWN: .*message being replied to/)
   })
 
+  // A draft reaches no one until gmail.users.drafts.send, which reads its recipients then.
+  it.each([
+    ["gmail.send", { to: "evil@evil.com", subject: "s", body: "b" }],
+    ["gmail.reply", { messageId: "m1", body: "hi" }],
+    ["gmail.reply-all", { messageId: "m1", body: "hi" }],
+    ["gmail.forward", { messageId: "m1", to: "evil@evil.com" }],
+  ])("plans %s with draft: true as a write that reaches no one, without reading the original", async (operation, input) => {
+    const gws = await runtime([DOMAIN_RULE, INTERNAL_RULE])
+    responses({ "gmail.users.messages.get": null, "gmail.users.getProfile": null })
+    const plan = await gws.plan({ operation, input: { ...input, draft: true } }, ctx)
+    expect(plan).toMatchObject({ category: "write", preview: { category: "write" } })
+    expect(plan.preview).not.toHaveProperty("recipients")
+    expect(plan.preview).not.toHaveProperty("recipientsUnknown")
+    await expect(gws.plan({ operation, input }, ctx)).rejects.toThrow(/^(POLICY_DENIED|RECIPIENTS_UNKNOWN):/)
+  })
+
   it("reads a draft's stored recipients before sending it", async () => {
     const gws = await runtime([DOMAIN_RULE])
     const draft = { operation: "gmail.users.drafts.send", params: { userId: "me" }, body: { id: "d1" } }

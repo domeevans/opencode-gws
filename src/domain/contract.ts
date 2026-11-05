@@ -161,7 +161,7 @@ const CatalogEntry = z.object({
   id: z.string().describe("Pass a method or helper id as operation"),
   service: z.string(),
   description: z.string(),
-  category: Category.optional().describe("The manifest category; a request can raise it, and the plan's category is final"),
+  category: Category.optional().describe("The manifest category; a request can change it (a notifying event write is send, a trash is delete, a draft is write), and the plan's category is final"),
   httpMethod: z.string().optional(),
   path: z.string().optional(),
   executable: z.boolean().describe("The plugin can run it (a service: at least one of its operations); false for denied, deploy, and watch entries"),

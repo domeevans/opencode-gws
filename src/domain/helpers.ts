@@ -30,9 +30,29 @@ export interface HelperCommand {
 export interface HelperAdapter {
   id: string
   service: string
+  /** The manifest category; categoryOf refines it for one input. */
   category: Category
+  /** The category of this input, when it differs from the manifest's, such as a draft. */
+  categoryOf?(input: unknown): Category
   inputSchema: z.ZodType<unknown>
   build(input: unknown, request: Request): HelperCommand
+}
+
+/** The category a helper call commits as. */
+export function helperCategory(adapter: HelperAdapter, input: unknown): Category {
+  return adapter.categoryOf?.(input) ?? adapter.category
+}
+
+/** A mail helper with draft: true only saves a draft, which reaches no one, so it is a write; gmail.users.drafts.send is the send. */
+function mailCategory(input: unknown): "send" | "write" {
+  return typeof input === "object" && input !== null && (input as { draft?: unknown }).draft === true ? "write" : "send"
+}
+
+/** A mail preview: a send lists who it reaches, a draft only who it is addressed to. */
+function mailPreview<T extends { recipients: string[] }>(category: "send" | "write", preview: T): Omit<T, "recipients"> | T {
+  if (category === "send") return preview
+  const { recipients: _none, ...draft } = preview
+  return draft
 }
 
 function emails(value: string | string[] | undefined): string[] {
@@ -90,24 +110,26 @@ const gmailSend: HelperAdapter = {
   id: "gmail.send",
   service: "gmail",
   category: "send",
+  categoryOf: mailCategory,
   inputSchema: z.strictObject(sendBase),
   build(input, request) {
     const parsed = this.inputSchema.parse(input) as z.infer<z.ZodObject<typeof sendBase>>
     const { argv, files } = sendArgv("+send", parsed)
+    const category = mailCategory(parsed)
     return {
       id: this.id,
-      category: "send",
+      category,
       argv,
       files,
-      preview: {
+      preview: mailPreview(category, {
         method: "gmail +send",
         params: { to: emails(parsed.to), cc: emails(parsed.cc), bcc: emails(parsed.bcc), subject: parsed.subject, draft: parsed.draft ?? false },
         bodySummary: bytes(parsed.body),
         recipients: [...emails(parsed.to), ...emails(parsed.cc), ...emails(parsed.bcc)],
         uploads: parsed.attachments,
         account: request.account,
-        category: "send",
-      },
+        category,
+      }),
     }
   },
 }
@@ -159,6 +181,7 @@ function replyAdapter(id: string, name: string, all: boolean): HelperAdapter {
     id,
     service: "gmail",
     category: "send",
+    categoryOf: mailCategory,
     inputSchema: z.strictObject(all ? replyAllBase : replyBase),
     build(input, request) {
       const parsed = this.inputSchema.parse(input) as z.infer<z.ZodObject<typeof replyAllBase>>
@@ -171,20 +194,21 @@ function replyAdapter(id: string, name: string, all: boolean): HelperAdapter {
       if (parsed.html) argv.push("--html")
       if (parsed.draft) argv.push("--draft")
       const files = attach(argv, parsed.attachments)
+      const category = mailCategory(parsed)
       return {
         id: this.id,
-        category: "send",
+        category,
         argv,
         files,
-        preview: {
+        preview: mailPreview(category, {
           method: `gmail ${name}`,
           params: { messageId: parsed.messageId, to: emails(parsed.to), cc: emails(parsed.cc), bcc: emails(parsed.bcc), ...(all ? { remove: emails(parsed.remove) } : {}), draft: parsed.draft ?? false },
           bodySummary: bytes(parsed.body),
           recipients: [...emails(parsed.to), ...emails(parsed.cc), ...emails(parsed.bcc)],
           uploads: parsed.attachments,
           account: request.account,
-          category: "send",
-        },
+          category,
+        }),
       }
     },
   }
@@ -207,6 +231,7 @@ const gmailForward: HelperAdapter = {
   id: "gmail.forward",
   service: "gmail",
   category: "send",
+  categoryOf: mailCategory,
   inputSchema: forwardSchema,
   build(input, request) {
     const parsed = this.inputSchema.parse(input) as z.infer<typeof forwardSchema>
@@ -219,20 +244,21 @@ const gmailForward: HelperAdapter = {
     if (parsed.draft) argv.push("--draft")
     if (parsed.noOriginalAttachments) argv.push("--no-original-attachments")
     const files = attach(argv, parsed.attachments)
+    const category = mailCategory(parsed)
     return {
       id: this.id,
-      category: "send",
+      category,
       argv,
       files,
-      preview: {
+      preview: mailPreview(category, {
         method: "gmail +forward",
         params: { messageId: parsed.messageId, to: emails(parsed.to), cc: emails(parsed.cc), bcc: emails(parsed.bcc), draft: parsed.draft ?? false },
         bodySummary: parsed.body ? bytes(parsed.body) : undefined,
         recipients: [...emails(parsed.to), ...emails(parsed.cc), ...emails(parsed.bcc)],
         uploads: parsed.attachments,
         account: request.account,
-        category: "send",
-      },
+        category,
+      }),
     }
   },
 }
