@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-gws",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Unofficial OpenCode plugin for Google Workspace (gws CLI)",
   "type": "module",
   "license": "MIT",
@@ -52,10 +52,10 @@
     "docs:coverage": "node scripts/generate-docs.mjs"
   },
   "optionalDependencies": {
-    "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.7",
-    "@joe-broadhead/opencode-gws-bin-darwin-x64": "0.0.7",
-    "@joe-broadhead/opencode-gws-bin-linux-arm64-gnu": "0.0.7",
-    "@joe-broadhead/opencode-gws-bin-linux-x64-gnu": "0.0.7"
+    "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.8",
+    "@joe-broadhead/opencode-gws-bin-darwin-x64": "0.0.8",
+    "@joe-broadhead/opencode-gws-bin-linux-arm64-gnu": "0.0.8",
+    "@joe-broadhead/opencode-gws-bin-linux-x64-gnu": "0.0.8"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",
@@ -175,7 +175,28 @@
         "relay": {
           "redirectField": "redirectUri",
           "portField": "callbackPort"
-        }
+        },
+        "account": {
+          "option": "accounts",
+          "label": "Account name",
+          "description": "A short name for this Google account, such as work or personal. The agent names it on every call. It gets every Google service your sign-in can use; when you sign in you choose Read-only or Read and write.",
+          "placeholder": "work",
+          "value": {
+            "mode": "interactive"
+          }
+        },
+        "hostClient": {
+          "id": "google",
+          "field": "clientJson",
+          "replaces": [
+            "clientId",
+            "clientSecret"
+          ]
+        },
+        "needed": [
+          "AUTH_REQUIRED",
+          "AUTH_SCOPE_MISSING"
+        ]
       }
     ],
     "contributes": {
