@@ -129,10 +129,8 @@ const configSchema = z.strictObject({
   execution: z
     .strictObject({
       timeoutMs: z.number().int().positive().optional(),
-      schemaTimeoutMs: z.number().int().positive().optional(),
       maxPages: z.number().int().positive().optional(),
       maxItems: z.number().int().positive().optional(),
-      pageDelayMs: z.number().int().nonnegative().optional(),
       maxStdoutBytes: z.number().int().positive().optional(),
       maxStderrBytes: z.number().int().positive().optional(),
       maxInlineBytes: z.number().int().positive().optional(),
@@ -145,15 +143,12 @@ const configSchema = z.strictObject({
   audit: z
     .strictObject({
       enabled: z.boolean().optional(),
-      sink: z.enum(["stderr", "jsonl"]).optional(),
       path: absolutePath.optional(),
     })
     .optional(),
   skills: z
     .strictObject({
       enabled: z.boolean().optional(),
-      include: z.array(z.string()).optional(),
-      exclude: z.array(z.string()).optional(),
     })
     .optional(),
   binary: z
@@ -174,7 +169,6 @@ const configSchema = z.strictObject({
 const DEFAULT_LIMITS = {
   maxPages: 10,
   maxItems: 1_000,
-  pageDelayMs: 100,
   maxStdoutBytes: 5 * 1024 * 1024,
   maxStderrBytes: 1 * 1024 * 1024,
   maxInlineBytes: 256 * 1024,
@@ -272,10 +266,8 @@ export function loadConfig(raw: unknown): PluginConfig {
     },
     execution: {
       timeoutMs: parsed.execution?.timeoutMs ?? 120_000,
-      schemaTimeoutMs: parsed.execution?.schemaTimeoutMs ?? 15_000,
       maxPages: parsed.execution?.maxPages ?? DEFAULT_LIMITS.maxPages,
       maxItems: parsed.execution?.maxItems ?? DEFAULT_LIMITS.maxItems,
-      pageDelayMs: parsed.execution?.pageDelayMs ?? DEFAULT_LIMITS.pageDelayMs,
       maxStdoutBytes: parsed.execution?.maxStdoutBytes ?? DEFAULT_LIMITS.maxStdoutBytes,
       maxStderrBytes: parsed.execution?.maxStderrBytes ?? DEFAULT_LIMITS.maxStderrBytes,
       maxInlineBytes: parsed.execution?.maxInlineBytes ?? DEFAULT_LIMITS.maxInlineBytes,
@@ -286,13 +278,10 @@ export function loadConfig(raw: unknown): PluginConfig {
     },
     audit: {
       enabled: parsed.audit?.enabled ?? true,
-      sink: parsed.audit?.sink ?? "jsonl",
       path: parsed.audit?.path,
     },
     skills: {
       enabled: parsed.skills?.enabled ?? true,
-      include: parsed.skills?.include ?? [],
-      exclude: parsed.skills?.exclude ?? [],
     },
     admin: {
       enabled: parsed.admin?.enabled ?? true,

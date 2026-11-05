@@ -27,7 +27,7 @@ describe("model-facing service scoping", () => {
     expect(entries.every((entry) => entry.service === "gmail")).toBe(true)
   })
 
-  it("still registers the three skills when only some services are visible", async () => {
+  it("still registers both skills when only some services are visible", async () => {
     const config = scoped()
     const added: Array<{ id: string }> = []
     const registered = await registerSkills(
@@ -39,9 +39,8 @@ describe("model-facing service scoping", () => {
         },
       } as never,
       config,
-      new Set(["gmail"]),
     )
-    expect(registered).toBe(3)
-    expect(added.map((skill) => skill.id)).toEqual(["opencode-gws", "opencode-gws-recipes", "opencode-gws-admin"])
+    expect(registered).toBe(2)
+    expect(added.map((skill) => skill.id)).toEqual(["opencode-gws", "opencode-gws-recipes"])
   })
 })

@@ -19,6 +19,9 @@ import { SchemaClient } from "../process/schema.js"
 import { Accounts, type CallContext, type RuntimeOptions } from "./accounts.js"
 import { Operations, type SchemaTarget, type Target } from "./operations.js"
 
+/** How long one `gws schema` lookup may take. */
+const SCHEMA_TIMEOUT_MS = 15_000
+
 /**
  * The orchestrator: owns the lifecycle, the binary, the work directory,
  * the plan store and audit, and composes account work (accounts.ts) with
@@ -65,7 +68,7 @@ export class Runtime {
     this.paths = options.paths ?? pluginPaths()
     this.workDir = createWorkDir()
     this.audit = new Audit({ ...config.audit, path: config.audit.path ?? join(this.paths.stateDir, "audit.jsonl") }, options.pluginVersion)
-    this.schema = new SchemaClient(binary, this.workDir, localEnv(this.workDir, ownedDir(join(this.paths.cacheDir, "discovery"))), config.execution.schemaTimeoutMs)
+    this.schema = new SchemaClient(binary, this.workDir, localEnv(this.workDir, ownedDir(join(this.paths.cacheDir, "discovery"))), SCHEMA_TIMEOUT_MS)
     this.accounts = new Accounts(this)
     this.operations = new Operations(this, this.accounts)
   }

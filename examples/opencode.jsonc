@@ -61,12 +61,7 @@
           "maxItems": 1000
         },
         "audit": {
-          "enabled": true,
-          "sink": "jsonl"
-        },
-        "skills": {
-          "enabled": true,
-          "exclude": []
+          "enabled": true
         },
         "admin": {
           "enabled": false,

@@ -64,7 +64,7 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
     await registerApprovalRules(ctx)
     const status = statusSource(runtime, agentLister(ctx))
     await registerTools(ctx, runtime, status)
-    await registerSkills(ctx, config, runtime.visibleServices())
+    await registerSkills(ctx, config)
     stopRpc = await registerRpc(ctx, runtime, status)
     stopScripting = await registerScripting(ctx, runtime, status)
     stopCommands = await registerCommands(ctx, { status, plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary), doctor: runtime }, runtime.signal)

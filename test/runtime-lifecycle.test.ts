@@ -26,7 +26,7 @@ async function fixture(options: { permission?: (request: PermissionRequest) => P
   writeFileSync(binary, `#!/bin/sh\nif [ "$1" = "--version" ]; then echo 'gws 0.22.5'; exit 0; fi\necho "$*" >> '${log}'\n${options.slow ? `echo $$ > '${pid}'\nexec /bin/sleep 30` : `printf '{"id":"fixture"}'`}\n`)
   chmodSync(binary, 0o755)
   const runtime = await testRuntime(
-    { binary: { path: binary }, accounts: { personal: account({ services: ["drive"] }) }, audit: { enabled: options.failedAudit ?? false, sink: "jsonl", path: dir } },
+    { binary: { path: binary }, accounts: { personal: account({ services: ["drive"] }) }, audit: { enabled: options.failedAudit ?? false, path: dir } },
     options.token ? { tokenProvider: options.token } : {},
   )
   cleanups.push(async () => { await runtime.close(); rmSync(dir, { recursive: true, force: true }) })

@@ -43,7 +43,7 @@ An account whose config sets `access` to read, with no write service, does not o
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
 | `execution` | see below | Timeouts, page caps, and file roots. |
 | `audit` | JSONL in the state directory | Audit sink. |
-| `skills` | all three skills enabled | `enabled`, `include`, `exclude`. Ids are `opencode-gws`, `opencode-gws-recipes`, and `opencode-gws-admin`. |
+| `skills` | both skills enabled | `enabled`. The ids are `opencode-gws` and `opencode-gws-recipes`. |
 | `admin` | enabled, every admin service, reason required | The admin gate. See [admin.md](admin.md). |
 
 ## Policy
@@ -134,10 +134,8 @@ Details are in [admin.md](admin.md).
 | Key | Default |
 | --- | --- |
 | `timeoutMs` | `120000` |
-| `schemaTimeoutMs` | `15000` |
 | `maxPages` | `10` |
 | `maxItems` | `1000` |
-| `pageDelayMs` | `100` |
 | `maxStdoutBytes` | 5 MiB |
 | `maxStderrBytes` | 1 MiB |
 | `maxInlineBytes` | 256 KiB |
@@ -151,14 +149,13 @@ Requested pagination is clamped to these caps and to any matching policy rule. A
 ## Audit
 
 ```jsonc
-{ "audit": { "enabled": true, "sink": "jsonl" } }
+{ "audit": { "enabled": true } }
 ```
 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | `true` | Write audit records. |
-| `sink` | `"jsonl"` | `"jsonl"` or `"stderr"`. |
-| `path` | `<stateDir>/audit.jsonl` | Absolute path of the JSONL file, when `sink` is `jsonl`. |
+| `path` | `<stateDir>/audit.jsonl` | Absolute path of the JSONL file. |
 
 The state directory is `$XDG_STATE_HOME/opencode-gws` when that variable is an absolute path, otherwise `~/Library/Application Support/opencode-gws` on macOS and `~/.local/state/opencode-gws` elsewhere. The file is capped at 5 MiB: a write that would pass the cap first moves it to `audit.jsonl.1`, replacing the previous one, so the log takes at most about 10 MiB. Every start writes one `plugin.loaded` record. Records contain the operation, account, category, duration, and outcome, and `caller: "rpc"` for a read or plan a script made through the [tools RPC](scripting.md). They do not contain bodies, tokens, credentials, or file contents.
 
@@ -167,16 +164,10 @@ A sink failure does not turn a completed operation into an error. Status keeps `
 ## Skills
 
 ```jsonc
-{ "skills": { "enabled": true, "include": [], "exclude": ["opencode-gws-admin"] } }
+{ "skills": { "enabled": false } }
 ```
 
-| Id | Loaded automatically |
-| --- | --- |
-| `opencode-gws` | yes |
-| `opencode-gws-recipes` | yes |
-| `opencode-gws-admin` | no |
-
-`include`, when non-empty, is the only set registered. `exclude` removes ids from that set. Service detail comes from `gws_catalog` and `gws_schema`, not from a skill per service.
+Two skills load automatically: `opencode-gws` (how the tools work: accounts, plan and commit, errors) and `opencode-gws-recipes` (requests for Gmail, Calendar, Drive, Docs, Sheets and the workflow helpers). `enabled: false` registers neither. Service detail comes from `gws_catalog` and `gws_schema`, not from a skill per service.
 
 ## Binary
 

@@ -126,10 +126,8 @@ interface PolicyConfig {
 
 interface ExecutionConfig {
   timeoutMs: number
-  schemaTimeoutMs: number
   maxPages: number
   maxItems: number
-  pageDelayMs: number
   maxStdoutBytes: number
   maxStderrBytes: number
   maxInlineBytes: number
@@ -141,15 +139,12 @@ interface ExecutionConfig {
 
 interface AuditConfig {
   enabled: boolean
-  sink: "stderr" | "jsonl"
   /** The JSONL file; the runtime defaults it to `<stateDir>/audit.jsonl`. */
   path?: string
 }
 
 interface SkillsConfig {
   enabled: boolean
-  include: string[]
-  exclude: string[]
 }
 
 interface BinaryConfig {

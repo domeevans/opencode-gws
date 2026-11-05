@@ -40,6 +40,9 @@ function pageSize(params: Record<string, unknown>): number | undefined {
 /** Services whose list responses hold their entries in `items`, not in a field named after the resource. */
 const ITEMS_LISTS = new Set(["calendar", "tasks", "admin-reports"])
 
+/** The pause between pages when a read sets no pagination.delayMs. */
+const PAGE_DELAY_MS = 100
+
 /** An example mask for a list or search, from the service's own resource name: the entries' field, then the page token. */
 export function maskExample(entry: Pick<MethodEntry, "id" | "service">): string {
   const resource = entry.id.split(".").at(-2)
@@ -97,7 +100,7 @@ export function buildCommand(
     let pages = Math.min(pagination.maxPages ?? limits.maxPages, limits.maxPages)
     const size = pageSize(params)
     if (pagination.maxItems !== undefined && size !== undefined) pages = Math.min(pages, Math.ceil(itemCap(request, limits) / size))
-    const delay = Math.max(pagination.delayMs ?? config.execution.pageDelayMs, 0)
+    const delay = Math.max(pagination.delayMs ?? PAGE_DELAY_MS, 0)
     argv.push("--page-all", "--page-limit", String(pages), "--page-delay", String(delay))
   }
   argv.push("--format", "json")

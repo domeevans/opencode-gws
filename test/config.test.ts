@@ -39,8 +39,11 @@ describe("config", () => {
   })
 
   it("defaults the audit sink to JSONL in the plugin's state directory", () => {
-    expect(testConfig().audit).toEqual({ enabled: true, sink: "jsonl", path: undefined })
-    expect(testConfig({ audit: { sink: "stderr" } }).audit.sink).toBe("stderr")
+    expect(testConfig().audit).toEqual({ enabled: true, path: undefined })
+    // Removed options are refused, not ignored.
+    for (const removed of [{ audit: { sink: "stderr" } }, { skills: { exclude: [] } }, { execution: { pageDelayMs: 0 } }, { execution: { schemaTimeoutMs: 1 } }]) {
+      expect(() => testConfig(removed), JSON.stringify(removed)).toThrow(/OPTIONS_INVALID/)
+    }
   })
 })
 

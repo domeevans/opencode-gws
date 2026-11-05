@@ -1,5 +1,4 @@
 import { mkdir, rename, stat, writeFile } from "node:fs/promises"
-import { write } from "node:fs"
 import { dirname } from "node:path"
 import { GwsError, isErrorCode } from "./errors.js"
 import { commandIndex } from "./manifest.js"
@@ -47,21 +46,17 @@ export class Audit {
   private readonly write: Writer
 
   constructor(
-    private readonly config: { enabled: boolean; sink: "stderr" | "jsonl"; path?: string },
+    private readonly config: { enabled: boolean; path: string },
     private readonly version: string,
     writer?: Writer,
   ) {
     this.write = writer ?? (async (line, signal) => {
-      if (this.config.sink === "jsonl" && this.config.path) {
-        await mkdir(dirname(this.config.path), { recursive: true, mode: 0o700 })
-        if (signal.aborted) return
-        const size = await stat(this.config.path).then((found) => found.size, () => 0)
-        if (size > 0 && size + Buffer.byteLength(line) > AUDIT_MAX_BYTES) await rename(this.config.path, `${this.config.path}.1`)
-        if (signal.aborted) return
-        await writeFile(this.config.path, line, { flag: "a", mode: 0o600, signal })
-      } else {
-        await writeStderr(line, signal)
-      }
+      await mkdir(dirname(this.config.path), { recursive: true, mode: 0o700 })
+      if (signal.aborted) return
+      const size = await stat(this.config.path).then((found) => found.size, () => 0)
+      if (size > 0 && size + Buffer.byteLength(line) > AUDIT_MAX_BYTES) await rename(this.config.path, `${this.config.path}.1`)
+      if (signal.aborted) return
+      await writeFile(this.config.path, line, { flag: "a", mode: 0o600, signal })
     })
   }
 
@@ -115,19 +110,5 @@ export class Audit {
       clearTimeout(this.active.timer)
       this.active.controller.abort()
     }
-  }
-}
-
-/** Use the fd API so a closed pipe cannot emit an unhandled stream error. */
-async function writeStderr(line: string, signal: AbortSignal): Promise<void> {
-  const bytes = Buffer.from(`[opencode-gws] ${line}`)
-  let offset = 0
-  while (offset < bytes.length) {
-    if (signal.aborted) return
-    const written = await new Promise<number>((resolve, reject) => {
-      write(2, bytes, offset, bytes.length - offset, null, (error, count) => error ? reject(error) : resolve(count))
-    })
-    if (written === 0) throw new Error("Audit write made no progress")
-    offset += written
   }
 }

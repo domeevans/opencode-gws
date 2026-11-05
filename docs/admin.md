@@ -60,5 +60,3 @@ A read on an admin-class service is still a read: `gws_read`, no admin gate. A w
 ## Services
 
 The default allowlist follows the manifest. It includes every service with an admin-class method or helper: `admin-reports`, `drive`, and `modelarmor`. No Model Armor helper can run, and no account enables Model Armor by default. Apps Script deployments and Workspace Events subscriptions are deploy or watch, so they never run.
-
-High-risk services (`admin-reports`, `script`, `events`, `modelarmor`, `workflow`) are documented in the `opencode-gws-admin` skill, which is not loaded automatically. Enabling the skill does not enable the gate.

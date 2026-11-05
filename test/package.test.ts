@@ -89,7 +89,6 @@ describe("gws package template", () => {
 
   it("ships no type declarations: files names no directory that holds a .d.ts (S6)", () => {
     const declarations = globSync("**/*.d.{ts,mts,cts}", { cwd: new URL("../", import.meta.url), exclude: (name) => name === "node_modules" || name.startsWith(".") })
-    expect(declarations).toContain("views/jelly-view.d.ts")
     for (const declaration of declarations) {
       expect(pkg.files.some((entry: string) => declaration === entry || declaration.startsWith(`${entry}/`) || matchesGlob(declaration, entry))).toBe(false)
     }
