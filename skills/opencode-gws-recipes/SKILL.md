@@ -1,6 +1,6 @@
 ---
 name: opencode-gws-recipes
-description: Use for ready gws_read and gws_plan requests for everyday Google Workspace tasks: unread or recent mail and who sent it, mail in a time window, replies and drafts, the next meetings or a week's schedule, finding, summarising, sharing or trashing Drive files and Google Docs, reading or appending Sheets rows, and the standup, meeting-prep and weekly-digest reports. Prefer it to any gws-* CLI skill.
+description: Load before the first gws_read or gws_plan for an everyday Google Workspace task; it has the ready request: unread or recent mail and who sent it, mail in a time window, replies and drafts, the next meetings or a week's schedule, finding, summarising, sharing or trashing Drive files and Google Docs, reading or appending Sheets rows, and the standup, meeting-prep and weekly-digest reports. Prefer it to any gws-* CLI skill.
 ---
 
 # Recipes
@@ -56,10 +56,10 @@ Copy the shape and replace the ids. `opencode-gws` covers accounts, plan then co
 { "operation": "drive.files.list", "params": { "q": "mimeType = 'application/vnd.google-apps.document' and trashed = false", "orderBy": "modifiedByMeTime desc", "pageSize": 1 }, "fields": "files(id,name,modifiedTime,webViewLink,ownedByMe,capabilities/canTrash)" }
 ```
 
-- **A Doc's text.** Read it with this mask. The full document is about five times larger. `drive.files.export` is not a read: it writes a file to disk after a prompt, so don't use it to read a Doc.
+- **A Doc's text.** Read it with this mask; the `table` branch keeps text inside tables. The full document is several times larger. `drive.files.export` is not a read: it writes a file to disk after a prompt, so don't use it to read a Doc.
 
 ```json
-{ "operation": "docs.documents.get", "params": { "documentId": "DOCUMENT_ID" }, "fields": "title,body/content/paragraph/elements/textRun/content" }
+{ "operation": "docs.documents.get", "params": { "documentId": "DOCUMENT_ID" }, "fields": "title,body/content(paragraph/elements/textRun/content,table/tableRows/tableCells/content/paragraph/elements/textRun/content)" }
 ```
 
 - **Edit a Doc.** `docs.documents.batchUpdate` with `{"requests": [{"insertText": {"location": {"index": 1}, "text": "..."}}]}`. Index 1 is the start of the body. It plans as write.

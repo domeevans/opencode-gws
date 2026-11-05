@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2026-11-05
+
+### Fixed
+
+- With only the `opencode-gws` skill loaded, an agent could say that people a Doc is shared with lose access while it is in the bin. They keep access until it is permanently deleted. `opencode-gws` now states this itself: only the owner (or a shared-drive organizer) can move a file to the bin, and the owner can restore it for 30 days. It also says to ask for `ownedByMe` and `capabilities/canTrash` when finding the file, and that a move to the bin commits with `gws_delete`.
+- `opencode-gws` also gives two requests that were only in the recipes: `timeZone` in a Calendar list's `fields`, and the mask for a Doc's text. The Doc mask in both skills now includes text inside tables, which the old recipe mask dropped.
+- Agents now load `opencode-gws-recipes` more often: `opencode-gws` tells them to load it before building a request it has a recipe for, and the recipes description starts with "Load before the first gws_read or gws_plan".
+
 ## [0.0.5] - 2026-11-05
 
 ### Added
