@@ -10,7 +10,7 @@ import type { Category, Request } from "./types.js"
  * manifest still lists every helper so coverage is honest.
  */
 
-export interface HelperCommand {
+interface HelperCommand {
   id: string
   category: Category
   argv: string[]

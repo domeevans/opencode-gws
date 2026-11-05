@@ -40,7 +40,7 @@ export const ClientJsonSchema = z.union([
 ])
 
 /** An OAuth client option: a Desktop client's ID and secret, or Google's client JSON. */
-export const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema])
+const OAuthClientSchema = z.union([DesktopClientSchema, ClientJsonSchema])
 
 const accessLevel = z.enum(["read", "write"])
 

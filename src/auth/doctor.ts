@@ -55,7 +55,7 @@ export interface DoctorTarget {
  * run. ADMIN_PRIVILEGE_REQUIRED: Google accepted the sign-in but the
  * account lacks the admin privilege the service needs.
  */
-export type DoctorStatus = "OK" | "AUTH_REQUIRED" | "AUTH_SCOPE_MISSING" | "ADMIN_PRIVILEGE_REQUIRED" | "API_DISABLED" | "ERROR" | "SKIPPED" | "DENIED"
+type DoctorStatus = "OK" | "AUTH_REQUIRED" | "AUTH_SCOPE_MISSING" | "ADMIN_PRIVILEGE_REQUIRED" | "API_DISABLED" | "ERROR" | "SKIPPED" | "DENIED"
 
 export interface DoctorOutcome extends DoctorTarget {
   status: DoctorStatus

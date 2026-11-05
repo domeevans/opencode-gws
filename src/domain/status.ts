@@ -33,7 +33,7 @@ const Host = z.object({
 })
 
 /** The plugin's state, in the shared status names. */
-export const STATES = ["connected", "sign_in_required", "not_configured"] as const
+const STATES = ["connected", "sign_in_required", "not_configured"] as const
 
 export const StatusOutput = z.object({
   version: z.string().describe("The plugin's version"),
@@ -50,7 +50,7 @@ export const StatusOutput = z.object({
 
 export type StatusOutput = z.infer<typeof StatusOutput>
 
-export type AccountStatus = z.infer<typeof AccountStatus>
+type AccountStatus = z.infer<typeof AccountStatus>
 
 /** What the runtime knows without OpenCode: versions, the binary, and the accounts. */
 export interface RuntimeStatus {

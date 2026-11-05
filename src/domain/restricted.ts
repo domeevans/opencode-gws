@@ -81,7 +81,7 @@ export function appOnly(operation: string): boolean {
 }
 
 /** True when the scopes include one Google grants only through domain-wide delegation. */
-export function addsDelegationScope(scopes: readonly string[]): boolean {
+function addsDelegationScope(scopes: readonly string[]): boolean {
   return scopes.some((scope) => DELEGATION_SCOPES.includes(scope))
 }
 

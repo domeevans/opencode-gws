@@ -272,7 +272,7 @@ export class GwsError extends Error {
 }
 
 /** Starts `text` with a capital and ends it with a full stop unless it already ends a sentence. */
-export function sentence(text: string): string {
+function sentence(text: string): string {
   const trimmed = text.trim()
   const capital = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
   return /[.!?]$/.test(capital) ? capital : `${capital}.`

@@ -28,7 +28,7 @@ interface FieldBase {
   when?: Array<{ key: string; op: "eq"; value: string }>
 }
 
-export interface ClientField extends FieldBase {
+interface ClientField extends FieldBase {
   type: "string"
   placeholder: string
   /** The host refuses an answer that does not match, before the plugin runs. */
@@ -38,26 +38,26 @@ export interface ClientField extends FieldBase {
   hidden?: boolean
 }
 
-export interface AccessField extends FieldBase {
+interface AccessField extends FieldBase {
   type: "string"
   default: AccessLevel
   options: Array<{ value: AccessLevel; label: string; description: string }>
 }
 
-export interface ConfirmField extends FieldBase {
+interface ConfirmField extends FieldBase {
   type: "boolean"
   default: boolean
 }
 
 /** A field only a host fills: never shown. */
-export interface HostTextField extends FieldBase {
+interface HostTextField extends FieldBase {
   type: "string"
   hidden: true
   pattern?: string
   default?: string
 }
 
-export interface HostPortField extends FieldBase {
+interface HostPortField extends FieldBase {
   type: "integer"
   hidden: true
   minimum: 1

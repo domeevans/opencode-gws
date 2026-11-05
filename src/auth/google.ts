@@ -153,7 +153,7 @@ export function buildAuthorizeUrl(input: BuildAuthorizeUrlInput): string {
 }
 
 /** What redirect_uri_mismatch from Google means for this sign-in's redirect. */
-export function mismatchHint(redirectUri: string, fixed: boolean): string {
+function mismatchHint(redirectUri: string, fixed: boolean): string {
   if (!fixed) return "If Google shows redirect_uri_mismatch, the client is not a Desktop app."
   if (isLoopback(redirectUri)) {
     return `If Google shows redirect_uri_mismatch, use a Desktop app client, or a Web application client that lists ${redirectUri} exactly.`

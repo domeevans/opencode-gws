@@ -46,7 +46,7 @@ interface StoredManifest {
 }
 
 /** The stored form expanded to full entries: each method's service, path and method from its id. */
-export function expandManifest(stored: StoredManifest): Manifest {
+function expandManifest(stored: StoredManifest): Manifest {
   return {
     gwsVersion: stored.gwsVersion,
     generatedAt: stored.generatedAt,
@@ -61,9 +61,9 @@ export function expandManifest(stored: StoredManifest): Manifest {
   }
 }
 
-export function loadManifest(path = join(ROOT, "manifest", "generated.json")): Manifest {
+export function loadManifest(): Manifest {
   if (cached) return cached
-  cached = expandManifest(JSON.parse(readFileSync(path, "utf8")) as StoredManifest)
+  cached = expandManifest(JSON.parse(readFileSync(join(ROOT, "manifest", "generated.json"), "utf8")) as StoredManifest)
   return cached
 }
 
@@ -74,8 +74,9 @@ interface CommandIndex {
 
 let index: CommandIndex | undefined
 
-export function commandIndex(manifest: Manifest = loadManifest()): CommandIndex {
+export function commandIndex(): CommandIndex {
   if (index) return index
+  const manifest = loadManifest()
   const methods = new Map<string, MethodEntry>()
   const helpers = new Map<string, HelperEntry>()
   for (const service of manifest.services) {

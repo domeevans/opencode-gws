@@ -11,7 +11,7 @@ import type { Target } from "../runtime/operations.js"
  */
 
 /** A tool call in a session. */
-export interface ToolCall {
+interface ToolCall {
   sessionID: string
   agent: string
   messageID: string
