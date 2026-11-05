@@ -24,9 +24,7 @@ changes nothing in Jelly.
 
 `gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
 
-A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
-default. Keep `jelly.tools` in step with the known-tool list; `test/views.test.ts` checks
-each declared effect against the plugin's own default rules.
+`test/views.test.ts` checks each declared effect against the plugin's own default rules.
 
 ## Skills
 
@@ -54,5 +52,5 @@ Jelly folds the declared sign-ins into this plugin's one card, which shows each 
 
 ## Versions
 
-Jelly's curated catalogue pins an exact version. `latest` is `0.0.0`; publish each release
-under a new version so a review in Jelly can tell the two apart.
+Jelly's curated catalogue pins an exact version. Publish each release under a new version so a
+review in Jelly can tell the two apart.

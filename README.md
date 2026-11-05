@@ -32,7 +32,7 @@ opencode auth login gws-default
 
 No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 42 scopes (35 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
 
-To update, run `opencode plugin update @joe-broadhead/opencode-gws`, then `opencode reload`. An entry pinned to a version (`@joe-broadhead/opencode-gws@0.0.2`) does not update: remove the `@version` from `plugins` first. Your options and sign-ins are kept.
+To update, run `opencode plugin update @joe-broadhead/opencode-gws`, then `opencode reload`. An entry pinned to a version (`@joe-broadhead/opencode-gws@<version>`) does not update: remove the `@version` from `plugins` first. Your options and sign-ins are kept.
 
 Details and the scope table: [docs/auth.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md).
 
