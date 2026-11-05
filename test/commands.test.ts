@@ -170,6 +170,11 @@ describe("/gws-status", () => {
     for (const secret of [STORED_TOKEN, TEST_CLIENT.clientSecret]) expect(JSON.stringify(h.synthetic)).not.toContain(secret)
   })
 
+  it("names a skill that hides the plugin's own, before Tools", () => {
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Move it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shadowedSkills: [{ id: "opencode-gws", path: "/u/skills/opencode-gws/SKILL.md" }], unguardedAgents: [] }
+    expect(formatStatus(status)).toMatch(/\nHidden skills: opencode-gws \(hidden by \/u\/skills\/opencode-gws\/SKILL\.md\)\nTools: /)
+  })
+
   it("says Nothing to do. and marks an untested host", () => {
     const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     const text = formatStatus(status)

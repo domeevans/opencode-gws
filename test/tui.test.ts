@@ -297,6 +297,11 @@ describe("status dialog", () => {
     expect(view).toContain(`Agents without default rules\nnotes, docs\n${block}\nOpenCode`)
   })
 
+  it("names a skill that hides the plugin's own, before Tools", async () => {
+    const view = (await open(status([ACCOUNTS.signedIn], { shadowedSkills: [{ id: "opencode-gws", path: "/u/skills/opencode-gws/SKILL.md" }] }))).view()
+    expect(view).toContain("Hidden skills\nopencode-gws (hidden by /u/skills/opencode-gws/SKILL.md)\nTools")
+  })
+
   it("says when no account is configured", async () => {
     expect((await open(status([]))).view()).toContain("Connection\nnot configured")
   })

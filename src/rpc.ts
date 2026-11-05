@@ -53,6 +53,8 @@ export interface GwsStatus {
   accounts: GwsAccount[]
   /** Audit persistence has failed; omitted means false. */
   auditDegraded?: boolean
+  /** Skills with one of the plugin's skill ids from another file, which hide the plugin's own; present when any does. */
+  shadowedSkills?: { id: string; path: string }[]
   /** Agents that missed the default ask rules, so a commit there runs without asking. */
   unguardedAgents: string[]
   /** The permission block to add first in each unguarded agent's own permissions; present when any is unguarded. */
@@ -97,6 +99,7 @@ const status = object(
     services: texts,
     accounts: { type: "array", items: account },
     auditDegraded: { type: "boolean" },
+    shadowedSkills: { type: "array", items: object({ id: text, path: text }, ["id", "path"]) },
     unguardedAgents: texts,
     permissionsBlock: text,
     nextStep: text,
@@ -155,6 +158,7 @@ export function isStatus(value: unknown): value is GwsStatus {
     Array.isArray(value["accounts"]) &&
     value["accounts"].every(isAccount) &&
     optional(value["auditDegraded"], (entry) => typeof entry === "boolean") &&
+    optional(value["shadowedSkills"], (entry) => Array.isArray(entry) && entry.every((skill) => isRecord(skill) && isText(skill["id"]) && isText(skill["path"]))) &&
     isStrings(value["unguardedAgents"]) &&
     optional(value["permissionsBlock"], isText) &&
     isText(value["nextStep"])
@@ -180,6 +184,12 @@ export function connectionLabel(account: GwsAccount): "connected" | "sign-in req
 export function openCodeLabel(status: GwsStatus): string {
   const version = status.host.version ?? "unknown"
   return status.host.tested ? `${version} (tested)` : `${version} (host untested; supported range ${status.host.range})`
+}
+
+/** The row naming skills that hide the plugin's own, and its value. */
+export const SHADOWED_LABEL = "Hidden skills"
+export function shadowedText(status: GwsStatus): string {
+  return (status.shadowedSkills ?? []).map((skill) => `${skill.id} (hidden by ${skill.path})`).join(", ")
 }
 
 /** The row naming services that need domain-wide delegation. */

@@ -13,8 +13,9 @@ The palette command **Google Workspace: Status**, or `/gws` in the prompt, opens
 | Connection | per account: `connected`, `sign-in required`, or `not configured` (a headless account whose environment variable is unset) |
 | Account | the alias and how it signs in: OpenCode sign-in, credentials file, or access token |
 | Access | `read-only` or `read and write`, then the client, services, and granted and missing scopes |
+| Hidden skills | only when another skill file uses one of the plugin's skill ids, which hides the plugin's own: the id and that file |
 | Tools | the services whose gws tools the model sees |
-| Agents without default rules | their names and the block to put first in each agent's own `permissions` |
+| Agents without default rules | their names, then the rules to put first in each agent's own `permissions` |
 | OpenCode | the version, then `(tested)`, or `(host untested; supported range >=2.2.3 <2.3.0)` |
 | Next step | exactly one; `Nothing to do.` when nothing is needed |
 
@@ -46,9 +47,10 @@ Contract: `src/rpc.ts`, id `google-workspace.gws`, method `status` only. It is i
 | `services` | Model-facing services. |
 | `accounts` | One entry per account, below. |
 | `auditDegraded` | Present when the audit sink has failed. Omitted means false. |
+| `shadowedSkills` | `[{ id, path }]`: skills OpenCode lists under one of the plugin's skill ids but from another file, so the plugin's own does not load. Present when any does. |
 | `unguardedAgents` | Agents that missed the default ask rules, so a commit there runs without asking. |
 | `permissionsBlock` | The JSON block to add first in each of those agents' own `permissions`. Present when `unguardedAgents` is not empty. |
-| `nextStep` | The one thing to do next, as one sentence: an account's sign-in step, then the unguarded agents. `Nothing to do.` when nothing is needed. |
+| `nextStep` | The one thing to do next, as one sentence: an account's sign-in step, then a hidden skill, then the unguarded agents. `Nothing to do.` when nothing is needed. |
 
 An account entry is `{ alias, mode, services, integrationID?, connected, needsAuth?, access?, clientSource?, grantedScopes?, missingScopes?, delegationRequired?, nextStep? }`. `delegationRequired` names the enabled services that need domain-wide delegation (Keep) when the interactive account's scopes do not add them; the dialog and `/gws-status` show it as **Needs domain-wide delegation**.
 

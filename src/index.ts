@@ -8,7 +8,7 @@ import { planSummary, registerCommands } from "./host/commands.js"
 import { integrationAuthReporter, integrationConnection, integrationIds, integrationTokenProvider, registerIntegrations } from "./host/integrations.js"
 import { registerRpc, statusSource } from "./host/rpc.js"
 import { registerScripting } from "./host/scripting.js"
-import { registerSkills } from "./host/skills.js"
+import { registerSkills, skillLister } from "./host/skills.js"
 import { registerTools } from "./host/tools.js"
 import { Runtime } from "./runtime/index.js"
 
@@ -62,7 +62,7 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
   try {
     await registerIntegrations(ctx, config, ids)
     await registerApprovalRules(ctx)
-    const status = statusSource(runtime, agentLister(ctx))
+    const status = statusSource(runtime, agentLister(ctx), skillLister(ctx))
     await registerTools(ctx, runtime, status)
     await registerSkills(ctx, config)
     stopRpc = await registerRpc(ctx, runtime, status)

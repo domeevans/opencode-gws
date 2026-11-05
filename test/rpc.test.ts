@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { integrationConnection } from "../src/host/integrations.js"
 import { registerRpc, statusSource } from "../src/host/rpc.js"
+import { ownSkillPath } from "../src/host/skills.js"
 import { IDENTITY_SCOPES, SCOPE_PREFIX, requestedScopes } from "../src/domain/scopes.js"
 import { Gws, RPC_ID, isStatus } from "../src/rpc.js"
 import type { Runtime } from "../src/runtime/index.js"
@@ -50,6 +51,8 @@ interface SetupOptions {
   accounts?: Record<string, unknown>
   /** The agents OpenCode lists. */
   agents?: Array<{ id: string; permissions: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }>
+  /** The skills OpenCode lists. */
+  skills?: Array<{ id: string; path: string }>
 }
 
 async function setup(options: SetupOptions = {}): Promise<Harness> {
@@ -86,7 +89,7 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
   )
   const handlers: Record<string, Handler> = {}
   let disposed = false
-  const stop = await registerRpc(ctx as never, runtime, statusSource(runtime, async () => options.agents ?? []))
+  const stop = await registerRpc(ctx as never, runtime, statusSource(runtime, async () => options.agents ?? [], async () => options.skills ?? []))
   harness = { runtime, handlers, disposed: () => disposed, stop }
   return harness
 }
@@ -234,6 +237,19 @@ describe("status", () => {
     const allow = { action: "*", resource: "*", effect: "allow" as const }
     const h = await setup({ accounts: { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } }, agents: [{ id: "notes", permissions: [allow] }] })
     expect((await status(h))["nextStep"]).toBe("Put the default rules shown by /gws-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Google Workspace tools.")
+  })
+
+  // A user-level skill with the plugin's skill id wins, so the plugin's own never loads.
+  it("names a skill that hides one of the plugin's own, and makes moving it the next step", async () => {
+    vi.stubEnv("GWS_CREDENTIALS", "/dev/null")
+    const accounts = { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } }
+    const own = { id: "opencode-gws", path: ownSkillPath("opencode-gws") }
+    const clear = await status(await setup({ accounts, skills: [own, { id: "other", path: "/u/.claude/skills/other/SKILL.md" }] }))
+    expect(clear).not.toHaveProperty("shadowedSkills")
+    const shadow = { id: "opencode-gws-recipes", path: "/u/.claude/skills/opencode-gws-recipes/SKILL.md" }
+    const output = await status(await setup({ accounts, skills: [own, shadow] }))
+    expect(output["shadowedSkills"]).toEqual([shadow])
+    expect(output["nextStep"]).toBe("Move or rename the skill at /u/.claude/skills/opencode-gws-recipes/SKILL.md: its id opencode-gws-recipes hides the plugin's own skill.")
   })
 
   it("says Nothing to do. when every account is ready and every agent guarded", async () => {

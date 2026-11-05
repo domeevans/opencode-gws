@@ -2,6 +2,7 @@ import { Gws, NOTHING_TO_DO, UNGUARDED_NEXT_STEP, type GwsAccount, type GwsState
 import type { Runtime } from "../runtime/index.js"
 import { permissionsBlock, unguardedAgents, type Rule } from "./agents.js"
 import type { PluginContext } from "./context.js"
+import { shadowedSkills } from "./skills.js"
 
 /**
  * The plugin's one status model and the `google-workspace.gws` RPC that
@@ -13,11 +14,14 @@ import type { PluginContext } from "./context.js"
 export type StatusSource = (signal?: AbortSignal) => Promise<GwsStatus>
 
 type AgentList = () => Promise<readonly { readonly id: string; readonly permissions: readonly Rule[] }[]>
+type SkillList = () => Promise<readonly { readonly id: string; readonly path: string }[]>
 
-/** The first thing to do: an account's sign-in, then the unguarded agents. */
-function nextStep(accounts: readonly GwsAccount[], agents: readonly string[]): string | undefined {
+/** The first thing to do: an account's sign-in, then a skill that hides the plugin's own, then the unguarded agents. */
+function nextStep(accounts: readonly GwsAccount[], shadowed: readonly { id: string; path: string }[], agents: readonly string[]): string | undefined {
   const account = accounts.find((entry) => entry.nextStep)
   if (account?.nextStep) return accounts.length > 1 ? `${account.alias}: ${account.nextStep}` : account.nextStep
+  const [skill] = shadowed
+  if (skill) return `Move or rename the skill at ${skill.path}: its id ${skill.id} hides the plugin's own skill.`
   if (agents.length > 0) return UNGUARDED_NEXT_STEP
   return undefined
 }
@@ -35,11 +39,12 @@ function stateOf(accounts: readonly GwsAccount[]): GwsState {
 }
 
 /** Plugin status with each account's sign-in state and the unguarded agents. Never a token or a client secret. */
-export function statusSource(runtime: Runtime, listAgents: AgentList): StatusSource {
+export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills: SkillList = async () => []): StatusSource {
   return async (signal) => {
     const base = await runtime.status(signal)
     const agents = unguardedAgents(await runtime.wait(() => listAgents(), signal))
-    const next = nextStep(base.accounts, agents)
+    const shadowed = shadowedSkills(await runtime.wait(() => listSkills(), signal))
+    const next = nextStep(base.accounts, shadowed, agents)
     return {
       version: base.version,
       host: base.host,
@@ -48,6 +53,7 @@ export function statusSource(runtime: Runtime, listAgents: AgentList): StatusSou
       services: base.services,
       accounts: base.accounts,
       auditDegraded: base.auditDegraded,
+      ...(shadowed.length > 0 ? { shadowedSkills: shadowed } : {}),
       unguardedAgents: agents,
       ...(agents.length > 0 ? { permissionsBlock: permissionsBlock(agents) } : {}),
       nextStep: next ?? NOTHING_TO_DO,
