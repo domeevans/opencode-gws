@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Status names any other skill that tells agents to run `gws` in a shell, such as the gws CLI's own `gws-*` skills, which lead around the plugin's plans, approvals and policy. A skill counts when a line in one of its code blocks, or an inline code span, starts with `gws ` and a word (`gws gmail +triage`); prose that only names gws does not. They appear in the status RPC's new `shellSkills`, in a **Shell gws skills** row in `/gws-status` and the dialog, and in a next step to remove each one or move it out of its skills folder.
+
+### Changed
+
+- When no account here can use an admin-only service such as `admin-reports` (the `default` account leaves it out), its refusal's next step and `gws_catalog`'s `unavailable` reason now say the same thing: only a Workspace admin's account with the needed privilege can use it, so add a separate account alias for that admin with `enabledServices` including the service, not the service to an existing account. Before, the next step said to add the service to the plugin's services or to this account, which for anyone who isn't an admin ends in `ADMIN_PRIVILEGE_REQUIRED`.
+- `opencode-gws` says a script creates its own session and keeps its id, never one found through history or a session list, and that an answer that only shows a preview names the tool that would commit it.
+
+### Fixed
+
+- A `fields` mask whose parentheses don't balance is refused with `FIELDS_INVALID`, which names the extra `)` or the unclosed `(`, before gws runs. Google's own error for it names no argument.
+
 ## [0.0.6] - 2026-11-05
 
 ### Fixed
