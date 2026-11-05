@@ -1,4 +1,4 @@
-import { Gws, NOTHING_TO_DO, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
+import { Gws, NOTHING_TO_DO, UNGUARDED_NEXT_STEP, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
 import type { Runtime } from "../runtime/index.js"
 import { permissionsBlock, unguardedAgents, type Rule } from "./agents.js"
 import type { PluginContext } from "./context.js"
@@ -18,7 +18,7 @@ type AgentList = () => Promise<readonly { readonly id: string; readonly permissi
 function nextStep(accounts: readonly GwsAccount[], agents: readonly string[]): string | undefined {
   const account = accounts.find((entry) => entry.nextStep)
   if (account?.nextStep) return accounts.length > 1 ? `${account.alias}: ${account.nextStep}` : account.nextStep
-  if (agents.length > 0) return "Put the permission block first in the own permissions of each agent without default rules, followed by your top-level rules for gws actions."
+  if (agents.length > 0) return UNGUARDED_NEXT_STEP
   return undefined
 }
 

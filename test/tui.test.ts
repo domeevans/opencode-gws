@@ -294,7 +294,7 @@ describe("status dialog", () => {
   it("names the agents without default rules and shows the block to add first in their own permissions", async () => {
     const block = '{\n  "agents": {}\n}'
     const view = (await open(status([ACCOUNTS.signedIn], { unguardedAgents: ["notes", "docs"], permissionsBlock: block }))).view()
-    expect(view).toContain(`Agents without default rules\nnotes, docs\n${block}\nPut this block first in that agent's own permissions, followed by your top-level rules for gws actions.`)
+    expect(view).toContain(`Agents without default rules\nnotes, docs\n${block}\nOpenCode`)
   })
 
   it("says when no account is configured", async () => {

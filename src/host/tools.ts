@@ -104,8 +104,8 @@ async function compactStatus(status: StatusSource, signal?: AbortSignal): Promis
   return {
     ...rest,
     auditDegraded: auditDegraded === true,
-    unguardedAgents: count,
-    ...(count > 0 ? { permissions: `${count} agent${count === 1 ? "" : "s"} missed the ask rules, so commits there run without asking; /gws-status names them and gives the block to add.` } : {}),
+    unguardedAgentCount: count,
+    ...(count > 0 ? { permissions: `${count} agent${count === 1 ? " lacks" : "s lack"} the default rules, so commits there run without asking; /gws-status names them and shows the rules.` } : {}),
   }
 }
 

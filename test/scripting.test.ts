@@ -198,7 +198,7 @@ describe("a script's call", () => {
 
   it("answers status, catalog and schema through the same specs as the tools", async () => {
     const h = await setup()
-    expect(await call(h, "status", {})).toMatchObject({ accounts: [expect.objectContaining({ alias: "personal" })], unguardedAgents: 0 })
+    expect(await call(h, "status", {})).toMatchObject({ accounts: [expect.objectContaining({ alias: "personal" })], unguardedAgentCount: 0 })
     expect(await call(h, "catalog", { query: "send email", service: "gmail" })).toMatchObject({ entries: expect.arrayContaining([expect.objectContaining({ id: "gmail.users.messages.send" })]) })
     expect(await call(h, "schema", { operation: "gmail.users.messages.get" })).toMatchObject({ ok: true, account: "personal" })
     expect(h.asserts.map((request) => request.action)).toEqual(["gws.status", "gws.catalog", "gws.schema"])

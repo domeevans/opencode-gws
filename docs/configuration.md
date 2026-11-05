@@ -109,9 +109,9 @@ Write and export offer Always for that exact `<account>:<operation>`. Send, shar
 
 `opencode run` cannot answer an ask. To let a commit run there, add a user allow rule, for example `{ "action": "gws.write", "resource": "work:*", "effect": "allow" }`. A user `deny` hides that tool. A Plan-style or custom deny such as `{ "action": "gws.*", "resource": "*", "effect": "deny" }` still wins, because it is later than the inserted ask.
 
-An agent defined only in the user's config is created after plugins run, so it misses the inserted rules. `/gws-status` and the status dialog name those agents and give the block to add first in **that agent's own** `permissions`, followed by any rules already set for gws tools in the top-level `permissions`. Do not put the block in the top-level `permissions`: those rules apply after every agent's base rules and would loosen Explore.
+An agent defined only in the user's config is created after plugins run, so it misses the inserted rules. `/gws-status` and the status dialog name those agents and show the default rules. Put them first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put the block in the top-level `permissions`: those rules apply after every agent's base rules and would loosen Explore.
 
-`gws_status` gives the model only the count and points to `/gws-status`.
+`gws_status` gives the model only the count, `unguardedAgentCount`, and points to `/gws-status`.
 
 Saved Always is stored by OpenCode for that exact resource. It applies across agents in the project, Plan included. A directory with no git commit belongs to the shared `global` project, so an Always saved there is not limited to one folder.
 

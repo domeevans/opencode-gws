@@ -43,8 +43,8 @@ export const StatusOutput = z.object({
   services: z.array(z.string()).describe("Model-facing services"),
   accounts: z.array(AccountStatus),
   auditDegraded: z.boolean().describe("Audit records were dropped, failed, or exceeded the sink deadline; sticky until reload"),
-  unguardedAgents: z.number().int().describe("How many agents missed the default ask rules"),
-  permissions: z.string().optional().describe("Present when an agent missed the ask rules: where to find the fix"),
+  unguardedAgentCount: z.number().int().describe("How many agents lack the default ask rules; /gws-status names them"),
+  permissions: z.string().optional().describe("Present when an agent lacks the default rules: where to find the fix"),
   nextStep: z.string().describe('The one thing to do next; "Nothing to do." when nothing is needed'),
 })
 

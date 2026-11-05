@@ -137,9 +137,8 @@ describe("/gws-status", () => {
   it("names a config-only agent and gives the per-agent block, first in its own permissions", () => {
     const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: ["notes"], permissionsBlock: '{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}' }
     const text = formatStatus(status)
-    expect(text).toContain("Agents without default rules: notes")
-    expect(text).toContain('"action":"gws.write","resource":"*"')
-    expect(text).toContain("Put this block first in that agent's own permissions, followed by your top-level rules for gws actions.")
+    // The row lists names only, then the block; the one fixed sentence is the Next step.
+    expect(text).toContain('Agents without default rules: notes\n{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}\nOpenCode:')
   })
 
   it("renders the rows in the shared order, as plain text, with exactly one Next step", async () => {

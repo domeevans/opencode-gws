@@ -191,6 +191,6 @@ export function delegationText(account: GwsAccount): string {
   return `${services.join(", ")} (a Workspace admin sets it up; then add the scopes to accounts.${account.alias}.scopes)`
 }
 
-/** Where the permission block goes. */
-export const BLOCK_PLACEMENT =
-  "Put this block first in that agent's own permissions, followed by your top-level rules for gws actions. Never put it in the top-level permissions: that would loosen Explore."
+/** The Next step when an agent lacks the default rules: one fixed sentence, the same in every plugin. */
+export const UNGUARDED_NEXT_STEP =
+  "Put the default rules shown by /gws-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Google Workspace tools."

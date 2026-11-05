@@ -70,7 +70,7 @@ A later rule wins. Your own allow rule, or **Always** on a write or export, remo
 { "action": "gws.write", "resource": "work:*", "effect": "allow" }
 ```
 
-An agent defined only in your config does not get the ask rules. `/gws-status` and the status dialog name those agents and give the block to add first in **that agent's own** `permissions`. Do not put it in the top-level `permissions`: that would loosen Explore.
+An agent defined only in your config does not get the ask rules. `/gws-status` and the status dialog name those agents and show the default rules. Put them first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put them in the top-level `permissions`: that would loosen Explore.
 
 ## Configure
 

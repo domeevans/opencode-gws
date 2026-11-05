@@ -233,7 +233,7 @@ describe("status", () => {
     vi.stubEnv("GWS_CREDENTIALS", "/dev/null")
     const allow = { action: "*", resource: "*", effect: "allow" as const }
     const h = await setup({ accounts: { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } }, agents: [{ id: "notes", permissions: [allow] }] })
-    expect((await status(h))["nextStep"]).toBe("Put the permission block first in the own permissions of each agent without default rules, followed by your top-level rules for gws actions.")
+    expect((await status(h))["nextStep"]).toBe("Put the default rules shown by /gws-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Google Workspace tools.")
   })
 
   it("says Nothing to do. when every account is ready and every agent guarded", async () => {

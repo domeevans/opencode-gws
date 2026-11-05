@@ -26,7 +26,7 @@ Each command posts a message and does not start a model turn.
 
 | Command | What it posts |
 | --- | --- |
-| `/gws-status` | The status model: each account's mode, access, client source, granted and missing scopes, and next step; the Google Cloud steps for accounts that have no OAuth client yet; this session's pending plans, redacted (category, operation, account, preview, expiry; never argv, a body, or a token); agents that missed the ask rules, with the block to add in each agent's own permissions; and one next step. |
+| `/gws-status` | The status model: each account's mode, access, client source, granted and missing scopes, and next step; the Google Cloud steps for accounts that have no OAuth client yet; this session's pending plans, redacted (category, operation, account, preview, expiry; never argv, a body, or a token); agents without the default rules, by name, then the rules to add first in each one's own permissions; and one next step. |
 | `/gws-doctor` | One small read per enabled service per account. Reports `OK`, `AUTH_REQUIRED`, `AUTH_SCOPE_MISSING`, `ADMIN_PRIVILEGE_REQUIRED` (a valid sign-in without the admin privilege the service needs, with the next step), `API_DISABLED` (with the enable URL), `SKIPPED` (with the reason), or a denied `gws.read`. The summary counts every status but `OK` and `SKIPPED` as needing attention. |
 
 `/gws-doctor` asks for `gws.read` on `<account>:<operation>` before each probe, the same way `gws_read` does. A refusal stops the run.
