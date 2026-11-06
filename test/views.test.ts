@@ -1,9 +1,8 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
-import { ASK_RULES } from "../src/host/agents.js"
 
 /**
- * What Jelly reads from package.json, and the Gmail thread page it shows behind
+ * The views Jelly reads from package.json, and the Gmail thread page it shows behind
  * gws_read. A page runs sealed with no network: it carries Jelly's bridge helper
  * (views/jelly-view.js, the text of @jelly/contracts VIEW_HELPER) inline, loads
  * nothing by URL, and draws only the data Jelly hands it.
@@ -12,13 +11,7 @@ import { ASK_RULES } from "../src/host/agents.js"
 const root = new URL("../", import.meta.url)
 const manifest = JSON.parse(readFileSync(new URL("package.json", root), "utf8")) as {
   files: string[]
-  jelly: {
-    tools: { name: string; permission: string; effect: string; readOnly: boolean }[]
-    summary: string
-    icon: string
-    skills: string[]
-    views: { place: string; tools?: string[]; page?: string; grants: string[] }[]
-  }
+  jelly: { views: { place: string; tools?: string[]; page?: string; grants: string[] }[] }
 }
 const page = readFileSync(new URL("views/gmail-thread.html", root), "utf8")
 const helper = readFileSync(new URL("views/jelly-view.js", root), "utf8").trimEnd()
@@ -73,38 +66,5 @@ describe("the Gmail thread view", () => {
     expect(threadOf({ ok: true, operation: "gmail.users.messages.list", data: { messages: [] } })).toBeNull()
     expect(threadOf({ ok: true, operation: "gmail.users.threads.get", data: {} })).toBeNull()
     expect(threadOf(null)).toBeNull()
-  })
-})
-
-describe("the jelly declaration", () => {
-  it("asks for every commit the plugin asks for, admin included, and lets the reads run", () => {
-    const effect = new Map(manifest.jelly.tools.map((tool) => [tool.permission, tool.effect]))
-    for (const rule of ASK_RULES) expect(effect.get(rule.action), rule.action).toBe("ask")
-    for (const read of ["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan"]) expect(effect.get(read)).toBe("allow")
-    expect(manifest.jelly.tools.filter((tool) => tool.readOnly).map((tool) => tool.permission).sort()).toEqual(
-      ["gws.catalog", "gws.plan", "gws.read", "gws.schema", "gws.status"],
-    )
-  })
-
-  it("names every skill the package ships", () => {
-    expect([...manifest.jelly.skills].sort()).toEqual(readdirSync(new URL("skills", root)).sort())
-  })
-
-  it("has a one-line summary of at most 120 characters", () => {
-    expect(manifest.jelly.summary.trim()).toBe(manifest.jelly.summary)
-    expect(manifest.jelly.summary.length).toBeGreaterThan(0)
-    expect(manifest.jelly.summary.length).toBeLessThanOrEqual(120)
-    expect(manifest.jelly.summary).not.toMatch(/\n/)
-  })
-
-  it("ships a small icon of drawing elements only, with no title (Jelly's cleaner drops an icon with one)", () => {
-    expect(manifest.jelly.icon).toBe("assets/icon.svg")
-    expect(manifest.files).toContain(manifest.jelly.icon)
-    const icon = readFileSync(new URL(manifest.jelly.icon, root), "utf8")
-    expect(Buffer.byteLength(icon)).toBeLessThan(2048)
-    expect(icon.trim()).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 (24 24|32 32|48 48)"[^>]*>[\s\S]*<\/svg>$/)
-    const elements = [...icon.matchAll(/<([A-Za-z][A-Za-z0-9]*)/g)].map((match) => match[1])
-    expect(elements.filter((name) => !["svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline", "polygon"].includes(name!))).toEqual([])
-    expect(icon).not.toMatch(/<title|<style|<script|href=|<!|&/i)
   })
 })

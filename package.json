@@ -39,7 +39,7 @@
   "scripts": {
     "build": "node scripts/clean.mjs && node scripts/bundle.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
-    "lint": "biome check",
+    "lint": "biome check && node scripts/check-copies.mjs",
     "test": "vitest run",
     "test:host": "vitest run -c vitest.host.config.ts",
     "test:pack": "node scripts/pack-smoke.mjs",

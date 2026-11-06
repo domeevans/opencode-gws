@@ -24,7 +24,7 @@ changes nothing in Jelly.
 
 `gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
 
-`test/views.test.ts` checks each declared effect against the plugin's own default rules.
+`test/jelly.test.ts` checks each declared effect against the plugin's own default rules.
 
 ## Skills
 
@@ -60,3 +60,5 @@ Jelly folds the declared sign-ins into this plugin's one card, which shows each 
 
 Jelly's curated catalogue pins an exact version. Publish each release under a new version so a
 review in Jelly can tell the two apart.
+
+The declaration test runs the shared kit, `test/support/jelly-kit.ts`, which checks the declaration and this page against Jelly's plugin authors' standard. `scripts/check-copies.mjs` holds the kit equal to the copy every plugin carries.
