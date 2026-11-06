@@ -175,28 +175,7 @@
         "relay": {
           "redirectField": "redirectUri",
           "portField": "callbackPort"
-        },
-        "account": {
-          "option": "accounts",
-          "label": "Account name",
-          "description": "A short name for this Google account, such as work or personal. The agent names it on every call. It gets every Google service your sign-in can use; when you sign in you choose Read-only or Read and write.",
-          "placeholder": "work",
-          "value": {
-            "mode": "interactive"
-          }
-        },
-        "hostClient": {
-          "id": "google",
-          "field": "clientJson",
-          "replaces": [
-            "clientId",
-            "clientSecret"
-          ]
-        },
-        "needed": [
-          "AUTH_REQUIRED",
-          "AUTH_SCOPE_MISSING"
-        ]
+        }
       }
     ],
     "contributes": {

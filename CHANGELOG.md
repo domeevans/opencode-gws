@@ -4,9 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [0.0.8] - 2026-11-06
 
-### Added
+### Fixed
 
-- The `jelly` declaration's `google` sign-in says what Jelly does for it, so Jelly needs no code of its own for gws: `account` (each account's name goes into `accounts` as `{ "mode": "interactive" }`, and gws has none until one is named), `hostClient` (Jelly answers the hidden `clientJson` field with the OAuth client it holds and hides `clientId` and `clientSecret`) and `needed` (`AUTH_REQUIRED` and `AUTH_SCOPE_MISSING` in a tool result put the Google Workspace card in front of the person). It needs Jelly 0.3.2 or later; an older Jelly refuses the declaration's new keys.
+- The `/connect` sign-in mark on an account now clears. The plugin read the mark back from
+  `integration.connection.active`, which returns the credential without its status, so it never saw its own report: after
+  Google rejected a sign-in, the account kept asking for a new one in `/gws-status`, the status RPC and `gws_status` once
+  it worked again. It now reads the status from `integration.get`, which projects it.
 
 ## [0.0.7] - 2026-11-05
 

@@ -70,11 +70,21 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
       },
     },
     integration: {
+      // `connection.active` returns the credential alone, as the host does; the status the plugin set on it is
+      // projected by `integration.get` as `connections[].status`.
+      get: async ({ integrationID }: { integrationID: string }) => {
+        const connection = options.connections?.[integrationID]
+        const shown = connection && typeof connection === "object" && "id" in connection ? connection : undefined
+        return { data: { id: integrationID, name: "Google Workspace", connections: shown ? [shown] : [] } }
+      },
       connection: {
         active: async (id: string) => {
           const connection = options.connections?.[id]
           if (connection instanceof Error) throw connection
-          return connection
+          if (connection instanceof Promise || !connection || typeof connection !== "object") return connection
+          const credential = { ...connection }
+          delete (credential as { status?: unknown }).status
+          return credential
         },
         resolve: async (connection: { integrationID?: string; id: string }) => options.credentials?.[connection.id],
       },
