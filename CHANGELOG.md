@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.9] - 2026-11-06
+
+### Added
+
+- The `jelly` declaration's `google` sign-in says what Jelly does for it, so Jelly needs no code of its own for gws: `account` (each account's name goes into `accounts` as `{ "mode": "interactive" }`, and gws has none until one is named), `hostClient` (Jelly answers the hidden `clientJson` field with the OAuth client it holds and hides `clientId` and `clientSecret`) and `needed` (`AUTH_REQUIRED` and `AUTH_SCOPE_MISSING` in a tool result put the Google Workspace card in front of the person). It needs Jelly 0.3.2 or later; an older Jelly refuses the declaration's new keys.
+
 ## [0.0.8] - 2026-11-06
 
 ### Fixed
