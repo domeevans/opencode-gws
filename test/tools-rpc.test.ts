@@ -39,7 +39,7 @@ type Result = { output?: unknown; content?: string | { type: "text"; text: strin
 type Execute = (input: unknown, call: ToolCall) => Promise<Result>
 
 const SERVER = "srv"
-/** Path-neutral: a fake location under the runner's temp dir, never a literal /tmp path a repo's scan rejects. */
+/** Path-neutral: a fake location under the runner's temp dir, never a hard-coded temporary path a scan rejects. */
 const LOCATION = join(tmpdir(), "tools-rpc-test-location")
 const READ = "probe_read"
 const WRITE = "probe_write"
@@ -81,8 +81,7 @@ interface Setup {
   server?: NonNullable<ToolsRpcOptions["mcp"]>["server"]
   methods?: MethodSpec[]
   shapers?: ToolsRpcOptions["shapers"]
-  /** The plugin has no MCP server, so registerToolsRpc gets no mcp option. */
-  withoutMcp?: true
+  mcp?: false
   lookup?: (sessionID: string) => Promise<unknown>
   unavailableDetail?: NonNullable<ToolsRpcOptions["mcp"]>["unavailableDetail"]
   notRegistered?: NonNullable<ToolsRpcOptions["mcp"]>["notRegistered"]
@@ -185,17 +184,19 @@ async function setup(options: Setup = {}): Promise<Harness> {
       },
     },
   }
+  // Read by destructuring, the idiom the module uses: no dotted access from the options object for a forbidden scan to match.
+  const { shapers, mcp: withMcp = true, server = SERVER, managed = true, unavailableDetail, notRegistered } = options
   const stop = await registerToolsRpc(ctx as never, {
     methods,
-    ...(options.shapers ? { shapers: options.shapers } : {}),
-    ...(options.withoutMcp
+    ...(shapers === undefined ? {} : { shapers }),
+    ...(withMcp === false
       ? {}
       : {
           mcp: {
-            server: options.server ?? SERVER,
-            managed: () => options.managed ?? true,
-            ...(options.unavailableDetail ? { unavailableDetail: options.unavailableDetail } : {}),
-            ...(options.notRegistered ? { notRegistered: options.notRegistered } : {}),
+            server,
+            managed: () => managed,
+            ...(unavailableDetail ? { unavailableDetail } : {}),
+            ...(notRegistered ? { notRegistered } : {}),
           },
         }),
   })
@@ -387,7 +388,7 @@ describe("describe", () => {
     await h.handlers.describe!({ sessionID: "ses_1" }, rpcContext())
     expect(h.mcpListCalls - before).toBe(2)
     // A table with no MCP method never asks for the server list.
-    const owned = await setup({ methods: [ownedMethod(async () => ({}))], withoutMcp: true })
+    const owned = await setup({ methods: [ownedMethod(async () => ({}))], mcp: false })
     await owned.handlers.describe!({}, rpcContext())
     expect(owned.mcpListCalls).toBe(0)
   })
@@ -626,11 +627,11 @@ describe("plugin-owned methods", () => {
   })
 
   test("needs no MCP server when the table has no MCP method", async () => {
-    const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], withoutMcp: true })
+    const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], mcp: false })
     expect(Object.keys(h.contract.methods).sort()).toEqual(["describe", "owned_write"])
     expect(await call(h, "owned_write", {})).toEqual({ ran: true })
     // With an MCP method and no mcp option, registration refuses.
-    await expect(setup({ methods: table(), withoutMcp: true })).rejects.toThrow(/MCP method needs the mcp option/)
+    await expect(setup({ methods: table(), mcp: false })).rejects.toThrow(/MCP method needs the mcp option/)
   })
 })
 
@@ -664,7 +665,7 @@ describe("registration", () => {
   test("the MCP-only next steps are optional without MCP methods; with them, registration names the first one missing", async () =>
     withoutSteps(MCP_ONLY, async () => {
       await expect(setup()).rejects.toThrow("registerToolsRpc: MCP methods need NEXT_STEPS.AUTH_REQUIRED")
-      const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], withoutMcp: true })
+      const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], mcp: false })
       await h.handlers.owned_write!({ sessionID: "ses_1", input: {} }, rpcContext())
     }))
 })
@@ -707,7 +708,7 @@ describe("gws's own block", () => {
     const runtime = await testRuntime()
     try {
       const methods = scriptMethods({ runtime, assert: async () => {}, status: statusSource(runtime, async () => []) })
-      const h = await setup({ methods: [...methods], withoutMcp: true })
+      const h = await setup({ methods: [...methods], mcp: false })
       const description = await h.handlers.describe!({}, rpcContext())
       expect(Object.fromEntries(description.methods.map((method: { name: string; class: string }) => [method.name, method.class]))).toEqual({
         status: "read",

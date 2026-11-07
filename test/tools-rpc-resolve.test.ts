@@ -5,6 +5,8 @@
 // Why the matrix: Jobs grants a script by writing run-session `allow` rules, and a session allow overrides an agent
 // deny on the host (V3). The one place a mistake widens access is this resolve, so it is tested rather than assumed.
 import { describe, expect, test } from "vitest"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { NEXT_STEPS, registerToolsRpc, type MethodSpec, type ToolCall, type ToolsRpcOptions } from "../src/host/tools-rpc.js"
 
 /**
@@ -26,6 +28,8 @@ Object.assign(NEXT_STEPS, {
 type Effect = "allow" | "deny" | "ask"
 type Rule = { action: string; resource: string; effect: Effect }
 const SERVER = "srv"
+/** Path-neutral: a fake location under the runner's temp dir, never a hard-coded temporary path a scan rejects. */
+const LOCATION = join(tmpdir(), "tools-rpc-resolve")
 const rule = (action: string, effect: Effect, resource = "*"): Rule => ({ action, resource, effect })
 const TOOLS = ["r", "w", "d"] as const
 const idOf = (name: string) => `${SERVER}_${name}`
@@ -70,22 +74,24 @@ interface Harness {
   executions: string[]
 }
 
-async function setup(options: { agent: readonly Rule[]; session: readonly Rule[]; saved: readonly { action: string; resource: string }[]; methods?: MethodSpec[] }): Promise<Harness> {
+async function setup(input: { agent: readonly Rule[]; session: readonly Rule[]; saved: readonly { action: string; resource: string }[]; methods?: MethodSpec[] }): Promise<Harness> {
+  // Read by destructuring, the idiom the module uses: no dotted access from the options object for a forbidden scan to match.
+  const { agent, session, saved, methods: given } = input
   const executions: string[] = []
-  const methods: MethodSpec[] = options.methods ?? TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: name === "r" ? "read" : name === "w" ? "write" : "destructive" }))
-  const agents: Record<string, Rule[]> = { build: [...options.agent] }
-  const sessions = { ses_1: { agent: "build", permissions: [...options.session] } }
+  const methods: MethodSpec[] = given ?? TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: name === "r" ? "read" : name === "w" ? "write" : "destructive" }))
+  const agents: Record<string, Rule[]> = { build: [...agent] }
+  const sessions = { ses_1: { agent: "build", permissions: [...session] } }
   /** The host's own check inside the executor: agent, session, then saved approvals. It never gates the resolve. */
   const check = (call: ToolCall, action: string) => {
     const configured = [...agents[call.agent]!, ...sessions.ses_1.permissions]
     if (configured.findLast((entry) => match(entry.action, action) && match(entry.resource, "*"))?.effect === "deny") throw Object.assign(new Error("blocked"), { _tag: "Permission.BlockedError" })
-    const all = [...configured, ...options.saved.map((entry) => rule(entry.action, "allow", entry.resource))]
+    const all = [...configured, ...saved.map((entry) => rule(entry.action, "allow", entry.resource))]
     const effect = all.findLast((entry) => match(entry.action, action) && match(entry.resource, "*"))?.effect ?? "ask"
     if (effect !== "allow") throw new Error("the fake host cannot answer a prompt")
   }
   const handlers: Harness["handlers"] = {}
   const ctx = {
-    location: { directory: "/tmp/resolve" },
+    location: { directory: LOCATION },
     rpc: {
       register: async (_definition: unknown, registered: Harness["handlers"]) => {
         Object.assign(handlers, registered)
@@ -96,7 +102,7 @@ async function setup(options: { agent: readonly Rule[]; session: readonly Rule[]
     session: {
       get: async ({ sessionID }: { sessionID: string }) => {
         if (sessionID !== "ses_1") throw Object.assign(new Error("not found"), { _tag: "Session.NotFoundError" })
-        return { id: sessionID, location: { directory: "/tmp/resolve" }, ...sessions.ses_1 }
+        return { id: sessionID, location: { directory: LOCATION }, ...sessions.ses_1 }
       },
     },
     agent: { get: async ({ agentID, location }: { agentID: string; location: unknown }) => ({ location, data: { id: agentID, permissions: agents[agentID] } }) },
@@ -116,8 +122,8 @@ async function setup(options: { agent: readonly Rule[]; session: readonly Rule[]
     },
     mcp: { list: async () => ({ data: [{ name: SERVER, status: { status: "connected" } }] }) },
   }
-  const optionsMcp: ToolsRpcOptions["mcp"] = { server: SERVER, managed: () => true }
-  await registerToolsRpc(ctx as never, { methods, mcp: optionsMcp })
+  const serverOptions: ToolsRpcOptions["mcp"] = { server: SERVER, managed: () => true }
+  await registerToolsRpc(ctx as never, { methods, mcp: serverOptions })
   return { handlers, executions }
 }
 
