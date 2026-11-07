@@ -82,6 +82,8 @@ interface Setup {
   methods?: MethodSpec[]
   shapers?: ToolsRpcOptions["shapers"]
   mcp?: false
+  /** Test-only: false disables the MCP-only next-step shim below, to prove registration still requires them. */
+  shim?: boolean
   lookup?: (sessionID: string) => Promise<unknown>
   unavailableDetail?: NonNullable<ToolsRpcOptions["mcp"]>["unavailableDetail"]
   notRegistered?: NonNullable<ToolsRpcOptions["mcp"]>["notRegistered"]
@@ -101,7 +103,27 @@ interface Harness {
   stop: () => Promise<void>
 }
 
+/**
+ * The MCP-only next steps a block whose tools are all its own (GWS, History, Utilities, Jobs) may omit. The suite's fake
+ * MCP table needs them, so a setup that uses it supplies a test-only value for each missing one. The shared module is
+ * not changed: this is the suite's own shim, and it never overrides a step the block declares.
+ */
+const MCP_STEPS: Readonly<Record<string, string>> = {
+  AUTH_REQUIRED: "Run /connect and sign in.",
+  CONNECTING: "Wait a few seconds, then call the method again.",
+  CONNECTION_FAILED: "Run the status command and follow its next step.",
+  DISABLED: "Enable the server in /mcps.",
+  NOT_REGISTERED: "Run the status command and follow its next step.",
+  TOOL_UNAVAILABLE: "Call describe to see which methods OpenCode lists now.",
+  UPSTREAM_ERROR: "Check the input against the method's schema from describe.",
+}
+function ensureMcpSteps() {
+  const steps = NEXT_STEPS as Record<string, string | undefined>
+  for (const [code, next] of Object.entries(MCP_STEPS)) if (steps[code] === undefined) steps[code] = next
+}
+
 async function setup(options: Setup = {}): Promise<Harness> {
+  if (options.shim !== false) ensureMcpSteps()
   const sessions = options.sessions ?? { ses_1: { agent: "build" } }
   const agents = options.agents ?? { build: [rule("*", "allow")] }
   const methods = options.methods ?? table()
@@ -226,22 +248,6 @@ const call = (h: Harness, method: string, input: unknown = { query: "q" }, sessi
 const refusedWith = (value: unknown, code: string) => expect(structuredClone(value)).toMatchObject(failure(code))
 
 const MCP_ONLY = ["SERVER_CONFLICT", "AUTH_REQUIRED", "CONNECTING", "CONNECTION_FAILED", "DISABLED", "NOT_REGISTERED", "TOOL_UNAVAILABLE", "UPSTREAM_ERROR"] as const
-
-/**
- * The plugin has no MCP server, so its block leaves the MCP-only next steps out: the module requires them only for a
- * block with MCP methods. This suite still exercises the module's MCP branch against its own fake server, so it
- * supplies them here; the registration test that checks they are optional removes them again.
- */
-Object.assign(NEXT_STEPS, {
-  SERVER_CONFLICT: `Remove your own server from opencode.json, then run "opencode reload".`,
-  AUTH_REQUIRED: "Sign in again, then call the method.",
-  CONNECTING: "Wait a few seconds, then call the method again.",
-  CONNECTION_FAILED: "Follow the status command's next step.",
-  DISABLED: "Enable the server, then call the method again.",
-  NOT_REGISTERED: "Follow the status command's next step.",
-  TOOL_UNAVAILABLE: "Call describe to see which methods OpenCode lists now.",
-  UPSTREAM_ERROR: "Check the input against the method's schema from describe.",
-})
 
 const withoutSteps = async (keys: readonly string[], body: () => Promise<void>) => {
   const steps = NEXT_STEPS as Record<string, string | undefined>
@@ -662,11 +668,17 @@ describe("registration", () => {
     expect(h.disposed.sort()).toEqual(["hook", "rpc"])
   })
 
-  test("the MCP-only next steps are optional without MCP methods; with them, registration names the first one missing", async () =>
+  test("a block without MCP methods may omit the MCP-only next steps: the suite supplies them for its fake MCP table", async () =>
     withoutSteps(MCP_ONLY, async () => {
-      await expect(setup()).rejects.toThrow("registerToolsRpc: MCP methods need NEXT_STEPS.AUTH_REQUIRED")
-      const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], mcp: false })
-      await h.handlers.owned_write!({ sessionID: "ses_1", input: {} }, rpcContext())
+      const h = await setup()
+      expect(await call(h, READ)).toMatchObject({ text: expect.any(String) })
+      const owned = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], mcp: false })
+      await owned.handlers.owned_write!({ sessionID: "ses_1", input: {} }, rpcContext())
+    }))
+
+  test("registration still requires the MCP-only next steps when the shim is off and the table has an MCP method", async () =>
+    withoutSteps(MCP_ONLY, async () => {
+      await expect(setup({ shim: false })).rejects.toThrow("registerToolsRpc: MCP methods need NEXT_STEPS.AUTH_REQUIRED")
     }))
 })
 

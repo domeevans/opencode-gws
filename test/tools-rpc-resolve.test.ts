@@ -9,22 +9,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { NEXT_STEPS, registerToolsRpc, type MethodSpec, type ToolCall, type ToolsRpcOptions } from "../src/host/tools-rpc.js"
 
-/**
- * The plugin has no MCP server, so its block leaves the MCP-only next steps out: the module requires them only for a
- * block with MCP methods. This suite still exercises the module's MCP branch against its own fake server, so it
- * supplies them here; the registration test that checks they are optional removes them again.
- */
-Object.assign(NEXT_STEPS, {
-  SERVER_CONFLICT: `Remove your own server from opencode.json, then run "opencode reload".`,
-  AUTH_REQUIRED: "Sign in again, then call the method.",
-  CONNECTING: "Wait a few seconds, then call the method again.",
-  CONNECTION_FAILED: "Follow the status command's next step.",
-  DISABLED: "Enable the server, then call the method again.",
-  NOT_REGISTERED: "Follow the status command's next step.",
-  TOOL_UNAVAILABLE: "Call describe to see which methods OpenCode lists now.",
-  UPSTREAM_ERROR: "Check the input against the method's schema from describe.",
-})
-
 type Effect = "allow" | "deny" | "ask"
 type Rule = { action: string; resource: string; effect: Effect }
 const SERVER = "srv"
@@ -69,6 +53,25 @@ const CASES: readonly Case[] = [
 
 const SAVED: readonly { action: string; resource: string }[][] = [[], TOOLS.map((name) => ({ action: idOf(name), resource: "*" }))]
 
+/**
+ * The MCP-only next steps a block whose tools are all its own may omit. This suite's fake MCP table needs them, so a
+ * setup supplies a test-only value for each missing one; the shared module is unchanged and nothing declared is
+ * overridden. The same shim is in `tools-rpc.test.ts`, because each suite is copied on its own.
+ */
+const MCP_STEPS: Readonly<Record<string, string>> = {
+  AUTH_REQUIRED: "Run /connect and sign in.",
+  CONNECTING: "Wait a few seconds, then call the method again.",
+  CONNECTION_FAILED: "Run the status command and follow its next step.",
+  DISABLED: "Enable the server in /mcps.",
+  NOT_REGISTERED: "Run the status command and follow its next step.",
+  TOOL_UNAVAILABLE: "Call describe to see which methods OpenCode lists now.",
+  UPSTREAM_ERROR: "Check the input against the method's schema from describe.",
+}
+function ensureMcpSteps() {
+  const steps = NEXT_STEPS as Record<string, string | undefined>
+  for (const [code, next] of Object.entries(MCP_STEPS)) if (steps[code] === undefined) steps[code] = next
+}
+
 interface Harness {
   handlers: Record<string, (input: unknown, context: { signal: AbortSignal; error: (type: string, message: string, data?: unknown) => unknown }) => Promise<any>>
   executions: string[]
@@ -76,6 +79,7 @@ interface Harness {
 
 async function setup(input: { agent: readonly Rule[]; session: readonly Rule[]; saved: readonly { action: string; resource: string }[]; methods?: MethodSpec[] }): Promise<Harness> {
   // Read by destructuring, the idiom the module uses: no dotted access from the options object for a forbidden scan to match.
+  ensureMcpSteps()
   const { agent, session, saved, methods: given } = input
   const executions: string[] = []
   const methods: MethodSpec[] = given ?? TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: name === "r" ? "read" : name === "w" ? "write" : "destructive" }))
