@@ -10,7 +10,7 @@ export const HOST_RANGE = ">=2.2.3 <2.3.0"
  * The OpenCode releases the checks run on (the host, pack and stock stages).
  * The one list: scripts/pack-smoke.mjs reads it from this file.
  */
-export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5"]
+export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.6"]
 
 /** The host as status reports it. */
 export interface HostCheck {

@@ -57,8 +57,8 @@ jobs:
       - name: Install the gws package for ${{ matrix.target }}
         run: npm run fetch:gws
 
-      # The pack test installs each tested stock OpenCode (2.2.3, 2.2.4 and
-      # 2.2.5, TESTED_HOSTS in src/domain/host.ts) into its temp folder,
-      # since OPENCODE_BIN_2_2_3, _2_2_4 and _2_2_5 are unset here.
+      # The pack test installs each tested stock OpenCode (2.2.3, 2.2.4,
+      # 2.2.5 and 2.2.6, TESTED_HOSTS in src/domain/host.ts) into its temp
+      # folder, since OPENCODE_BIN_2_2_3 to _2_2_6 are unset here.
       - name: Check
         run: npm run check

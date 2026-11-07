@@ -18,7 +18,7 @@ import { REPO } from "./package.js"
  */
 
 /** The versions the family tests, TESTED_HOSTS in src/domain/host.ts. */
-export const TESTED_HOSTS = ["2.2.3", "2.2.4", "2.2.5"] as const
+export const TESTED_HOSTS = ["2.2.3", "2.2.4", "2.2.5", "2.2.6"] as const
 const STOCK = "/private/var/folders/yj/xc5d3w1x3nv91lqg4nhs11ww0000gn/T/opencode"
 // A local convenience beside the checkouts, for the 2.2.5 binary; OPENCODE_BIN_2_2_5 is the supported route, and the
 // host suite rewrites HOME before the tests load so it cannot be derived from it.

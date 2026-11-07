@@ -6,7 +6,7 @@ Unofficial; not affiliated with Google.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. Another release in that range works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Another release in that range works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
 - macOS (arm64, x64) or Linux (arm64, x64, glibc).
 - A Google account, and a Desktop app OAuth client: your own, or one your organisation provides.
 

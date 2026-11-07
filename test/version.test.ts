@@ -22,11 +22,11 @@ describe("package versions", () => {
 
 describe("checkHost", () => {
   it("accepts 2.2.3 and later 2.2 releases, and calls only the listed ones tested", () => {
-    expect(TESTED_HOSTS).toEqual(["2.2.3", "2.2.4", "2.2.5"])
-    for (const version of ["2.2.3", "2.2.4", "2.2.5", "v2.2.3", " 2.2.3 "]) {
+    expect(TESTED_HOSTS).toEqual(["2.2.3", "2.2.4", "2.2.5", "2.2.6"])
+    for (const version of ["2.2.3", "2.2.4", "2.2.5", "2.2.6", "v2.2.3", " 2.2.3 "]) {
       expect(checkHost(version, HOST_RANGE, false)).toEqual({ version: version.trim(), range: HOST_RANGE, tested: true })
     }
-    for (const version of ["2.2.6", "2.2.10", "2.2.4+build.7"]) {
+    for (const version of ["2.2.99", "2.2.10", "2.2.4+build.7"]) {
       expect(checkHost(version, HOST_RANGE, false)).toEqual({ version, range: HOST_RANGE, tested: false })
     }
   })

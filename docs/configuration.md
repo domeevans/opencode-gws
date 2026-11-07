@@ -39,7 +39,7 @@ An account whose config sets `access` to read, with no write service, does not o
 | `redirectUri` | none: a loopback redirect | The absolute URL Google redirects to after consent, when the browser is not on the machine OpenCode runs on, such as `https://host.example/oauth/return`. `https`, unless it is loopback. Needs `callbackPort` and a Web application client that lists it exactly. See [auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine). |
 | `callbackPort` | none: a random port | The port on `127.0.0.1` where the sign-in listens and the redirect is forwarded. Alone, a loopback redirect on that port. |
 | `binary.path` | the platform package | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
-| `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0`, such as 2.2.2, 2.3.0, 3.0.0, a prerelease or a dev build, and show it as host untested in status. A release inside the range loads without it; only 2.2.3, 2.2.4 and 2.2.5 are tested. |
+| `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0`, such as 2.2.2, 2.3.0, 3.0.0, a prerelease or a dev build, and show it as host untested in status. A release inside the range loads without it; only 2.2.3, 2.2.4, 2.2.5 and 2.2.6 are tested. |
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
 | `execution` | see below | Timeouts, page caps, and file roots. |
 | `audit` | JSONL in the state directory | Audit sink. |
