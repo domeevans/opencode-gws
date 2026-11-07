@@ -88,7 +88,7 @@ function schemaOf(schema: z.ZodType, io: "input" | "output"): JsonSchema {
   try {
     return z.toJSONSchema(schema, { io, unrepresentable: "any" }) as JsonSchema
   } catch {
-    return NO_INPUT
+    return { type: "object" }
   }
 }
 
@@ -299,7 +299,6 @@ const object = (properties: Record<string, JsonSchema>, required: readonly strin
 })
 const STRING = { type: "string" } as const
 const ANY_OBJECT = { type: "object" } as const
-const NO_INPUT = object({}, [])
 const FAILED = object({ code: STRING, next: STRING }, ["code", "next"])
 const mcpOutput = (output: JsonSchema = {}) => object({ output, text: STRING }, ["text"])
 const DESCRIBED = object(
@@ -741,14 +740,15 @@ export async function registerToolsRpc(ctx: ToolsRpcContext, options: ToolsRpcOp
     const input = (raw ?? {}) as { readonly sessionID?: string }
     const resolved = input.sessionID === undefined ? undefined : await session(input.sessionID)
     const tools = mcp ? await ctx.tool.list() : []
+    // One server lookup and one mcp.list() for the whole describe, whatever the number of MCP methods.
+    const server = anyMcp ? serverOf(undefined) : ""
+    const managed = mcp !== undefined && server !== "" ? mcp.managed(server) : false
+    const status = managed ? (await ctx.mcp.list()).data.find((entry) => entry.name === server)?.status.status : undefined
     const methodsOut: Record<string, unknown>[] = []
     for (const method of methods) {
       if (method.kind === "mcp") {
-        const server = serverOf(undefined)
-        const managed = mcp!.managed(server)
         const id = `${server}_${method.name}`
         const tool = managed ? tools.find((entry) => entry.id === id) : undefined
-        const status = managed ? (await ctx.mcp.list()).data.find((entry) => entry.name === server)?.status.status : undefined
         const code: Code | undefined = !managed ? "SERVER_CONFLICT" : tool ? undefined : (connection(status) ?? "TOOL_UNAVAILABLE")
         const reason = code === "NOT_REGISTERED" ? (notRegistered(server)?.code ?? code) : code
         const detail = code === undefined ? undefined : mcp!.unavailableDetail?.(method.name, code)

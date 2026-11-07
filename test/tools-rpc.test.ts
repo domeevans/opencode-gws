@@ -1,6 +1,8 @@
 // Unit tests for the shared tools RPC module v2, against narrow fakes of the public plugin context.
 // A copy in a plugin repository changes only the two imports: its test runner, and the path of its copy.
 import { describe, expect, test } from "vitest"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   CLASSES,
   hidden,
@@ -37,7 +39,8 @@ type Result = { output?: unknown; content?: string | { type: "text"; text: strin
 type Execute = (input: unknown, call: ToolCall) => Promise<Result>
 
 const SERVER = "srv"
-const LOCATION = "/tmp/tools-rpc-v2-test"
+/** Path-neutral: a fake location under the runner's temp dir, never a literal /tmp path a repo's scan rejects. */
+const LOCATION = join(tmpdir(), "tools-rpc-test-location")
 const READ = "probe_read"
 const WRITE = "probe_write"
 const SLOW = "probe_slow"
@@ -79,7 +82,7 @@ interface Setup {
   methods?: MethodSpec[]
   shapers?: ToolsRpcOptions["shapers"]
   /** The plugin has no MCP server, so registerToolsRpc gets no mcp option. */
-  withoutMcp?: false
+  withoutMcp?: true
   lookup?: (sessionID: string) => Promise<unknown>
   unavailableDetail?: NonNullable<ToolsRpcOptions["mcp"]>["unavailableDetail"]
   notRegistered?: NonNullable<ToolsRpcOptions["mcp"]>["notRegistered"]
@@ -94,6 +97,8 @@ interface Harness {
   calls: { tool: string; input: unknown; call: ToolCall }[]
   evaluations: Evaluation[]
   disposed: string[]
+  /** How many times describe asked OpenCode for the MCP server list. */
+  mcpListCalls: number
   stop: () => Promise<void>
 }
 
@@ -106,6 +111,7 @@ async function setup(options: Setup = {}): Promise<Harness> {
   const calls: Harness["calls"] = []
   const evaluations: Evaluation[] = []
   const disposed: string[] = []
+  const counter = { mcpListCalls: 0 }
   let contract: Harness["contract"] | undefined
   let handlers: Record<string, Handler> = {}
   let hook: Harness["hook"] = () => {}
@@ -172,12 +178,17 @@ async function setup(options: Setup = {}): Promise<Harness> {
           },
         })),
     },
-    mcp: { list: async () => ({ data: [{ name: SERVER, status: { status: options.status ?? "connected" } }] }) },
+    mcp: {
+      list: async () => {
+        counter.mcpListCalls++
+        return { data: [{ name: SERVER, status: { status: options.status ?? "connected" } }] }
+      },
+    },
   }
   const stop = await registerToolsRpc(ctx as never, {
     methods,
     ...(options.shapers ? { shapers: options.shapers } : {}),
-    ...(options.withoutMcp === false
+    ...(options.withoutMcp
       ? {}
       : {
           mcp: {
@@ -188,7 +199,19 @@ async function setup(options: Setup = {}): Promise<Harness> {
           },
         }),
   })
-  return { contract: contract!, handlers, hook: (evaluation) => hook(evaluation), check, calls, evaluations, disposed, stop }
+  return {
+    contract: contract!,
+    handlers,
+    hook: (evaluation) => hook(evaluation),
+    check,
+    calls,
+    evaluations,
+    disposed,
+    get mcpListCalls() {
+      return counter.mcpListCalls
+    },
+    stop,
+  }
 }
 
 function rpcContext(signal = new AbortController().signal): RpcContext {
@@ -204,17 +227,17 @@ const refusedWith = (value: unknown, code: string) => expect(structuredClone(val
 const MCP_ONLY = ["SERVER_CONFLICT", "AUTH_REQUIRED", "CONNECTING", "CONNECTION_FAILED", "DISABLED", "NOT_REGISTERED", "TOOL_UNAVAILABLE", "UPSTREAM_ERROR"] as const
 
 /**
- * gws has no MCP server, so its block leaves the MCP-only next steps out: the module requires them only for a block
- * with MCP methods. This suite still exercises the module's MCP branch against its own fake server, so it supplies
- * them here; the registration test that checks they are optional removes them again.
+ * The plugin has no MCP server, so its block leaves the MCP-only next steps out: the module requires them only for a
+ * block with MCP methods. This suite still exercises the module's MCP branch against its own fake server, so it
+ * supplies them here; the registration test that checks they are optional removes them again.
  */
 Object.assign(NEXT_STEPS, {
   SERVER_CONFLICT: `Remove your own server from opencode.json, then run "opencode reload".`,
   AUTH_REQUIRED: "Sign in again, then call the method.",
   CONNECTING: "Wait a few seconds, then call the method again.",
-  CONNECTION_FAILED: "Run /gws-status and follow its next step.",
+  CONNECTION_FAILED: "Follow the status command's next step.",
   DISABLED: "Enable the server, then call the method again.",
-  NOT_REGISTERED: "Run /gws-status and follow its next step.",
+  NOT_REGISTERED: "Follow the status command's next step.",
   TOOL_UNAVAILABLE: "Call describe to see which methods OpenCode lists now.",
   UPSTREAM_ERROR: "Check the input against the method's schema from describe.",
 })
@@ -354,6 +377,19 @@ describe("describe", () => {
     // Without a session there is no permission field.
     const plain = await h.handlers.describe!({}, rpcContext())
     expect(plain.methods.every((method: object) => !Object.hasOwn(method, "permission"))).toBe(true)
+  })
+
+  test("lists the MCP servers once per describe, however many MCP methods there are", async () => {
+    const h = await setup()
+    const before = h.mcpListCalls
+    await h.handlers.describe!({}, rpcContext())
+    expect(h.mcpListCalls - before).toBe(1)
+    await h.handlers.describe!({ sessionID: "ses_1" }, rpcContext())
+    expect(h.mcpListCalls - before).toBe(2)
+    // A table with no MCP method never asks for the server list.
+    const owned = await setup({ methods: [ownedMethod(async () => ({}))], withoutMcp: true })
+    await owned.handlers.describe!({}, rpcContext())
+    expect(owned.mcpListCalls).toBe(0)
   })
 
   test("with an unknown session, refuses with SESSION_UNKNOWN", async () => {
@@ -590,11 +626,11 @@ describe("plugin-owned methods", () => {
   })
 
   test("needs no MCP server when the table has no MCP method", async () => {
-    const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], withoutMcp: false })
+    const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], withoutMcp: true })
     expect(Object.keys(h.contract.methods).sort()).toEqual(["describe", "owned_write"])
     expect(await call(h, "owned_write", {})).toEqual({ ran: true })
     // With an MCP method and no mcp option, registration refuses.
-    await expect(setup({ methods: table(), withoutMcp: false })).rejects.toThrow(/MCP method needs the mcp option/)
+    await expect(setup({ methods: table(), withoutMcp: true })).rejects.toThrow(/MCP method needs the mcp option/)
   })
 })
 
@@ -628,7 +664,7 @@ describe("registration", () => {
   test("the MCP-only next steps are optional without MCP methods; with them, registration names the first one missing", async () =>
     withoutSteps(MCP_ONLY, async () => {
       await expect(setup()).rejects.toThrow("registerToolsRpc: MCP methods need NEXT_STEPS.AUTH_REQUIRED")
-      const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], withoutMcp: false })
+      const h = await setup({ methods: [ownedMethod(async () => ({ ran: true }))], withoutMcp: true })
       await h.handlers.owned_write!({ sessionID: "ses_1", input: {} }, rpcContext())
     }))
 })
@@ -671,7 +707,7 @@ describe("gws's own block", () => {
     const runtime = await testRuntime()
     try {
       const methods = scriptMethods({ runtime, assert: async () => {}, status: statusSource(runtime, async () => []) })
-      const h = await setup({ methods: [...methods], withoutMcp: false })
+      const h = await setup({ methods: [...methods], withoutMcp: true })
       const description = await h.handlers.describe!({}, rpcContext())
       expect(Object.fromEntries(description.methods.map((method: { name: string; class: string }) => [method.name, method.class]))).toEqual({
         status: "read",

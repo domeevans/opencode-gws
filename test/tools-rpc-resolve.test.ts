@@ -8,16 +8,17 @@ import { describe, expect, test } from "vitest"
 import { NEXT_STEPS, registerToolsRpc, type MethodSpec, type ToolCall, type ToolsRpcOptions } from "../src/host/tools-rpc.js"
 
 /**
- * gws has no MCP server, so its block leaves the MCP-only next steps out. This suite exercises the module's MCP branch
- * with its own fake server and supplies them, as a plugin with an MCP server would.
+ * The plugin has no MCP server, so its block leaves the MCP-only next steps out: the module requires them only for a
+ * block with MCP methods. This suite still exercises the module's MCP branch against its own fake server, so it
+ * supplies them here; the registration test that checks they are optional removes them again.
  */
 Object.assign(NEXT_STEPS, {
   SERVER_CONFLICT: `Remove your own server from opencode.json, then run "opencode reload".`,
   AUTH_REQUIRED: "Sign in again, then call the method.",
   CONNECTING: "Wait a few seconds, then call the method again.",
-  CONNECTION_FAILED: "Run /gws-status and follow its next step.",
+  CONNECTION_FAILED: "Follow the status command's next step.",
   DISABLED: "Enable the server, then call the method again.",
-  NOT_REGISTERED: "Run /gws-status and follow its next step.",
+  NOT_REGISTERED: "Follow the status command's next step.",
   TOOL_UNAVAILABLE: "Call describe to see which methods OpenCode lists now.",
   UPSTREAM_ERROR: "Check the input against the method's schema from describe.",
 })
