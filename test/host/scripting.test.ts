@@ -15,7 +15,12 @@ const Tools = Rpc.define({
   id: "google-workspace.gws.tools",
   methods: {
     describe: { input: open, output: open },
-    ...Object.fromEntries(["status", "catalog", "schema", "read", "plan", "write"].map((name) => [name, { input: open, output: open, errors: { failed: open } }])),
+    ...Object.fromEntries(
+      ["status", "catalog", "schema", "read", "plan", "write", "send", "share", "delete", "export", "admin"].map((name) => [
+        name,
+        { input: open, output: open, errors: { failed: open } },
+      ]),
+    ),
   },
   events: {},
 })
@@ -61,9 +66,21 @@ const get = request("gmail.users.messages.get", { params: { userId: "me", id: "m
 const asked = (session: string) => host.events.filter((event) => event.type === "permission.asked" && event.data?.sessionID === session)
 
 describe("tools RPC on a real host", () => {
-  it("describes exactly the non-commit tools", async () => {
-    const description = (await tools().describe!({}, at())) as { methods: Array<{ name: string }> }
-    expect(description.methods.map((method) => method.name)).toEqual(["status", "catalog", "schema", "read", "plan"])
+  it("describes every tool, each with its class", async () => {
+    const description = (await tools().describe!({}, at())) as { methods: Array<{ name: string; class: string }> }
+    expect(Object.fromEntries(description.methods.map((method) => [method.name, method.class]))).toEqual({
+      status: "read",
+      catalog: "read",
+      schema: "read",
+      read: "read",
+      plan: "read",
+      write: "write",
+      send: "send",
+      share: "send",
+      delete: "destructive",
+      export: "export",
+      admin: "destructive",
+    })
   })
 
   it("reads as a session whose agent allows it, with no model turn", async () => {
@@ -87,7 +104,7 @@ describe("tools RPC on a real host", () => {
     const started = Date.now()
     const result = await run("read", sessions.careful!, list)
     expect(result).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-    expect(result.message).toMatch(/cannot answer an approval prompt/)
+    expect(result.message).toMatch(/cannot answer/)
     expect(Date.now() - started).toBeLessThan(5000)
     expect(asked(sessions.careful!)).toEqual([])
     expect(host.invocations().length).toBe(before)
@@ -129,13 +146,30 @@ describe("tools RPC on a real host", () => {
     expect(extra.value).toBeUndefined()
     expect(extra.message).toContain('"extra" is not allowed')
     expect((await raw("read", { input: list })).message).toContain('"sessionID" must be a non-empty string')
-    expect((await raw("describe", { sessionID: sessions.build! })).message).toContain("describe takes no input")
+    expect((await raw("describe", 1)).message).toContain("describe takes nothing")
   })
 
-  it("has no commit method", async () => {
-    const result = await run("write", sessions.build!, { planId: "p" })
-    expect(result.value).toBeUndefined()
-    expect(result.type).not.toBe("failed")
-    expect(result.message).toMatch(/not.?found|unknown/i)
+  it("has the six commit tools as methods: a commit is refused before anything runs unless the session allows it", async () => {
+    const planned = await run("plan", sessions.build!, request("gmail.users.labels.create", { params: { userId: "me" }, body: { name: "scripted-two" } }))
+    expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
+    const writes = () => host.invocations().filter((argv) => argv.includes("create") && !argv.includes("--dry-run"))
+    const before = writes().length
+    const refused = await run("write", sessions.build!, { planId: planned.value.planId })
+    expect(refused).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+    expect(refused.message).toMatch(/would ask/)
+    expect(writes().length).toBe(before)
+  })
+
+  it("commits a plan as the session that planned it, when that session's rules allow the commit", async () => {
+    const allowed = (await host.opencode.sessions.create({ location: host.location, agent: "build", permissions: [{ action: "gws.write", resource: "*", effect: "allow" }] } as never)).id
+    const planned = await run("plan", allowed, request("gmail.users.labels.create", { params: { userId: "me" }, body: { name: "scripted-three" } }))
+    expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
+    const writes = () => host.invocations().filter((argv) => argv.includes("create") && !argv.includes("--dry-run"))
+    const before = writes().length
+    const committed = await run("write", allowed, { planId: planned.value.planId })
+    expect(committed.value, committed.message).toMatchObject({ ok: true })
+    expect(writes().length).toBe(before + 1)
+    // The plan is single-use and bound to its session: another session cannot commit it again.
+    expect(await run("write", allowed, { planId: planned.value.planId })).toMatchObject({ type: "failed", code: "PLAN_ALREADY_USED" })
   })
 })

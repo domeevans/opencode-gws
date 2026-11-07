@@ -18,14 +18,7 @@ interface ToolCall {
   id: string
 }
 
-/** A script calling through the tools RPC as a session and its agent: no message or tool call stands behind it. */
-export interface ScriptCall {
-  sessionID: string
-  agent: string
-  script: true
-}
-
-export type Caller = ToolCall | ScriptCall
+export type Caller = ToolCall
 
 export interface PermissionRequest {
   sessionID: string
@@ -34,22 +27,14 @@ export interface PermissionRequest {
   resources: string[]
   save?: string[]
   metadata: Record<string, unknown>
-  /** Present for a tool call; a script call has no source. */
-  source?: { type: "tool"; messageID: string; id: string }
+  source: { type: "tool"; messageID: string; id: string }
 }
-
-/**
- * The metadata key that marks a script's request. The scripting hook turns
- * an `ask` on a marked request into a deny: no one is there to answer.
- */
-export const SCRIPT_MARK = "script"
 
 function resource(account: string, operation: string): string {
   return `${account}:${operation}`
 }
 
 function base(call: Caller, action: string): Pick<PermissionRequest, "sessionID" | "agent" | "action" | "source"> {
-  if ("script" in call) return { sessionID: call.sessionID, agent: call.agent, action }
   return {
     sessionID: call.sessionID,
     agent: call.agent,
@@ -58,13 +43,9 @@ function base(call: Caller, action: string): Pick<PermissionRequest, "sessionID"
   }
 }
 
-function mark(call: Caller): Record<string, unknown> {
-  return "script" in call ? { [SCRIPT_MARK]: true } : {}
-}
-
 /** Local, account-free tools (status, catalog). */
 export function localRequest(call: Caller, action: string): PermissionRequest {
-  return { ...base(call, action), resources: ["*"], save: ["*"], metadata: mark(call) }
+  return { ...base(call, action), resources: ["*"], save: ["*"], metadata: {} }
 }
 
 /** Account-scoped tools that resolve an operation (schema, read, plan). */
@@ -78,7 +59,7 @@ export function operationRequest(
     ...base(call, action),
     resources: [id],
     save: [id],
-    metadata: compact({ ...mark(call), account: target.account, operation: target.operation, service: target.service, category: target.category }),
+    metadata: compact({ account: target.account, operation: target.operation, service: target.service, category: target.category }),
   }
 }
 

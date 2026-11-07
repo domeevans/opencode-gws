@@ -63,10 +63,11 @@ Deploy and watch are never committable. Admin needs `admin.enabled`, an allowed 
 
 ## Scripts
 
-The tools RPC (`google-workspace.gws.tools`, see [docs/scripting.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)) runs the plugin's non-commit tools for a script, with no model. It adds no authority:
+The tools RPC (`google-workspace.gws.tools`, see [docs/scripting.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md)) runs the plugin's tools for a script, with no model. It adds no authority:
 
-- A script names a session that names an agent, and runs as them. Every call asserts the same action and resource as the tool, against that agent's rules and the session's own.
-- An ask on a script's call is denied, not prompted: no one is there to answer it. A script needs an allow rule, or no rule, for what it does.
-- Only `status`, `catalog`, `schema`, `read` and `plan` are methods. The six commit tools are never methods, whatever their exposure, so a script can plan but never commit; a plan binds to the session and agent, and only an approved commit tool in that session applies it.
+- A script names a session that names an agent, and runs as them. Every call resolves the method's action against that agent's rules and the session's own before anything runs, then the tool asserts the same action and resource as on the model path.
+- Only a resolved `allow` runs. An `ask` is refused, because no one is there to answer it, and a `deny` is refused; both cost no gws call and no prompt. A write therefore needs a prior explicit allow in the session's or the agent's rules.
+- A saved **Always allow** does not authorise an ad-hoc script: it is not part of those rules. The supported way to get an approval-bound grant is a Jobs one-off script, whose approval names the exact methods.
+- Every tool is a method, with a class; an unknown tool never is, and `describe` lists it as unclassified. A commit method takes only a `planId` and is refused unless that commit's action is allowed; a plan binds to the session and agent, and only a commit in that session applies it.
 - The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The session is not a login: it scopes a script to what its agent may do.
 - Audit records of a script's reads and plans carry `caller: "rpc"`.

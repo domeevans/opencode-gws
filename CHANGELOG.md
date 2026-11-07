@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- tools RPC v2: every known tool is scriptable under a prior explicit allow. The six commit tools are methods too, in
+  the shared tools RPC module (`src/host/tools-rpc.ts`), so a script can plan and commit in one run; a commit still
+  takes only a `planId`, and is refused unless the session's agent allows that commit's action. Every method carries a
+  class; `describe` reports it, and with a session each method's resolved `permission`. A call now resolves the rule
+  before dispatch: an `ask` is refused, and a `deny` is refused, with no gws call and no prompt.
+- A saved "Always allow" no longer authorises an ad-hoc script. A script's grant is a rule in config, or a Jobs run
+  session; `docs/scripting.md` says so, and names the Jobs one-off as the way to get an approval-bound grant.
+- The permissions a script's calls assert now carry the same tool source id as a model call, so an inner `ask`, such
+  as a plan's read of an event's guests, is refused and named instead of waiting for a prompt.
+
 ## [0.0.9] - 2026-11-06
 
 ### Added

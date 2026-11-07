@@ -40,8 +40,9 @@ import type { Caller, PermissionRequest } from "./permissions.js"
  * program can catch and work around.
  *
  * The specs are the one definition of each tool. The tools RPC
- * (`scripting.ts`) runs the same specs for scripts, with the same
- * permission asserts: every tool except the six commit tools is a method.
+ * (`tools-rpc.ts`) runs the same specs for scripts, through
+ * `scriptMethods`, with the same permission asserts: every tool is a
+ * method, the six commit tools included.
  */
 
 export const NAMESPACE = {
@@ -66,6 +67,12 @@ const DIRECT: Exposure = { codemode: false }
 
 export type Assert = (request: PermissionRequest) => Promise<void>
 
+/**
+ * What a tool can do, for the tools RPC's describe and a job's approval: the worst thing its
+ * branches allow. It never decides whether a call runs; the permission rules do.
+ */
+export type ToolClass = "read" | "write" | "send" | "export" | "destructive"
+
 export interface Call {
   host: Caller
   runtime: CallContext
@@ -81,11 +88,26 @@ interface Outcome<O> {
 export interface ToolSpec<I extends z.ZodType, O extends z.ZodType> {
   name: string
   action: string
+  class: ToolClass
   description: string
   exposure: Exposure
   input: I
   output: O
   run: (input: z.output<I>, call: Call) => Promise<Outcome<z.output<O>>>
+}
+
+/**
+ * The six commit tools' class. write and export are what they say; a send and a share reach
+ * people, so both are sends; a delete and an admin change can remove data or access, so both
+ * are destructive. The category is still in the method's name and its action.
+ */
+const COMMIT_CLASSES: Readonly<Record<CommitCategory, ToolClass>> = {
+  write: "write",
+  send: "send",
+  share: "send",
+  delete: "destructive",
+  export: "export",
+  admin: "destructive",
 }
 
 const COMMIT_CATEGORIES: readonly { category: CommitCategory; description: string }[] = [
@@ -121,6 +143,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "status",
       action: "gws.status",
+      class: "read",
       description:
         "Shows the plugin and gws versions, each configured account with its sign-in state, access level, and granted scopes, " +
         "the services the model can use, and the next step. Reads the stored sign-ins and never calls a Google Workspace API. " +
@@ -136,6 +159,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "catalog",
       action: "gws.catalog",
+      class: "read",
       description:
         'Searches the gws command manifest for services, methods, and helpers. Words from operation ids work best, such as "gmail messages list" or "drive files update". ' +
         "When no entry matches every word, the best partial matches come back with relaxed: true; unavailable names a service this setup leaves out, and why. " +
@@ -152,6 +176,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "schema",
       action: "gws.schema",
+      class: "read",
       description:
         "Shows one operation's parameters, scopes, and request body for a method, or its input flags for a helper, " +
         "so read and plan requests are right the first time. Pass the operation id from catalog.",
@@ -169,6 +194,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "read",
       action: "gws.read",
+      class: "read",
       description:
         "Runs a read-only operation and returns the parsed result in data. Pass the operation id from catalog with params " +
         "(and fields, required for list and search), or input for a helper. It returns one page unless pagination is set; " +
@@ -192,6 +218,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "plan",
       action: "gws.plan",
+      class: "read",
       description:
         "Prepares a change without making it: a gws dry run that returns a single-use planId, a redacted preview of the exact command, and its category. " +
         "Show the preview to the user, then commit with the direct tool of that category (gws_write, gws_send, gws_share, gws_delete, gws_export, or gws_admin), " +
@@ -213,6 +240,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
       spec({
         name: category,
         action: `gws.${category}`,
+        class: COMMIT_CLASSES[category],
         description:
           `${description} Input is only {planId}. Call it after showing the plan's preview; ` +
           "OpenCode may ask the user to approve it. Returns Google's response.",

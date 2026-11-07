@@ -44,7 +44,7 @@ src/
     integrations.ts sign-in
     commands.ts     /gws-status, /gws-doctor
     rpc.ts          status implementation
-    scripting.ts    tools RPC: every non-commit tool spec for scripts, as a session
+    tools-rpc.ts    tools RPC: every tool spec as a method, for a script running as a session
   domain/           pure logic; imports only domain/
     contract.ts     tool schemas
     config.ts       options

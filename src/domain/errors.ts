@@ -247,6 +247,8 @@ interface ErrorOptions {
  */
 export class GwsError extends Error {
   readonly code: ErrorCode
+  /** What happened, without the code or the next step: the form the tools RPC reports as `what`. */
+  readonly detail: string
   readonly next: string
   readonly enableUrl?: string
 
@@ -254,6 +256,7 @@ export class GwsError extends Error {
     const next = options.next ?? ErrorCode[code].next
     super(`${code}: ${sentence(detail)} Next step: ${sentence(next)}`)
     this.code = code
+    this.detail = detail
     this.next = next
     if (options.enableUrl) this.enableUrl = options.enableUrl
   }

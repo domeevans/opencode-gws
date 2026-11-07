@@ -7,9 +7,9 @@ import { agentLister, registerApprovalRules } from "./host/agents.js"
 import { planSummary, registerCommands } from "./host/commands.js"
 import { integrationAuthReporter, integrationConnection, integrationIds, integrationTokenProvider, registerIntegrations } from "./host/integrations.js"
 import { registerRpc, statusSource } from "./host/rpc.js"
-import { registerScripting } from "./host/scripting.js"
 import { registerSkills, skillLister } from "./host/skills.js"
 import { registerTools } from "./host/tools.js"
+import { registerToolsRpc, scriptMethods } from "./host/tools-rpc.js"
 import { Runtime } from "./runtime/index.js"
 
 /**
@@ -47,13 +47,13 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
   })
 
   let stopRpc: (() => Promise<void>) | undefined
-  let stopScripting: (() => Promise<void>) | undefined
+  let stopToolsRpc: (() => Promise<void>) | undefined
   let stopCommands: (() => Promise<void>) | undefined
   const close = async () => {
     const settled = runtime.close()
     try {
       await stopCommands?.()
-      await stopScripting?.()
+      await stopToolsRpc?.()
       await stopRpc?.()
     } finally {
       await settled
@@ -66,7 +66,9 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
     await registerTools(ctx, runtime, status)
     await registerSkills(ctx, config)
     stopRpc = await registerRpc(ctx, runtime, status)
-    stopScripting = await registerScripting(ctx, runtime, status)
+    stopToolsRpc = await registerToolsRpc(ctx, {
+      methods: scriptMethods({ runtime, assert: (request) => ctx.permission.assert(request as never), status }),
+    })
     stopCommands = await registerCommands(ctx, { status, plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary), doctor: runtime }, runtime.signal)
     runtime.audit.emit({ event: "plugin.loaded", outcome: "success" })
   } catch (error) {

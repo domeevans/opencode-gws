@@ -49,12 +49,15 @@ Ask the agent for what you need. It works in four steps:
 
 ### Scripts
 
-A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules, and it can plan but never commit:
+A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules. Every tool is a method; a write needs a prior explicit `allow` in the session's or the agent's rules, and an `ask` is refused because no one can answer it:
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/read \
+  -H "x-opencode-directory:$PWD" \
   -d '{"input":{"sessionID":"ses_…","input":{"operation":"gmail.users.messages.list","params":{"userId":"me","q":"is:unread"},"fields":"messages(id)"}}}'
 ```
+
+The header names the location whose plugin and sessions you mean; without it the call fails `rpc.unavailable` when the plugin is not loaded in the service's default location.
 
 See [Scripting](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/scripting.md).
 
