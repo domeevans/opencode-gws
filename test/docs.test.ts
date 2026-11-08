@@ -247,7 +247,7 @@ describe("the text the model is given", () => {
     ]
     for (const [file, text] of texts) {
       for (const sentence of sentences(text)) {
-        if (!/(?:\basks? (?:the user|you|first|before|each time|every time|for (?:each|every))|\bmay ask\b|\b(?:is|are) off\b|\b(?:the user|you) approv)/iu.test(sentence)) continue
+        if (!/(?:\basks? (?:the user|you|first|before|each time|every time|for (?:each|every))|\bmay ask\b|\b(?:is|are) off\b|\b(?:the user|you) approv|\bpermission prompt (?:is|shows)\b|\bprompt (?:is|shows) (?:the user's|your)\b)/iu.test(sentence)) continue
         expect({ file, sentence, namesAccess: /\baccess\b/.test(sentence) }).toEqual({ file, sentence, namesAccess: true })
       }
     }
