@@ -108,6 +108,30 @@ describe("the README's generated blocks", () => {
 describe("the tested releases", () => {
   const said = `${TESTED_HOSTS.slice(0, -1).join(", ")} and ${TESTED_HOSTS.at(-1)}`
 
+  it("names exactly the tested hosts in every file that says what is tested", () => {
+    // README, AGENTS.md, SECURITY, the configuration doc and the CHANGELOG's Unreleased section: wherever a sentence
+    // mentions a release as tested, the list is TESTED_HOSTS, in full.
+    const unreleased = /## \[Unreleased\]([\s\S]*?)(?=\n## |$)/.exec(read("CHANGELOG.md"))?.[1] ?? ""
+    const sources: [string, string][] = [
+      ["README.md", read("README.md")],
+      ["AGENTS.md", read("AGENTS.md")],
+      ["SECURITY.md", read("SECURITY.md")],
+      ["docs/configuration.md", read("docs/configuration.md")],
+      ["CHANGELOG.md (Unreleased)", unreleased],
+    ]
+    for (const [file, body] of sources) {
+      const mentions = body
+        .split("\n")
+        .flatMap((line) => line.split(/\.\s+/))
+        .filter((sentence) => /\btested\b/i.test(sentence))
+        // The supported range is not a tested release: drop a backticked `>=a.b.c <d.e.f` span before reading versions.
+        .map((sentence) => sentence.replace(/`[^`]*>=[^`]*`/g, ""))
+        .map((sentence) => [...sentence.matchAll(/\b\d+\.\d+\.\d+\b/g)].map((match) => match[0]))
+        .filter((versions) => versions.length > 0)
+      for (const versions of mentions) expect({ file, versions: [...new Set(versions)].sort() }).toEqual({ file, versions: [...TESTED_HOSTS].sort() })
+    }
+  })
+
   it("names the tested hosts in full wherever prose states them", () => {
     expect(TESTED_HOSTS).toContain("2.2.6")
     // Prose wraps, so compare with the line breaks flattened.
