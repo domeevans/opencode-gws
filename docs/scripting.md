@@ -77,12 +77,15 @@ Run the command in the project whose agent you mean, and send the call to that l
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/read \
-  -H "x-opencode-directory:$PWD" -d '{"input":{"sessionID":"ses_…","input":{…}}}'
+  -H "x-opencode-directory:$PWD" -d '{"input":{"sessionID":"ses_…","input":{"operation":"users.get","params":{"userId":"me"}}}}'
 ```
 
 Without it the call goes to the service's default location and fails `rpc.unavailable` if the plugin is not loaded
 there. The HTTP equivalents are the `location[directory]` query parameter and the same header. `describe` reports the
-plugin's `location` and a `locationHint`.
+`location` that answered and a `locationHint`.
+
+A location unloads after OpenCode's idle timeout. If a scheduled script gets `rpc.unavailable` from a location that was
+loaded before, send the call again once: the request loads the location. Jobs keeps its own location loaded.
 
 ## Calling a method
 

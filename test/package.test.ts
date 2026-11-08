@@ -31,16 +31,30 @@ describe("main package", () => {
   })
 
   it("states the tested host line and has no lifecycle scripts", () => {
-    expect(pkg.opencode).toEqual({ host: ">=2.2.3 <2.3.0" })
+    expect(pkg.opencode).toMatchObject({
+      host: ">=2.2.3 <2.3.0",
+      vendor: { id: "google-workspace", name: "Google Workspace", domain: "workspace.google.com" },
+      icons: [
+        { src: "assets/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] },
+        { src: "assets/icon-128.png", mimeType: "image/png", sizes: ["128x128"] },
+        { src: "assets/icon-256.png", mimeType: "image/png", sizes: ["256x256"] },
+      ],
+    })
     expect(LIFECYCLE.filter((name) => pkg.scripts[name] !== undefined)).toEqual([])
   })
 
   it("exports only the server part and the TUI part, with no declarations", () => {
-    expect(pkg.exports).toEqual({ ".": "./dist/index.js", "./tui": "./dist/tui.js" })
+    expect(pkg.exports).toEqual({
+      ".": "./dist/index.js",
+      "./tui": "./dist/tui.js",
+      "./icon.svg": "./assets/icon.svg",
+      "./icon-128.png": "./assets/icon-128.png",
+      "./icon-256.png": "./assets/icon-256.png",
+    })
   })
 
   it("whitelists the published files", () => {
-    expect(pkg.files).toEqual(["dist", "assets/icon.svg", "skills", "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
+    expect(pkg.files).toEqual(["dist", "assets/icon.svg", "assets/icon-128.png", "assets/icon-256.png", "skills", "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
   })
 
   it("pins every dev dependency exactly, with the OpenCode SDKs at 2.2.3", () => {
