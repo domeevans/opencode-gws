@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { CHANGING_ACTIONS, NAMESPACE_ACTION, READ_ACTIONS, type Access } from "../src/domain/access.js"
 import { defaultRules, hasDefaultRules, insertDefaultRules, permissionsBlock, unguardedAgents, type Rule } from "../src/host/agents.js"
+import { evaluate } from "../src/host/tools-rpc.js"
 
 /**
  * The default rules: the block every agent gets after its base allow. At the
@@ -25,6 +26,10 @@ describe("the default rules", () => {
     // The default is `all`: every tool the plugin registers, and the namespace, allowed.
     expect(defaultRules().every((rule) => rule.effect === "allow")).toBe(true)
     expect(defaultRules()).toEqual(defaultRules("all"))
+    // An unclassified name is not in the block's exact actions, so the namespace rule alone decides it.
+    for (const access of ["all", "ask-changes", "read-only"] as const) {
+      expect({ access, effect: evaluate([base(), ...defaultRules(access)], "gws.new_tool") }).toEqual({ access, effect: effectOf(access) })
+    }
   })
 
   it("inserts the block immediately after the base allow, and a replay changes nothing", () => {
