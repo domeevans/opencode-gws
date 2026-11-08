@@ -16,9 +16,10 @@
  *
  * Usage:
  *   node scripts/generate-manifest.mjs [--gws <absolute path>] [--services gmail,drive] [--out path]
+ *   node scripts/generate-manifest.mjs --check    never writes: exits 1 when the checkout's manifest differs
  */
 import { execFileSync } from "node:child_process"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { manifestText } from "./manifest-format.mjs"
@@ -325,6 +326,7 @@ export function walk(gws, service, path, acc, resolve = true) {
 
 async function main() {
   const args = process.argv.slice(2)
+  const check = args.includes("--check")
   const gws = gwsRunner(await resolveGws(args))
   const servicesIndex = args.indexOf("--services")
   const outIndex = args.indexOf("--out")
@@ -351,10 +353,24 @@ async function main() {
     result.services.push(acc)
   }
 
-  mkdirSync(dirname(out), { recursive: true })
-  writeFileSync(out, manifestText(result))
   const methods = result.services.reduce((sum, service) => sum + service.methods.length, 0)
   const helpers = result.services.reduce((sum, service) => sum + service.helpers.length, 0)
+  const text = manifestText(result)
+  if (check) {
+    // The generation stamp is not part of what the checkout must match, so both sides drop it.
+    const withoutStamp = (value) => value.replace(/"generatedAt": "[^"]*",/, '"generatedAt": "",')
+    if (!existsSync(out) || withoutStamp(readFileSync(out, "utf8")) !== withoutStamp(text)) {
+      process.stderr.write(
+        `[manifest] ${out} does not match what this gws reports (${result.services.length} services, ${methods} methods, ` +
+          `${helpers} helpers). Next step: Run npm run manifest and commit the result, then npm run docs:coverage.\n`,
+      )
+      process.exit(1)
+    }
+    process.stderr.write(`[manifest] ${out} matches: ${result.services.length} services, ${methods} methods, ${helpers} helpers\n`)
+    return
+  }
+  mkdirSync(dirname(out), { recursive: true })
+  writeFileSync(out, text)
   process.stderr.write(`[manifest] wrote ${out}: ${result.services.length} services, ${methods} methods, ${helpers} helpers\n`)
 }
 

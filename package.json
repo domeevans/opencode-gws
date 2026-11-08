@@ -18,15 +18,48 @@
     "google-workspace"
   ],
   "opencode": {
-    "host": ">=2.2.3 <2.3.0"
+    "host": ">=2.2.3 <2.3.0",
+    "icons": [
+      {
+        "src": "assets/icon.svg",
+        "mimeType": "image/svg+xml",
+        "sizes": [
+          "any"
+        ]
+      },
+      {
+        "src": "assets/icon-128.png",
+        "mimeType": "image/png",
+        "sizes": [
+          "128x128"
+        ]
+      },
+      {
+        "src": "assets/icon-256.png",
+        "mimeType": "image/png",
+        "sizes": [
+          "256x256"
+        ]
+      }
+    ],
+    "vendor": {
+      "id": "google-workspace",
+      "name": "Google Workspace",
+      "domain": "workspace.google.com"
+    }
   },
   "exports": {
     ".": "./dist/index.js",
-    "./tui": "./dist/tui.js"
+    "./tui": "./dist/tui.js",
+    "./icon.svg": "./assets/icon.svg",
+    "./icon-128.png": "./assets/icon-128.png",
+    "./icon-256.png": "./assets/icon-256.png"
   },
   "files": [
     "dist",
     "assets/icon.svg",
+    "assets/icon-128.png",
+    "assets/icon-256.png",
     "skills",
     "manifest/generated.json",
     "views/gmail-thread.html",
@@ -39,7 +72,7 @@
   "scripts": {
     "build": "node scripts/clean.mjs && node scripts/bundle.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
-    "lint": "biome check && node scripts/check-copies.mjs",
+    "lint": "biome check && node scripts/check-copies.mjs && node scripts/check-icons.mjs && node scripts/check-workflows.mjs",
     "test": "vitest run",
     "test:host": "vitest run -c vitest.host.config.ts",
     "test:pack": "node scripts/pack-smoke.mjs",
@@ -49,7 +82,8 @@
     "generated:check": "node scripts/generate-docs.mjs --check",
     "manifest": "node scripts/generate-manifest.mjs",
     "drift": "node scripts/drift.mjs",
-    "docs:coverage": "node scripts/generate-docs.mjs"
+    "docs:coverage": "node scripts/generate-docs.mjs",
+    "manifest:check": "node scripts/generate-manifest.mjs --check"
   },
   "optionalDependencies": {
     "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.9",
