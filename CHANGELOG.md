@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `gws_events_list`, and the tools RPC method `events_list`: the Gmail messages that arrived since a cursor, as Memory's normalised events, oldest first. The first listing searches `messages.list` from `since` (24 hours back by default), then follows `history.list` from the mailbox's history id; a history id Gmail no longer keeps falls back to the search. Each event has the sender and recipients as `mailto:` ids, the subject, the thread and its Gmail link, the system labels, and the message's own text without quoted replies or signature, at most 4,096 characters. Spam, trash, drafts, Promotions and Social are left out. The owner is the account's address from `getProfile`. It only reads and never asks: it asserts `gws.events_list`, then `gws.read` on each Gmail read.
+- `src/host/events-list.ts`, the shared `events_list` source contract: the event type, the input parser, the cursor helpers, the checks, and the conformance check every source runs in its tests. `scripts/check-copies.mjs` pins it like the other shared copies.
+- The error `CURSOR_INVALID`, for an events_list cursor from another account, mailbox or source.
+- The fake gws answers Gmail reads from a synthetic mailbox file (`FAKE_GWS_MAILBOX`), for the events_list tests.
+
+### Changed
+
+- A Google API error keeps its HTTP status on the plugin's error, so events_list can tell a message deleted since it was listed (404) from a failure.
+
 ## [0.0.9] - 2026-11-06
 
 ### Added

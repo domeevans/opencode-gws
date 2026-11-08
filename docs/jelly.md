@@ -13,14 +13,14 @@ declaration, because that schema accepts no unknown keys.
 
 ## Tools and permissions
 
-11 tools are declared (5 read-only). Jelly's agents have no base "allow everything"
+12 tools are declared (6 read-only). Jelly's agents have no base "allow everything"
 rule, so this plugin's own default rules, which it puts after that rule, never reach them. Jelly
 writes each declared `ask` or `deny` as that tool's default instead (the person's own choice
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
 changes nothing in Jelly.
 
 - Ask: `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete`, `gws.admin`.
-- Everything else runs, as the plugin's own rules let it.
+- Everything else runs, as the plugin's own rules let it. `gws.events_list` is for Memory's collector, which runs it unattended, so it never asks; it also asserts `gws.read` on each Gmail read it makes.
 
 `gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
 

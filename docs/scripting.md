@@ -13,6 +13,7 @@ Each method is a tool with the same name, input and output: every tool except th
 | `schema` | `gws_schema` |
 | `read` | `gws_read` |
 | `plan` | `gws_plan` |
+| `events_list` | `gws_events_list`: the Gmail messages since a cursor, as Memory's events ([configuration.md](configuration.md#events-list)) |
 | `describe` | none: lists the methods, their permission actions, and their input and output as JSON Schema |
 
 The commit tools are not methods. A script can plan a change but never commit it.

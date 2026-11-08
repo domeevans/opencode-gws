@@ -167,7 +167,7 @@ describe("skill content", () => {
 
   it("names only real tools", () => {
     const names = new Set(toolSpecs({} as never, async () => {}, async () => { throw new Error("unused") }).map((spec) => spec.name))
-    expect(names.size).toBe(11)
+    expect(names.size).toBe(12)
     const bad: string[] = []
     for (const { dir, text } of skills) {
       for (const match of text.matchAll(/\bgws_(\w+)/g)) if (!names.has(match[1]!)) bad.push(`${dir}: gws_${match[1]}`)

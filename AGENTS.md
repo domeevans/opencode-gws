@@ -49,8 +49,8 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   every agent through `ctx.agent.transform`, right after its base
   `* * allow`. An agent counts as guarded when the block appears anywhere
   after that rule.
-- Reads (`gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan`)
-  get no rule. The last matching rule wins, so user rules and saved Always
+- Reads (`gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan`,
+  `gws.events_list`) get no rule. The last matching rule wins, so user rules and saved Always
   override the asks and a stricter agent is never weakened.
 - Each commit asserts `gws.<category>` on `<account>:<operation>`. Only write
   and export offer Always.
@@ -88,6 +88,14 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 - Do not weaken a security test to get a green run.
 
 ## Tools, errors, skills
+
+- `gws_events_list` is Gmail's side of Memory's sources funnel: a Code
+  Mode read that never asks, asserting `gws.events_list` and then
+  `gws.read` on each Gmail read it makes. `src/host/events-list.ts` is the
+  shared `events_list` contract every source plugin carries unchanged
+  (`scripts/check-copies.mjs` pins it); change it in every source plugin
+  at once. Its tests run the contract's conformance check against the fake
+  gws's synthetic mailbox (`FAKE_GWS_MAILBOX`).
 
 - `manifest/generated.json` is the coverage contract. Regenerate it with
   `npm run manifest`; never hand-edit it or any other generated file.

@@ -11,7 +11,7 @@ import { type Declaration, type DeclaredTool, declarationProblems, docProblems, 
 
 const ROOT = new URL("../", import.meta.url)
 const jelly = readPackage(ROOT).jelly as Declaration & { tools: DeclaredTool[] }
-const READS = ["gws.catalog", "gws.plan", "gws.read", "gws.schema", "gws.status"]
+const READS = ["gws.catalog", "gws.events_list", "gws.plan", "gws.read", "gws.schema", "gws.status"]
 
 describe("the jelly declaration", () => {
   it("follows the plugin authors' standard, with the effects the plugin's own ask rules give", () => {

@@ -380,7 +380,7 @@ export function processError(result: ProcessResult, parsed: ParsedResult, servic
   if (result.exitCode === EXIT.validation) return new GwsError("GWS_VALIDATION_ERROR", `gws rejected the request: ${message.slice(0, 500)}`)
   if (result.exitCode === EXIT.discovery) return new GwsError("GWS_DISCOVERY_ERROR", `gws could not load the API description: ${message.slice(0, 500)}`)
   if (result.exitCode === EXIT.internal) return new GwsError("GWS_INTERNAL_ERROR", `gws failed: ${message.slice(0, 500)}`)
-  return new GwsError("GWS_API_ERROR", message.slice(0, 500))
+  return new GwsError("GWS_API_ERROR", message.slice(0, 500), typeof payload?.code === "number" ? { status: payload.code } : {})
 }
 
 /** The message of `processError`. */
