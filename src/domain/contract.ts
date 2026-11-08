@@ -286,6 +286,11 @@ export const EventsListInput = z
     cursor: z.string().min(1).max(1024).optional().describe("The cursor of the previous result, to list what arrived after it. It wins over since"),
     limit: z.number().int().min(1).max(500).optional().describe("Most events to return, 1 to 500; 100 by default"),
     account: Account,
+    source: z
+      .string()
+      .max(64)
+      .optional()
+      .describe('The source to list: "gmail", the only one until Calendar and Drive are added. Default: "gmail"'),
   })
   .describe("List Gmail messages since a cursor, as Memory's events")
 
@@ -307,6 +312,8 @@ export const SourceEvent = z.object({
 })
 
 export const EventsListOutput = z.object({
+  source: z.literal("gmail").describe("The source listed, also on an empty page"),
+  account: z.string().describe("The account alias listed, also on an empty page"),
   owner: z.object({ id: z.string(), label: z.string() }).describe("The signed-in Gmail address"),
   events: z.array(SourceEvent).describe("Oldest first"),
   cursor: z.string().describe("Pass it to the next call"),

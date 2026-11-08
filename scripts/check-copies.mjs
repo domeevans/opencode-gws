@@ -13,7 +13,7 @@ const END = "// <<< PLUGIN-SPECIFIC <<<"
 const COPIES = [
   { path: "src/host/tools-rpc.ts", optional: true, sha256: "cb13ea1d31f90d9c8bf84f95b2c18bbc70cdcc347552e49b11a860b647ae317d", part: sharedPart },
   { path: "test/support/jelly-kit.ts", optional: false, sha256: "ab599abcf041044c77e7938c3d9a081e00072487a7ec20b654d86c8230951190", part: (text) => text },
-  { path: "src/host/events-list.ts", optional: true, sha256: "8b622f2b73901d9ab86ce03ba61a782ff5e1a074705d712d6b947910b28d896c", part: (text) => text },
+  { path: "src/host/events-list.ts", optional: true, sha256: "9d72fc8dd88fa88b22bf74eb078ad05afcaebff1b324976c42250c77d1ea605e", part: (text) => text },
 ]
 
 function sharedPart(text, path) {

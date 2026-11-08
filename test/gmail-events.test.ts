@@ -114,6 +114,20 @@ describe("gws_events_list keeps the shared contract", () => {
     await assertEventsListConformance(list, { source: GMAIL_SOURCE, owner: OWNER, since: SINCE, expected: LISTED, pageSize: 1 })
   })
 
+  it("passes it with source named on every call, as the collector names it for a plugin with several sources", async () => {
+    const { list } = await harness()
+    await assertEventsListConformance(list, { source: GMAIL_SOURCE, account: "personal", owner: OWNER, since: SINCE, expected: LISTED, sourceInput: true })
+  })
+
+  it("names the source and account on an empty first page, and refuses any source but gmail", async () => {
+    const { list } = await harness()
+    expect(await list({ since: "2026-12-01T00:00:00Z" })).toMatchObject({ source: "gmail", account: "personal", owner: OWNER, events: [], more: false })
+    await expect(list({ since: SINCE, source: "calendar" })).rejects.toThrow(
+      /^GWS_VALIDATION_ERROR: The source 'calendar' is not available: events_list lists Gmail only, until Calendar and Drive are added\. Next step: Call events_list without source, or with source "gmail"\.$/,
+    )
+    await expect(list({ since: SINCE, source: "Drive" })).rejects.toThrow(/^GWS_VALIDATION_ERROR: "source" must be a source's name/)
+  })
+
   it("states the contract's limits in its schemas", () => {
     const input = z.toJSONSchema(EventsListInput, { io: "input" }) as { properties: Record<string, { maximum?: number; minimum?: number; maxLength?: number }> }
     expect(input.properties["limit"]).toMatchObject({ minimum: PAGE.min, maximum: PAGE.max })
@@ -133,7 +147,7 @@ describe("the events", () => {
     const result = await list({ since: SINCE })
     expect(resultProblems(result)).toEqual([])
     expect(spec.output.safeParse(result).success).toBe(true)
-    expect(result).toMatchObject({ owner: OWNER, more: false, trust: "untrusted" })
+    expect(result).toMatchObject({ source: "gmail", account: "personal", owner: OWNER, more: false, trust: "untrusted" })
     expect(ids(result)).toEqual(LISTED)
     const [ask, reply, build, lunch] = result.events
     expect(ask).toMatchObject({

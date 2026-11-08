@@ -12,10 +12,16 @@ const T0 = Date.parse("2026-11-01T09:00:00Z")
 const event = (index: number, extra: Partial<Parameters<typeof makeEvent>[0]> = {}): SourceEvent =>
   makeEvent({ source: "demo", account: "work", external_id: `item-${index}`, kind: "message", occurred_at: T0 + index * 60_000, title: `Item ${index}`, text: `Text ${index}`, ...extra })
 
+const OWNER = { id: "mailto:sam@example.com", label: "sam@example.com" }
+const WHOSE = { source: "demo", account: "work", owner: OWNER }
+
+type Broken = { skip?: boolean; anyCursor?: boolean; noLimit?: boolean; newestFirst?: boolean; anySource?: boolean; unnamedWhenEmpty?: boolean }
+
 /** A correct in-memory source over `items`, and switches that break one rule each. */
-function source(items: readonly SourceEvent[], broken: { skip?: boolean; anyCursor?: boolean; noLimit?: boolean; newestFirst?: boolean } = {}) {
+function source(items: readonly SourceEvent[], broken: Broken = {}) {
   return async (input: EventsListInput) => {
     const parsed = parseEventsListInput(input)
+    if (parsed.ok && parsed.value.source !== undefined && parsed.value.source !== "demo" && !broken.anySource) throw new Error("not a source of this plugin")
     if (!parsed.ok && !(broken.noLimit && parsed.problems.every(problem => problem.startsWith('"limit"')))) throw new Error(parsed.ok ? "" : parsed.problems.join("; "))
     const request = parsed.ok ? parsed.value : { limit: 1_000, ...(input.cursor ? { cursor: input.cursor } : {}) }
     let from = 0
@@ -31,7 +37,12 @@ function source(items: readonly SourceEvent[], broken: { skip?: boolean; anyCurs
     }
     const page = items.slice(from, from + request.limit)
     const next = from + page.length + (broken.skip && page.length > 0 ? 1 : 0)
-    return eventsListResult({ id: "mailto:sam@example.com", label: "sam@example.com" }, broken.newestFirst ? [...page].reverse() : page, encodeCursor("demo", { n: next }), next < items.length)
+    const result = eventsListResult(WHOSE, broken.newestFirst ? [...page].reverse() : page, encodeCursor("demo", { n: next }), next < items.length)
+    if (broken.unnamedWhenEmpty && page.length === 0) {
+      const { source: _source, account: _account, ...unnamed } = result
+      return unnamed
+    }
+    return result
   }
 }
 
@@ -39,7 +50,9 @@ describe("input", () => {
   it("defaults the limit and reads since as epoch milliseconds", () => {
     expect(parseEventsListInput({})).toEqual({ ok: true, value: { limit: PAGE.default } })
     expect(parseEventsListInput(undefined)).toEqual({ ok: true, value: { limit: PAGE.default } })
-    expect(parseEventsListInput({ since: "2026-11-01", cursor: "abc", limit: 7, account: "work" })).toEqual({ ok: true, value: { since: Date.parse("2026-11-01T00:00:00Z"), cursor: "abc", limit: 7, account: "work" } })
+    expect(parseEventsListInput({ since: "2026-11-01", cursor: "abc", limit: 7, account: "work", source: "gmail" })).toEqual({
+      ok: true, value: { since: Date.parse("2026-11-01T00:00:00Z"), cursor: "abc", limit: 7, account: "work", source: "gmail" },
+    })
     expect(sinceTime("2026-11-01T10:00+01:00")).toBe(Date.parse("2026-11-01T09:00:00Z"))
   })
 
@@ -51,6 +64,7 @@ describe("input", () => {
     for (const limit of [0, 501, 1.5, "10"]) expect(problems({ limit }), String(limit)).toEqual(['"limit" must be an integer from 1 to 500'])
     expect(problems({ cursor: "" })).toHaveLength(1)
     expect(problems({ account: "" })).toHaveLength(1)
+    for (const source of ["", "Gmail", "g mail", 7]) expect(problems({ source }), String(source)).toEqual(['"source" must be a source\'s name, a lowercase word such as gmail'])
     expect(problems([])).toEqual(["the input must be an object"])
     expect(JSON.stringify(problems({ since: "secret-value" }))).not.toContain("secret-value")
   })
@@ -114,14 +128,19 @@ describe("events", () => {
   })
 
   it("finds each way a result breaks the contract", () => {
-    const owner = { id: "mailto:sam@example.com", label: "sam@example.com" }
-    expect(resultProblems(eventsListResult(owner, [event(1), event(2)], "c", false))).toEqual([])
-    expect(resultProblems(eventsListResult(owner, [event(2), event(1)], "c", false))).toEqual(["the result's events are not oldest first"])
-    expect(resultProblems(eventsListResult(owner, [event(1), event(1)], "c", false))).toEqual(["the result lists one event twice"])
-    expect(resultProblems(eventsListResult(owner, [event(1), event(2)], "c", false), 1)).toEqual(["the result has 2 events, over the limit of 1"])
-    expect(resultProblems({ owner, events: [], cursor: "", more: false, trust: "trusted", extra: true })).toEqual([
+    expect(resultProblems(eventsListResult(WHOSE, [event(1), event(2)], "c", false))).toEqual([])
+    expect(resultProblems(eventsListResult(WHOSE, [event(2), event(1)], "c", false))).toEqual(["the result's events are not oldest first"])
+    expect(resultProblems(eventsListResult(WHOSE, [event(1), event(1)], "c", false))).toEqual(["the result lists one event twice"])
+    expect(resultProblems(eventsListResult(WHOSE, [event(1), event(2)], "c", false), 1)).toEqual(["the result has 2 events, over the limit of 1"])
+    expect(resultProblems({ ...WHOSE, events: [], cursor: "", more: false, trust: "trusted", extra: true })).toEqual([
       'the result has the field "extra", which the contract does not define', expect.stringContaining("cursor"), expect.stringContaining("trust"),
     ])
+    // Source and account are required, empty pages included, and every event names the same two.
+    expect(resultProblems({ owner: OWNER, events: [], cursor: "c", more: false, trust: "untrusted" })).toEqual([
+      "the result's source must be a lowercase name such as gmail", expect.stringContaining("the result's account"),
+    ])
+    expect(resultProblems(eventsListResult({ ...WHOSE, account: "home" }, [event(1)], "c", false))).toEqual(["events[0] names another account than the result"])
+    expect(resultProblems(eventsListResult({ ...WHOSE, source: "other" }, [event(1)], "c", false))).toEqual(["events[0] names another source than the result"])
   })
 
   it("orders oldest first, keeping ties in order, and fits a page under the byte cap", () => {
@@ -130,7 +149,7 @@ describe("events", () => {
     const fits = fitPage(big, 500)
     expect(fits).toBeGreaterThan(100)
     expect(fits).toBeLessThan(400)
-    expect(Buffer.byteLength(JSON.stringify(eventsListResult({ id: "x:y", label: "y" }, big.slice(0, fits), "c", true)))).toBeLessThanOrEqual(MAX_PAGE_BYTES)
+    expect(Buffer.byteLength(JSON.stringify(eventsListResult(WHOSE, big.slice(0, fits), "c", true)))).toBeLessThanOrEqual(MAX_PAGE_BYTES)
     expect(fitPage(big, 3)).toBe(3)
     expect(fitPage([], 3)).toBe(0)
   })
@@ -138,18 +157,26 @@ describe("events", () => {
 
 describe("conformance", () => {
   const items = Array.from({ length: 5 }, (_, index) => event(index))
-  const fixtures = { source: "demo", account: "work", owner: { id: "mailto:sam@example.com", label: "sam@example.com" }, since: "2026-11-01T08:00:00Z", expected: items.map(item => item.external_id) }
+  const fixtures = { source: "demo", account: "work", owner: OWNER, since: "2026-11-01T08:00:00Z", expected: items.map(item => item.external_id) }
 
   it("passes a source that keeps the contract", async () => {
     await assertEventsListConformance(source(items), fixtures)
     await assertEventsListConformance(source(items), { ...fixtures, pageSize: 1 })
     await assertEventsListConformance(source(items), { ...fixtures, pageSize: 5 })
+    await assertEventsListConformance(source(items), { ...fixtures, sourceInput: true })
+    await assertEventsListConformance(source([]), { ...fixtures, expected: [] })
   })
 
   it("catches a source that skips, ignores the limit, accepts any cursor, or lists newest first", async () => {
     expect(await eventsListConformance(source(items, { skip: true }), fixtures)).toContainEqual(expect.stringMatching(/^the pages of 2 list \[item-0, item-1, item-3/))
     expect(await eventsListConformance(source(items, { noLimit: true }), fixtures)).toEqual(["a limit of 501 was not refused", "a limit of 0 was not refused"])
     expect(await eventsListConformance(source(items, { anyCursor: true }), fixtures)).toEqual(["a malformed cursor was not refused", "another source's cursor was not refused"])
+    expect(await eventsListConformance(source(items, { anySource: true }), fixtures)).toEqual(["a source the plugin does not have was not refused"])
+    // Both empty pages are caught: the one after the last cursor, and a first page from a since in the future.
+    expect(await eventsListConformance(source(items, { unnamedWhenEmpty: true }), fixtures)).toEqual([
+      "the last cursor: the result's source must be a lowercase name such as gmail", expect.stringContaining("the last cursor: the result's account"),
+      "an empty first page: the result's source must be a lowercase name such as gmail", expect.stringContaining("an empty first page: the result's account"),
+    ])
     expect(await eventsListConformance(source(items, { newestFirst: true }), fixtures)).toContainEqual(expect.stringContaining("not oldest first"))
     await expect(assertEventsListConformance(source(items, { skip: true }), fixtures)).rejects.toThrow(/^events_list breaks the contract:\n- /)
   })
@@ -157,7 +184,7 @@ describe("conformance", () => {
   it("catches events from before since, another source or account, and a changing owner", async () => {
     expect(await eventsListConformance(source(items), { ...fixtures, since: "2026-11-01T09:02:00Z", expected: fixtures.expected.slice(2) })).toEqual([])
     expect(await eventsListConformance(source(items), { ...fixtures, source: "other" })).toContainEqual(expect.stringContaining("names the source demo, not other"))
-    expect(await eventsListConformance(source(items), { ...fixtures, account: "home" })).toContainEqual(expect.stringContaining("names the account work, not home"))
+    expect(await eventsListConformance(source(items), { ...fixtures, account: "home" })).toContainEqual(expect.stringContaining("the result names the account work, not home"))
     expect(await eventsListConformance(source(items), { ...fixtures, owner: { id: "mailto:x@example.com", label: "x" } })).toContainEqual(expect.stringContaining("not the fixture's owner"))
   })
 })

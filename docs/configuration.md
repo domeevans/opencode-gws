@@ -183,8 +183,9 @@ Two skills load automatically: `opencode-gws` (how the tools work: accounts, pla
 | `cursor` | unset | The `cursor` of the previous result. It wins over `since`. A cursor from another account, another source, or the account before it signed in as another address is `CURSOR_INVALID`. |
 | `limit` | `100` | Events, 1–500. |
 | `account` | the only account | The account alias, as for every tool. |
+| `source` | `gmail` | The source to list. Only `gmail` exists until Calendar and Drive are added; any other is `GWS_VALIDATION_ERROR`. |
 
-The result is `{ owner, events, cursor, more, trust: "untrusted" }`. `owner` is `{ "id": "mailto:<address>", "label": "<address>" }`, the account's address from `gmail.users.getProfile`. Each event is one Gmail message:
+The result is `{ source, account, owner, events, cursor, more, trust: "untrusted" }`. `source` is `gmail` and `account` the account alias on every result, an empty one included, so Memory can bind the source before it has anything to list. `owner` is `{ "id": "mailto:<address>", "label": "<address>" }`, the account's address from `gmail.users.getProfile`. Each event is one Gmail message:
 
 | Field | Value |
 | --- | --- |

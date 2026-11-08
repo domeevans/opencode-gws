@@ -92,10 +92,19 @@ const step = (id: string, by: bigint) => {
 }
 const before = (a: string, b: string) => BigInt(a) < BigInt(b)
 
-/** A request's problems as GWS_VALIDATION_ERROR, or the parsed request. */
+/** The sources events_list lists today. Calendar and Drive come later, each as its own source. */
+export const EVENT_SOURCES: readonly string[] = [GMAIL_SOURCE]
+
+/** A request's problems as GWS_VALIDATION_ERROR, or the parsed request; a source other than gmail is refused. */
 export function eventsRequest(input: unknown): EventsListRequest {
   const parsed = parseEventsListInput(input)
   if (!parsed.ok) throw new GwsError("GWS_VALIDATION_ERROR", parsed.problems.join("; "))
+  const { source } = parsed.value
+  if (source !== undefined && !EVENT_SOURCES.includes(source)) {
+    throw new GwsError("GWS_VALIDATION_ERROR", `the source '${source}' is not available: events_list lists Gmail only, until Calendar and Drive are added`, {
+      next: 'Call events_list without source, or with source "gmail".',
+    })
+  }
   return parsed.value
 }
 
@@ -295,5 +304,5 @@ export async function gmailEvents(runtime: Pick<Runtime, "read">, account: strin
     const last = Math.max(state.t, ...events.map((event) => Date.parse(event.occurred_at)))
     state = { ...state, t: last }
   }
-  return eventsListResult(owner, oldestFirst(events), encodeCursor(GMAIL_SOURCE, { a: account, o: mailbox, ...state }), more)
+  return eventsListResult({ source: GMAIL_SOURCE, account, owner }, oldestFirst(events), encodeCursor(GMAIL_SOURCE, { a: account, o: mailbox, ...state }), more)
 }
