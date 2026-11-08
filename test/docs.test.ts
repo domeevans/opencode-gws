@@ -1,11 +1,16 @@
 import { readdirSync, readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
+import type { z } from "zod"
 import { ACCESS_VALUES, type Access } from "../src/domain/access.js"
+import { CatalogInput, CommitInput, RequestInput, SchemaInput, StatusInput } from "../src/domain/contract.js"
 import { ErrorCode } from "../src/domain/errors.js"
 import { TESTED_HOSTS } from "../src/domain/host.js"
 import { defaultRules } from "../src/host/agents.js"
-import { NEXT_STEPS } from "../src/host/tools-rpc.js"
+import type { StatusSource } from "../src/host/rpc.js"
+import { NAMESPACE, toolSpecs } from "../src/host/tools.js"
+import { NEXT_STEPS, TOOLS_RPC_ID } from "../src/host/tools-rpc.js"
+import type { Runtime } from "../src/runtime/index.js"
 
 /**
  * The README is the shipped contract: the default-rules block for every
@@ -64,6 +69,9 @@ describe("the README's generated blocks", () => {
     const raised = new Set<string>()
     for (const file of walk("src")) {
       for (const match of read(file).matchAll(/"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)"/g)) raised.add(match[1]!)
+      // A code written into a message, such as "STATUS_UNAVAILABLE: ...", is caught here too.
+      for (const match of read(file).matchAll(/"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*): /g)) raised.add(match[1]!)
+      for (const match of read(file).matchAll(/`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*): /g)) raised.add(match[1]!)
     }
     // Not plugin codes: Google's own reason and status strings, the audit's marker for a non-plugin error, an
     // httpMethod marker for helpers, HTTP methods, Node's errno codes, and the shared tools RPC's codes for
@@ -78,6 +86,8 @@ describe("the README's generated blocks", () => {
       "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "CLOUDSDK_CONFIG",
       "TMPDIR", "TMP", "TEMP", "XDG_CACHE_HOME", "XDG_STATE_HOME", "SIGKILL",
       "EEXIST", "EXDEV", "EPERM", "ENOTSUP", "ENOENT",
+      // "CODE" is the placeholder a doc comment writes the message shape with, not a code.
+      "CODE",
     ])
     expect([...raised].filter((code) => !table.has(code) && !upstream.has(code))).toEqual([])
     // Every code in the table is in the README table, which the previous test pins to the same table.
@@ -121,3 +131,116 @@ function walk(dir: string): string[] {
     })
     .sort()
 }
+
+/** Everything a user or the model reads about this release, and the source its comments ship in. */
+const SHIPPED: readonly string[] = [
+  "README.md",
+  "SECURITY.md",
+  "CHANGELOG.md",
+  "AGENTS.md",
+  "CONTRIBUTING.md",
+  ...readdirSync(`${ROOT}docs`).map((name) => `docs/${name}`),
+  ...readdirSync(`${ROOT}skills`).map((name) => `skills/${name}/SKILL.md`),
+  ...walk("src"),
+]
+
+describe("no internal wording", () => {
+  // R9: shipped text states behaviour, never who decided it, and names no lane.
+  const banned = [
+    /\bowner(?:'s)? (?:decision|ruling)\b/iu,
+    /\bthe lead\b/iu,
+    /\b(?:audit|review|reconcile) lane\b/iu,
+    /hey-jelly\s*#/iu,
+  ]
+
+  it("names no owner decision, lead, lane or issue in any shipped file", () => {
+    for (const file of SHIPPED) {
+      for (const pattern of banned) expect({ file, pattern: String(pattern), hit: pattern.exec(read(file))?.[0] }).toEqual({ file, pattern: String(pattern), hit: undefined })
+    }
+  })
+})
+
+describe("docs/scripting.md and the README's scripting lines", () => {
+  const SCHEMAS: Readonly<Record<string, z.ZodType>> = {
+    status: StatusInput,
+    catalog: CatalogInput,
+    schema: SchemaInput,
+    read: RequestInput,
+    plan: RequestInput,
+    write: CommitInput,
+    export: CommitInput,
+    send: CommitInput,
+    share: CommitInput,
+    delete: CommitInput,
+    admin: CommitInput,
+  }
+  const examples = (file: string) => {
+    // A shell continuation joins its line, so one example is one logical line.
+    const source = read(file).replace(/\\\n\s*/g, " ")
+    return [...source.matchAll(/opencode api post (\/api\/rpc\/[^\s/]+\/([A-Za-z0-9._<>-]+))[ \t]+([^\n]*)/g)].map((match) => {
+      const window = source.slice(match.index!, match.index! + match[0].length + 400)
+      const body = /-d '(\{[^']*\})'/.exec(window.replace(/\n\s+(?=["}])/g, ""))
+      return { url: match[1]!, method: match[2]!, line: match[0], body: body?.[1] }
+    })
+  }
+
+  it("gives every example a method of this plugin's RPC, the location header, the envelope and a valid input", () => {
+    let seen = 0
+    for (const file of ["docs/scripting.md", "README.md"]) {
+      for (const example of examples(file)) {
+        seen += 1
+        expect({ file, url: example.url }).toEqual({ file, url: `/api/rpc/${TOOLS_RPC_ID}/${example.method}` })
+        expect({ file, method: example.method, known: example.method === "describe" || example.method in SCHEMAS }).toEqual({ file, method: example.method, known: true })
+        expect({ file, header: example.line.includes('-H "x-opencode-directory:$PWD"') }).toEqual({ file, header: true })
+        expect({ file, method: example.method, body: example.body !== undefined }).toEqual({ file, method: example.method, body: true })
+        const parsed = JSON.parse(example.body!) as { input?: { sessionID?: unknown; input?: unknown } }
+        expect({ file, envelope: typeof parsed.input }).toEqual({ file, envelope: "object" })
+        // `describe` takes nothing, or one session; every other method names the session and passes the tool's input.
+        if (example.method === "describe") {
+          expect({ file, keys: Object.keys(parsed.input!).filter((key) => key !== "sessionID") }).toEqual({ file, keys: [] })
+          continue
+        }
+        expect({ file, session: typeof parsed.input!.sessionID }).toEqual({ file, session: "string" })
+        // A placeholder session (`ses_…`) is a string too; the tool's input is then checked against the method's schema.
+        const check = SCHEMAS[example.method]!.safeParse(parsed.input!.input)
+        expect({ file, method: example.method, issues: check.success ? [] : check.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`) }).toEqual({ file, method: example.method, issues: [] })
+      }
+    }
+    expect(seen).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe("the text the model is given", () => {
+  // R18 and the model-facing rule: at `access: "all"` nothing a model reads may say a tool asks or is off, unless the
+  // sentence it sits in names `access`, so a reader can tell the claim depends on the value.
+  const sentences = (text: string) => text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/).filter(Boolean)
+
+  it("says a tool asks or is off only in a sentence that names access", () => {
+    const texts: [string, string][] = [
+      ["src/host/tools.ts", specDescriptions()],
+      ["src/host/tools.ts (namespace)", NAMESPACE.description],
+      ...readdirSync(`${ROOT}skills`).map((name): [string, string] => [`skills/${name}/SKILL.md`, read(`skills/${name}/SKILL.md`)]),
+    ]
+    for (const [file, text] of texts) {
+      for (const sentence of sentences(text)) {
+        if (!/(?:\basks? (?:the user|you|first|before|each time|every time|for (?:each|every))|\bmay ask\b|\b(?:is|are) off\b|\b(?:the user|you) approv)/iu.test(sentence)) continue
+        expect({ file, sentence, namesAccess: /\baccess\b/.test(sentence) }).toEqual({ file, sentence, namesAccess: true })
+      }
+    }
+  })
+
+  it("keeps the plan-then-commit shape at every access value", () => {
+    // A commit always needs its plan: the default only removes the prompt, never the plan.
+    expect(NAMESPACE.description).toContain("A change takes two steps")
+    for (const file of ["README.md", "SECURITY.md", "docs/configuration.md"]) expect({ file, plan: read(file).includes("plan") }).toEqual({ file, plan: true })
+  })
+})
+
+/** Every tool's description, as the tools RPC's describe and the model receive it. */
+function specDescriptions(): string {
+  // The specs are built, never run, so an empty runtime and a no-op assert will do.
+  return toolSpecs({} as Runtime, async () => {}, {} as StatusSource)
+    .map((spec) => spec.description)
+    .join(" ")
+}
+
