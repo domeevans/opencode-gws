@@ -358,7 +358,8 @@ async function main() {
   const text = manifestText(result)
   if (check) {
     // The generation stamp is not part of what the checkout must match, so both sides drop it.
-    const withoutStamp = (value) => value.replace(/"generatedAt": "[^"]*",/, '"generatedAt": "",')
+    // The generation stamp is not part of what the checkout must match, so both sides drop it.
+    const withoutStamp = (value) => value.replace(/"generatedAt":"[^"]*",?/, "")
     if (!existsSync(out) || withoutStamp(readFileSync(out, "utf8")) !== withoutStamp(text)) {
       process.stderr.write(
         `[manifest] ${out} does not match what this gws reports (${result.services.length} services, ${methods} methods, ` +
