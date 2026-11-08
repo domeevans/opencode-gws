@@ -8,10 +8,11 @@
 // Sign in: run /connect and choose Google Workspace, or run
 // opencode auth login gws-<alias>.
 //
-// Commits ask by default. Reads do not. To let a write run in
-// noninteractive `opencode run`, add an allow rule. Every rule includes
-// "resource". Send, share, delete, and admin do not offer Always.
-// Do not put the plugin's ask block in the top-level permissions.
+// Every tool is allowed by default, the six commit tools included; a
+// commit still needs its plan and planId. Set "access" to "ask-changes" to
+// ask before each commit, or "read-only" to deny the commits. A later rule
+// wins, and every rule includes "resource". Do not put the plugin's block
+// in the top-level permissions.
 {
   "$schema": "https://opencode.ai/config.json",
   "permissions": [
@@ -42,6 +43,7 @@
           }
         },
         "services": ["gmail", "drive", "calendar", "docs", "sheets", "admin-reports"],
+        "access": "ask-changes",
         "allowUntestedHost": false,
         "policy": {
           "planTtlSeconds": 300,

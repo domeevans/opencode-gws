@@ -3,6 +3,7 @@
  * Types the model sends or receives are inferred from contract.ts.
  */
 
+import type { Access } from "./access.js"
 import type { HelperEntry, Preview, RequestInput } from "./contract.js"
 import type { FileSpecs, PlannedFiles } from "./files.js"
 
@@ -175,6 +176,8 @@ export interface PluginConfig {
   binary: BinaryConfig
   /** Continue on an OpenCode host outside the tested range, with a status warning. */
   allowUntestedHost: boolean
+  /** What the generated default rules allow: everything, changes ask, or read-only. */
+  access: Access
   policy: PolicyConfig
   execution: ExecutionConfig
   audit: AuditConfig

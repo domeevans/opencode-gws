@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin/tui"
 import { type RGBA, TextAttributes } from "@opentui/core"
 import { For, Show, createSignal } from "solid-js"
-import { DELEGATION_LABEL, SHADOWED_LABEL, SHELL_LABEL, shadowedText, shellText, Gws, connectionLabel, delegationText, isStatus, openCodeLabel, type GwsAccount, type GwsStatus } from "./rpc.js"
+import { DELEGATION_LABEL, PERMISSIONS_LABEL, SHADOWED_LABEL, SHELL_LABEL, accessText, shadowedText, shellText, Gws, connectionLabel, delegationText, isStatus, openCodeLabel, type GwsAccount, type GwsStatus } from "./rpc.js"
 
 /**
  * The TUI part: one palette command, "Google Workspace: Status" (slash
@@ -130,6 +130,7 @@ function StatusBody(props: { readonly status: GwsStatus; readonly colors: Colors
           <Row label={SHELL_LABEL} value={shellText(props.status)} fg={tone("warning")} muted={muted()} />
         </Show>
         <Row label="Tools" value={`gws tools for ${props.status.services.join(", ") || "no services"} (${props.status.gws.version})`} fg={base()} muted={muted()} />
+        <Row label={PERMISSIONS_LABEL} value={accessText(props.status)} fg={base()} muted={muted()} />
         <Show
           when={props.status.unguardedAgents.length > 0 ? props.status.unguardedAgents : undefined}
           fallback={<Row label="Agents without default rules" value="none" fg={base()} muted={muted()} />}

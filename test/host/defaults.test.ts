@@ -3,15 +3,16 @@ import { request } from "../support/requests.js"
 import { ACCOUNT, prompt, startHost, type Harness } from "./harness.js"
 
 /**
- * Default ask rules: reads never prompt. Each commit prompts once, and a
- * rejection spawns nothing. Write offers Always; send does not.
+ * The default rules at `access: "ask-changes"`: reads never prompt. Each
+ * commit prompts once, and a rejection spawns nothing. Write offers Always;
+ * send does not.
  */
 
 let host: Harness
 let sessionID: string
 
 beforeAll(async () => {
-  host = await startHost()
+  host = await startHost({ options: { access: "ask-changes" } })
   sessionID = (await host.opencode.sessions.create({ location: host.location })).id
 })
 
@@ -39,7 +40,7 @@ function call(tool: string, input: unknown): string {
 const commits = () => host.invocations().filter((argv) => !argv.includes("--dry-run"))
 const asked = () => host.events.filter((event) => event.type === "permission.asked" && event.data?.sessionID === sessionID)
 
-describe("default ask rules", () => {
+describe("the default rules at ask-changes", () => {
   it("reads without a permission prompt", async () => {
     const before = asked().length
     const result = await read({ operation: "gmail.users.messages.list", params: { userId: "me" }, fields: "messages(id)" })

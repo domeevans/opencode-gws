@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { integrationConnection } from "../src/host/integrations.js"
 import { registerRpc, statusSource } from "../src/host/rpc.js"
 import { ownSkillPath } from "../src/host/skills.js"
+import { ACCESS_VALUES } from "../src/domain/access.js"
 import { IDENTITY_SCOPES, SCOPE_PREFIX, requestedScopes } from "../src/domain/scopes.js"
 import { Gws, RPC_ID, isStatus } from "../src/rpc.js"
 import type { Runtime } from "../src/runtime/index.js"
@@ -53,6 +54,8 @@ interface SetupOptions {
   agents?: Array<{ id: string; permissions: Array<{ action: string; resource: string; effect: "allow" | "deny" | "ask" }> }>
   /** The skills OpenCode lists. */
   skills?: Array<{ id: string; path: string; content?: string }>
+  /** The plugin option that decides what the default rules allow. */
+  access?: "all" | "ask-changes" | "read-only"
 }
 
 async function setup(options: SetupOptions = {}): Promise<Harness> {
@@ -99,7 +102,7 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
   )
   const handlers: Record<string, Handler> = {}
   let disposed = false
-  const stop = await registerRpc(ctx as never, runtime, statusSource(runtime, async () => options.agents ?? [], async () => options.skills ?? []))
+  const stop = await registerRpc(ctx as never, runtime, statusSource(runtime, async () => options.agents ?? [], async () => options.skills ?? [], options.access ?? "all"))
   harness = { runtime, handlers, disposed: () => disposed, stop }
   return harness
 }
@@ -123,12 +126,14 @@ describe("rpc contract", () => {
     expect(Object.keys(Gws.events)).toEqual([])
     const { input, output } = Gws.methods.status
     expect(input).toEqual({ type: "object", properties: {}, additionalProperties: false })
-    expect(output).toMatchObject({ type: "object", required: ["version", "host", "state", "gws", "services", "accounts", "unguardedAgents", "nextStep"] })
+    expect(output).toMatchObject({ type: "object", required: ["version", "host", "state", "access", "gws", "services", "accounts", "unguardedAgents", "nextStep"] })
+    // The wire contract repeats the three values; this is the one check that they are the plugin's one list.
+    expect((output as unknown as { properties: { access: { enum: readonly string[] } } }).properties.access.enum).toEqual([...ACCESS_VALUES])
     expect(JSON.parse(JSON.stringify(output))).toEqual(output)
   })
 
   it("accepts only the status shape in isStatus", () => {
-    const valid = { version: "1", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "sign_in_required", nextStep: "Sign in.", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
+    const valid = { version: "1", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "sign_in_required", access: "all", nextStep: "Sign in.", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
     expect(isStatus(valid)).toBe(true)
     expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: ["keep"] }] })).toBe(true)
     for (const broken of [
@@ -140,6 +145,7 @@ describe("rpc contract", () => {
       { ...valid, host: { ...valid.host, tested: "yes" } },
       { ...valid, host: { ...valid.host, version: undefined } },
       { ...valid, state: "ready" },
+      { ...valid, access: "sometimes" },
       { ...valid, nextStep: undefined },
       { ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: "keep" }] },
     ]) expect(isStatus(broken), JSON.stringify(broken)).toBe(false)
@@ -234,8 +240,9 @@ describe("status", () => {
 
   it("names the unguarded agents with their block, and gives one next step for the plugin", async () => {
     const allow = { action: "*", resource: "*", effect: "allow" as const }
-    const h = await setup({ accounts: { personal: account({ oauthClient: TEST_CLIENT }) }, agents: [{ id: "notes", permissions: [allow] }] })
+    const h = await setup({ accounts: { personal: account({ oauthClient: TEST_CLIENT }) }, agents: [{ id: "notes", permissions: [allow] }], access: "ask-changes" })
     const output = await status(h)
+    expect(output["access"]).toBe("ask-changes")
     expect(output["unguardedAgents"]).toEqual(["notes"])
     expect(output["permissionsBlock"]).toContain('"notes": {')
     expect(output["permissionsBlock"]).toContain('{"action":"gws.write","resource":"*","effect":"ask"}')
@@ -245,7 +252,7 @@ describe("status", () => {
   it("points the next step at the unguarded agents once every account is ready", async () => {
     vi.stubEnv("GWS_CREDENTIALS", "/dev/null")
     const allow = { action: "*", resource: "*", effect: "allow" as const }
-    const h = await setup({ accounts: { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } }, agents: [{ id: "notes", permissions: [allow] }] })
+    const h = await setup({ accounts: { ci: { mode: "credentials_file", enabledServices: ["drive"], credentialsFileEnv: "GWS_CREDENTIALS" } }, agents: [{ id: "notes", permissions: [allow] }], access: "ask-changes" })
     expect((await status(h))["nextStep"]).toBe("Put the default rules shown by /gws-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Google Workspace tools.")
   })
 

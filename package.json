@@ -147,37 +147,37 @@
       {
         "name": "gws.write",
         "permission": "gws.write",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "gws.export",
         "permission": "gws.export",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "gws.send",
         "permission": "gws.send",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "gws.share",
         "permission": "gws.share",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "gws.delete",
         "permission": "gws.delete",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       },
       {
         "name": "gws.admin",
         "permission": "gws.admin",
-        "effect": "ask",
+        "effect": "allow",
         "readOnly": false
       }
     ],

@@ -31,11 +31,16 @@ The class says the worst thing a method can do. It never decides whether a call 
 Every call names a session, and the session must name an agent. The script runs as that agent: each call asserts the
 same action and resource as the tool, against the agent's permission rules and the session's own.
 
-**A write needs a prior explicit allow.** Before anything runs, the RPC resolves the method's action against the
-agent's rules and then the session's, with the host's order (the last matching rule wins). Only an `allow` runs. An
-`ask` is refused, because no one is there to answer the prompt, and a `deny` is refused. A refusal costs nothing: no
-gws call, no credential, no prompt left waiting. So a script that writes, sends, shares, deletes, exports or runs an
-admin operation needs a rule in config, or a Jobs run session that carries one.
+**A rule decides, before anything runs.** The RPC resolves the method's action against the agent's rules and then the
+session's, with the host's order (the last matching rule wins). Only an `allow` runs. An `ask` is refused, because no
+one is there to answer the prompt, and a `deny` is refused. A refusal costs nothing: no gws call, no credential, no
+prompt left waiting.
+
+A script gets the same default as the model: every method is allowed, the six commits included, because the agent's
+block allows them. Restrict a script with the plugin's `access` option (`"ask-changes"` asks for each commit, so a
+script's commit is refused; `"read-only"` denies them), or with a rule on the session the script runs as. A script
+that needs a commit at `ask-changes` runs as a session whose rules allow it, or as a Jobs run session that carries
+one.
 
 A saved **Always allow** does not authorise an ad-hoc script. It is not part of the agent's or the session's rules, so
 the resolve never sees it. That is deliberate: a script's permission must be reviewable in config. The supported way to
@@ -58,8 +63,9 @@ opencode api post /api/session -d '{"title":"label sorter","agent":"build","perm
 ]}'
 ```
 
-Reads have no default ask rule, so most agents allow them already. The six commit actions ask by default in every
-agent; a script needs the allow above, or the commit is refused.
+The reads are always allowed. The six commit actions follow the plugin's `access`: allowed by default, asking at
+`ask-changes`, denied at `read-only`. The session above denies the namespace and opts back in, which is what a script
+needs at `ask-changes`.
 
 Ask `describe` with the session to see what it may run:
 

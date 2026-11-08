@@ -39,11 +39,12 @@ export const StatusOutput = z.object({
   version: z.string().describe("The plugin's version"),
   host: Host,
   state: z.enum(STATES).describe("connected; sign_in_required or not_configured when an account needs it"),
+  access: z.enum(["all", "ask-changes", "read-only"]).describe("What the default permission rules allow: everything, changes ask first, or read-only"),
   gws: z.object({ path: z.string(), version: z.string() }),
   services: z.array(z.string()).describe("Model-facing services"),
   accounts: z.array(AccountStatus),
   auditDegraded: z.boolean().describe("Audit records were dropped, failed, or exceeded the sink deadline; sticky until reload"),
-  unguardedAgentCount: z.number().int().describe("How many agents lack the default ask rules; /gws-status names them"),
+  unguardedAgentCount: z.number().int().describe("How many agents lack the default rules; /gws-status names them"),
   permissions: z.string().optional().describe("Present when an agent lacks the default rules: where to find the fix"),
   nextStep: z.string().describe('The one thing to do next; "Nothing to do." when nothing is needed'),
 })

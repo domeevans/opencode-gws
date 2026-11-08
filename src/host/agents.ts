@@ -1,14 +1,22 @@
 import type { Plugin } from "@opencode/plugin"
+import { ACCESS_VALUES, CHANGING_ACTIONS, NAMESPACE_ACTION, READ_ACTIONS, type Access } from "../domain/access.js"
 
 /**
- * Approval model: default ask rules through `ctx.agent.transform`. A user
- * `permissions` allow rule and a saved "Always" on a write both remove the
- * prompt, because the last matching rule wins.
+ * Approval model: the default rules, through `ctx.agent.transform`. Every
+ * tool is allowed at `access: "all"`; `access` narrows the block, and a
+ * user's own rules and a saved "Always" still win, because the last
+ * matching rule wins.
+ *
+ * The block is broad first, narrow last: the `gws.*` namespace, then every
+ * read (always allowed), then the six commit actions with the value's
+ * effect. At `all` every rule allows; `ask-changes` asks for the commits
+ * and allows the reads; `read-only` denies the commits.
  *
  * Agents defined only in the user's config are created after plugins run, so
- * they miss these rules. Status names them and gives the per-agent block.
- * Never put that block in the top-level `permissions`: top-level rules apply
- * after every agent's base rules and would loosen Explore.
+ * they miss these rules. Status names them, and only when the value holds
+ * something back, with the block for that agent's own `permissions`. Never
+ * put that block in the top-level `permissions`: top-level rules apply after
+ * every agent's base rules and would loosen Explore.
  */
 
 export interface Rule {
@@ -17,42 +25,63 @@ export interface Rule {
   effect: "allow" | "deny" | "ask"
 }
 
-const ASK_ACTIONS = ["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"] as const
+export type Block = readonly Rule[]
 
-/** Reads (status, catalog, schema, read, plan) get no rule. */
-export const ASK_RULES: readonly Rule[] = ASK_ACTIONS.map((action) => ({ action, resource: "*", effect: "ask" as const }))
+/** The rules the plugin inserts after each agent's base allow, for one `access` value. */
+export function defaultRules(access: Access = "all"): Block {
+  const effect: Rule["effect"] = access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"
+  return [
+    { action: NAMESPACE_ACTION, resource: "*", effect },
+    ...READ_ACTIONS.map((action) => ({ action, resource: "*", effect: "allow" as const })),
+    ...CHANGING_ACTIONS.map((action) => ({ action, resource: "*", effect })),
+  ]
+}
 
-const same = (left: Rule, right: Rule) => left.action === right.action && left.resource === right.resource && left.effect === right.effect
+/** The block every `access` value produces, for the docs and for replacing an earlier one on a rebuild. */
+export const BLOCKS: readonly { readonly access: Access; readonly rules: Block }[] = ACCESS_VALUES.map((access) => ({ access, rules: defaultRules(access) }))
+
+const same = (left: Rule | undefined, right: Rule) => left?.action === right.action && left?.resource === right.resource && left?.effect === right.effect
 
 const isBaseAllow = (rule: Rule) => rule.action === "*" && rule.resource === "*" && rule.effect === "allow"
 
-/**
- * Inserts any missing ask rules immediately after the base `* * allow`. An
- * agent without one gets no rules: inserting at index 0 would turn its
- * default deny into an ask. A rule already present is skipped, so a replay
- * changes nothing and a later deny is never moved.
- */
-export function insertAskRules(rules: Rule[]): void {
-  const base = rules.findIndex(isBaseAllow)
-  if (base < 0) return
-  let index = base + 1
-  for (const rule of ASK_RULES) {
-    if (rules.some((existing) => same(existing, rule))) continue
-    rules.splice(index, 0, { ...rule })
-    index += 1
+/** The start index of `block` appearing whole and in order in `rules`, or -1. */
+function indexOfBlock(rules: readonly Rule[], block: Block): number {
+  for (let start = 0; start + block.length <= rules.length; start += 1) {
+    if (block.every((rule, offset) => same(rules[start + offset], rule))) return start
   }
+  return -1
 }
 
 /**
- * Every ask rule appears somewhere after the base allow. Other plugins
- * insert at the same index, so the rules need not sit directly after it.
- * An agent without a base allow has no guarded position.
+ * Inserts the block for `access` immediately after the base `* * allow`. An
+ * agent without one gets no rules: inserting at index 0 would turn its
+ * default deny into an allow. A block already present, for this value or
+ * another, is replaced, so a replay changes nothing and a later deny is
+ * never moved.
  */
-export function hasAskRules(rules: readonly Rule[]): boolean {
+export function insertDefaultRules(rules: Rule[], access: Access = "all"): void {
+  const base = rules.findIndex(isBaseAllow)
+  if (base < 0) return
+  const block = defaultRules(access)
+  if (indexOfBlock(rules.slice(base + 1), block) >= 0) return
+  // An earlier block for another value is replaced, so the new one is the last word.
+  for (const candidate of BLOCKS) {
+    const start = indexOfBlock(rules, candidate.rules)
+    if (start >= 0) rules.splice(start, candidate.rules.length)
+  }
+  const at = rules.findIndex(isBaseAllow)
+  rules.splice(at + 1, 0, ...block.map((rule) => ({ ...rule })))
+}
+
+/**
+ * Every rule of the block appears somewhere after the base allow, in order.
+ * Other plugins insert at the same index, so the block need not sit directly
+ * after it. An agent without a base allow has no guarded position.
+ */
+export function hasDefaultRules(rules: readonly Rule[], access: Access = "all"): boolean {
   const base = rules.findIndex(isBaseAllow)
   if (base < 0) return false
-  const after = rules.slice(base + 1)
-  return ASK_RULES.every((rule) => after.some((found) => same(found, rule)))
+  return indexOfBlock(rules, defaultRules(access)) > base
 }
 
 /** OpenCode's wildcard: `*` matches any run of characters. */
@@ -70,15 +99,17 @@ function winner(action: string, rules: readonly Rule[]): Rule | undefined {
 }
 
 /**
- * Agents that missed the ask rules and would run a commit without asking.
- * A gws allow or deny already decides that commit, and no matching rule
- * denies it, so those agents are not listed. A generic allow is.
+ * Agents that missed the rules and would run a commit without asking. At
+ * `all` nothing is held back, so none needs the block. At a restricting
+ * value, an agent whose own rules already allow or deny every commit is not
+ * listed; one with a generic allow is.
  */
-export function unguardedAgents(agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[]): string[] {
+export function unguardedAgents(agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[], access: Access = "all"): string[] {
+  if (access === "all") return []
   return agents
-    .filter((agent) => !hasAskRules(agent.permissions))
+    .filter((agent) => !hasDefaultRules(agent.permissions, access))
     .filter((agent) =>
-      ASK_ACTIONS.some((action) => {
+      CHANGING_ACTIONS.some((action) => {
         const rule = winner(action, agent.permissions)
         // No matching rule is the host's default deny, so only a generic allow leaves a commit unasked.
         return rule?.effect === "allow" && !rule.action.startsWith("gws.")
@@ -88,8 +119,8 @@ export function unguardedAgents(agents: readonly { readonly id: string; readonly
 }
 
 /** The JSON block the user adds first in an unguarded agent's own permission list. Every rule has `resource`. */
-export function permissionsBlock(agents: readonly string[]): string {
-  const rules = ASK_RULES.map((rule) => `        ${JSON.stringify(rule)}`).join(",\n")
+export function permissionsBlock(agents: readonly string[], access: Access = "all"): string {
+  const rules = defaultRules(access).map((rule) => `        ${JSON.stringify(rule)}`).join(",\n")
   return [
     "{",
     `  "agents": {`,
@@ -111,9 +142,9 @@ export function agentLister(ctx: Pick<Plugin.Context, "agent" | "location">): ()
   }
 }
 
-/** Registers the ask rules in every agent the host knows at setup. */
-export async function registerApprovalRules(ctx: Pick<Plugin.Context, "agent">): Promise<void> {
+/** Registers the default rules in every agent the host knows at setup. */
+export async function registerApprovalRules(ctx: Pick<Plugin.Context, "agent">, access: Access = "all"): Promise<void> {
   await ctx.agent.transform((editor) => {
-    for (const agent of editor.list()) editor.update(agent.id, (current) => insertAskRules(current.permissions))
+    for (const agent of editor.list()) editor.update(agent.id, (current) => insertDefaultRules(current.permissions, access))
   })
 }

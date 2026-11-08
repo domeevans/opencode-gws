@@ -1,5 +1,6 @@
 import { isAbsolute } from "node:path"
 import * as z from "zod"
+import { ACCESS_VALUES } from "./access.js"
 import { GwsError } from "./errors.js"
 import type { AccountProfile, PluginConfig } from "./types.js"
 import { adminServices, canonicalService, loadManifest } from "./manifest.js"
@@ -157,6 +158,7 @@ const configSchema = z.strictObject({
     })
     .optional(),
   allowUntestedHost: z.boolean().optional(),
+  access: z.enum(ACCESS_VALUES).optional(),
   admin: z
     .strictObject({
       enabled: z.boolean().optional(),
@@ -260,6 +262,7 @@ export function loadConfig(raw: unknown): PluginConfig {
       path: parsed.binary?.path,
     },
     allowUntestedHost: parsed.allowUntestedHost ?? false,
+    access: parsed.access ?? "all",
     policy: {
       planTtlSeconds: parsed.policy?.planTtlSeconds ?? 300,
       rules: parsed.policy?.rules ?? [],

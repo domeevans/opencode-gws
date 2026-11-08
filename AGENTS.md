@@ -44,19 +44,25 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 
 ## Permissions
 
-- Setup inserts `{ action, resource: "*", effect: "ask" }` for `gws.write`,
-  `gws.export`, `gws.send`, `gws.share`, `gws.delete` and `gws.admin` into
-  every agent through `ctx.agent.transform`, right after its base
-  `* * allow`. An agent counts as guarded when the block appears anywhere
-  after that rule.
-- Reads (`gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan`)
-  get no rule. The last matching rule wins, so user rules and saved Always
-  override the asks and a stricter agent is never weakened.
+- **Every tool is allowed by default.** Setup inserts the block from
+  `defaultRules(access)` (`src/host/agents.ts`, from the lists in
+  `src/domain/access.ts`) into every agent through `ctx.agent.transform`,
+  right after its base `* * allow`: the `gws.*` namespace, then the five
+  reads, then the six commits. `access` is `"all"` (the default), so every
+  rule allows; `"ask-changes"` asks for the commits and `"read-only"`
+  denies them. The reads are always allowed. An agent counts as guarded
+  when the whole block appears, in order, anywhere after that rule.
+- `plan-then-commit` is unchanged: a commit still needs a `planId` from
+  `plan`, bound to the session, agent and account. The default allow is a
+  permission default, not a shortcut past the plan.
+- The last matching rule wins, so user rules and saved Always override the
+  block and a stricter agent is never weakened.
 - Each commit asserts `gws.<category>` on `<account>:<operation>`. Only write
   and export offer Always.
-- Agents defined only in user config miss the rules. The status model names
-  them and carries the block for that agent's own `permissions` (never the
-  top-level ones); `gws_status` gives the model only their count
+- Agents defined only in user config miss the block; that matters only when
+  `access` holds something back. The status model then names them and
+  carries the block for that agent's own `permissions` (never the top-level
+  ones); `gws_status` gives the model only their count
   (`unguardedAgentCount`). `unguardedAgents` is always a list of names.
 - Plugin policy is deny-only content constraints plus the admin gate.
   `deploy` and `watch` are never committable.

@@ -6,7 +6,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-- tools RPC v2: every known tool is scriptable under a prior explicit allow. The six commit tools are methods too, in
+- **Every tool is allowed by default.** The plugin inserts an allow for each of its actions, the six commit tools and
+  the `gws.*` namespace included, so a tool a later release adds runs at once. The new `access` option restricts it:
+  `"ask-changes"` asks before each commit, and `"read-only"` denies the commits while every read still runs. A commit
+  still needs its plan and `planId`. `gws_status`, the status RPC and the dialog show the value.
+- The tools RPC follows the same default: a script runs every method unless `access` or a rule says otherwise.
+
+- tools RPC v2: every known tool is scriptable, and a call runs when the session's rules allow it. The six commit tools are methods too, in
   the shared tools RPC module (`src/host/tools-rpc.ts`), so a script can plan and commit in one run; a commit still
   takes only a `planId`, and is refused unless the session's agent allows that commit's action. Every method carries a
   class; `describe` reports it, and with a session each method's resolved `permission`. A call now resolves the rule

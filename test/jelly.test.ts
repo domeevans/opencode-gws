@@ -1,24 +1,27 @@
 import { describe, expect, it } from "vitest"
-import { ASK_RULES } from "../src/host/agents.js"
+import { CHANGING_ACTIONS } from "../src/domain/access.js"
+import { defaultRules } from "../src/host/agents.js"
 import { type Declaration, type DeclaredTool, declarationProblems, docProblems, effectFromRules, readPackage } from "./support/jelly-kit.js"
 
 /**
  * The `jelly` section of package.json, which Jelly reads without loading the plugin. Jelly's agents have no base
- * "allow everything" rule, so this plugin's own ask rules never reach them; Jelly writes each declared "ask" as that
- * tool's default instead. The shared kit checks the declaration against Jelly's plugin authors' standard. gws names
+ * "allow everything" rule, so this plugin's own rules never reach them; Jelly writes each declared effect as that
+ * tool's default instead. Every tool is allowed by default, commits included, so the declaration follows
+ * `defaultRules("all")`. The shared kit checks the declaration against Jelly's plugin authors' standard. gws names
  * its permissions after risk actions (`gws.write`), not tools, because one commit tool covers a whole category.
  */
 
 const ROOT = new URL("../", import.meta.url)
 const jelly = readPackage(ROOT).jelly as Declaration & { tools: DeclaredTool[] }
 const READS = ["gws.catalog", "gws.plan", "gws.read", "gws.schema", "gws.status"]
+const RULES = defaultRules("all")
 
 describe("the jelly declaration", () => {
-  it("follows the plugin authors' standard, with the effects the plugin's own ask rules give", () => {
+  it("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
     expect(
       declarationProblems(ROOT, {
-        effectOf: effectFromRules(ASK_RULES),
-        registered: [...READS, ...ASK_RULES.map((rule) => rule.action)],
+        effectOf: effectFromRules(RULES),
+        registered: [...READS, ...CHANGING_ACTIONS],
         actionPermissions: true,
       }),
     ).toEqual([])

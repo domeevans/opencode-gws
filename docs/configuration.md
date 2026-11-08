@@ -40,6 +40,7 @@ An account whose config sets `access` to read, with no write service, does not o
 | `callbackPort` | none: a random port | The port on `127.0.0.1` where the sign-in listens and the redirect is forwarded. Alone, a loopback redirect on that port. |
 | `binary.path` | the platform package | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
 | `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0`, such as 2.2.2, 2.3.0, 3.0.0, a prerelease or a dev build, and show it as host untested in status. A release inside the range loads without it; only 2.2.3, 2.2.4, 2.2.5 and 2.2.6 are tested. |
+| `access` | `"all"` | What the default permission rules allow: `"all"` allows every tool, the six commit tools included; `"ask-changes"` allows the reads and asks for each commit; `"read-only"` allows the reads and denies the commits. It is not the account's sign-in level, which is `accounts.<alias>.access`. See [Approvals](#approvals). |
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
 | `execution` | see below | Timeouts, page caps, and file roots. |
 | `audit` | JSONL in the state directory | Audit sink. |
@@ -92,24 +93,21 @@ A Calendar event write (`insert`, `patch`, `update`, `move`, `quickAdd`) becomes
 
 ## Approvals
 
-The model is default ask rules through `ctx.agent.transform`. Setup inserts these rules immediately after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets none, so its default deny stays a deny:
+**Every tool is allowed by default.** The plugin inserts its default rules through `ctx.agent.transform`, immediately after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets none, so its default deny stays a deny. The block is the `gws.*` namespace, then the five reads, then the six commits; the `access` option decides the effect, and the README prints the block for each value:
 
-```json
-{ "action": "gws.write", "resource": "*", "effect": "ask" }
-{ "action": "gws.export", "resource": "*", "effect": "ask" }
-{ "action": "gws.send", "resource": "*", "effect": "ask" }
-{ "action": "gws.share", "resource": "*", "effect": "ask" }
-{ "action": "gws.delete", "resource": "*", "effect": "ask" }
-{ "action": "gws.admin", "resource": "*", "effect": "ask" }
-```
+| `access` | The namespace and the six commits | The five reads |
+| --- | --- | --- |
+| `"all"` (the default) | `allow` | `allow` |
+| `"ask-changes"` | `ask` | `allow` |
+| `"read-only"` | `deny` | `allow` |
 
-Reads (`gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan`) have no rule, so they do not prompt. A later rule wins, so a user's `permissions` rules and a saved Always override the asks, and a stricter agent is not weakened.
+The namespace rule means a tool a later release adds follows the same value: allowed at `all`, asking at `ask-changes`, denied at `read-only`. A later rule wins, so a user's `permissions` rules and a saved Always override the block, and a stricter agent is not weakened.
 
-Write and export offer Always for that exact `<account>:<operation>`. Send, share, and delete pass no save patterns, so they never offer Always and ask every time unless a user rule allows them. Admin asks every time the same way.
+Write and export offer Always for that exact `<account>:<operation>`. Send, share, delete, and admin pass no save patterns, so they never offer Always; at `ask-changes` they ask every time unless a user rule allows them.
 
-`opencode run` cannot answer an ask. To let a commit run there, add a user allow rule, for example `{ "action": "gws.write", "resource": "work:*", "effect": "allow" }`. A user `deny` hides that tool. A Plan-style or custom deny such as `{ "action": "gws.*", "resource": "*", "effect": "deny" }` still wins, because it is later than the inserted ask.
+`opencode run` cannot answer an ask. At `ask-changes`, give a commit a user allow rule there, for example `{ "action": "gws.write", "resource": "work:*", "effect": "allow" }`, or choose `all`. A user `deny` hides that tool. A Plan-style or custom deny such as `{ "action": "gws.*", "resource": "*", "effect": "deny" }` still wins, because it is later than the inserted block.
 
-An agent defined only in the user's config is created after plugins run, so it misses the inserted rules. `/gws-status` and the status dialog name those agents and show the default rules. Put them first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put the block in the top-level `permissions`: those rules apply after every agent's base rules and would loosen Explore.
+An agent defined only in the user's config is created after plugins run, so it misses the inserted rules. That matters only when `access` holds something back. `/gws-status` and the status dialog then name those agents and show the block for the current value. Put it first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put the block in the top-level `permissions`: those rules apply after every agent's base rules and would loosen Explore.
 
 `gws_status` gives the model only the count, `unguardedAgentCount`, and points to `/gws-status`.
 
@@ -224,7 +222,7 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
 | `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
 | `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0). | Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true. |
-| `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, or access or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
+| `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
 | `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
 | `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
 | `GWS_UNAVAILABLE` | No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist. | Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable. |

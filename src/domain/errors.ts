@@ -202,7 +202,8 @@ export const ErrorCode = {
     next: 'Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true.',
   },
   OPTIONS_INVALID: {
-    meaning: "The plugin options are not valid: an unknown key, a wrong type, an unknown service, or access or scopes that name something the account does not enable.",
+    meaning:
+      "The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable.",
     next: "Fix the plugin options in opencode.json; the message names the option.",
   },
   STATUS_UNAVAILABLE: {

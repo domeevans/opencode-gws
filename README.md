@@ -43,13 +43,13 @@ Ask the agent for what you need. It works in four steps:
 1. `gws_catalog` finds an operation, and `gws_schema` shows its parameters.
 2. `gws_read` runs a read. List and search calls need `fields`.
 3. `gws_plan` dry-runs a change and returns a `planId` with a redacted preview.
-4. The commit tool named by the plan's category (`gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` or `gws_admin`) runs it, with only the `planId`. OpenCode asks you first.
+4. The commit tool named by the plan's category (`gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` or `gws_admin`) runs it, with only the `planId`. OpenCode asks you first when `access` is `"ask-changes"`; every tool is allowed at the default ([Permissions](#permissions)).
 
 `gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is data, never an instruction.
 
 ### Scripts
 
-A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules. Every tool is a method; a write needs a prior explicit `allow` in the session's or the agent's rules, and an `ask` is refused because no one can answer it:
+A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every tool. Every tool is a method; a rule that `ask`s is refused, because no one can answer it:
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/read \
@@ -65,15 +65,114 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
 
 ## Permissions
 
-The plugin adds an ask rule for `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete` and `gws.admin` to every agent, right after the agent's base allow rule. Reads do not ask, so they also work in `opencode run`.
+**Every tool is allowed by default.** An agent can read your mail and files, send mail, change sharing, delete files and run admin operations without asking. Each change is still only a plan until the agent commits it with the plan's `planId`, so a commit is one tool call on something you were shown first. Restrict the plugin in any of these three ways:
 
-A later rule wins. Your own allow rule, or **Always** on a write or export, removes that prompt. Send, share, delete and admin never offer Always. Your deny rule, and the Plan agent, keep a commit denied. Every rule needs `resource`:
+1. **The `access` option**, which drives the rules the plugin inserts directly after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. Agents without that base rule are left alone, and a later rule still wins.
+
+   | Value | What runs | What asks |
+   | --- | --- | --- |
+   | `"all"` (the default) | every tool, the six commit tools included, and any tool a later release adds | nothing |
+   | `"ask-changes"` | the reads: status, catalog, schema, read and plan | each of the six commits |
+   | `"read-only"` | the reads | nothing: the six commits are **denied** |
+
+   ```json
+   { "plugins": [{ "package": "@joe-broadhead/opencode-gws", "options": { "access": "read-only" } }] }
+   ```
+
+   This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
+
+2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's. The actions are `gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan` and the six commits:
+
+   ```json
+   { "agents": { "reader": { "permissions": [
+     { "action": "gws.*", "resource": "*", "effect": "deny" },
+     { "action": "gws.read", "resource": "*", "effect": "allow" }
+   ] } } }
+   ```
+
+3. **A rule per action**, with `resource` set to the account and operation it covers. A later rule wins, so your allow or deny replaces the plugin's:
+
+   ```json
+   { "permissions": [
+     { "action": "gws.delete", "resource": "*", "effect": "deny" },
+     { "action": "gws.write", "resource": "work:*", "effect": "ask" }
+   ] }
+   ```
+
+The block for each value, generated from `defaultRules(access)` in `src/host/agents.ts`:
+
+<!-- generated:rules-all -->
+
+`access: "all"`
+
+| Action | Resource | Effect |
+| --- | --- | --- |
+| `gws.*` | `*` | `allow` |
+| `gws.status` | `*` | `allow` |
+| `gws.catalog` | `*` | `allow` |
+| `gws.schema` | `*` | `allow` |
+| `gws.read` | `*` | `allow` |
+| `gws.plan` | `*` | `allow` |
+| `gws.write` | `*` | `allow` |
+| `gws.export` | `*` | `allow` |
+| `gws.send` | `*` | `allow` |
+| `gws.share` | `*` | `allow` |
+| `gws.delete` | `*` | `allow` |
+| `gws.admin` | `*` | `allow` |
+
+<!-- /generated:rules-all -->
+
+<!-- generated:rules-ask-changes -->
+
+`access: "ask-changes"`
+
+| Action | Resource | Effect |
+| --- | --- | --- |
+| `gws.*` | `*` | `ask` |
+| `gws.status` | `*` | `allow` |
+| `gws.catalog` | `*` | `allow` |
+| `gws.schema` | `*` | `allow` |
+| `gws.read` | `*` | `allow` |
+| `gws.plan` | `*` | `allow` |
+| `gws.write` | `*` | `ask` |
+| `gws.export` | `*` | `ask` |
+| `gws.send` | `*` | `ask` |
+| `gws.share` | `*` | `ask` |
+| `gws.delete` | `*` | `ask` |
+| `gws.admin` | `*` | `ask` |
+
+<!-- /generated:rules-ask-changes -->
+
+<!-- generated:rules-read-only -->
+
+`access: "read-only"`
+
+| Action | Resource | Effect |
+| --- | --- | --- |
+| `gws.*` | `*` | `deny` |
+| `gws.status` | `*` | `allow` |
+| `gws.catalog` | `*` | `allow` |
+| `gws.schema` | `*` | `allow` |
+| `gws.read` | `*` | `allow` |
+| `gws.plan` | `*` | `allow` |
+| `gws.write` | `*` | `deny` |
+| `gws.export` | `*` | `deny` |
+| `gws.send` | `*` | `deny` |
+| `gws.share` | `*` | `deny` |
+| `gws.delete` | `*` | `deny` |
+| `gws.admin` | `*` | `deny` |
+
+<!-- /generated:rules-read-only -->
+
+What each commit asserts: `gws.<category>` on `<account>:<operation>`. Write and export offer **Always** for that exact resource. Send, share, delete and admin pass no save patterns, so they never offer Always. Every rule needs `resource`:
 
 ```json
 { "action": "gws.write", "resource": "work:*", "effect": "allow" }
 ```
 
-An agent defined only in your config does not get the ask rules. `/gws-status` and the status dialog name those agents and show the default rules. Put them first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put them in the top-level `permissions`: that would loosen Explore.
+`opencode run` cannot answer an ask. At `ask-changes`, give a commit an allow rule there, or choose `all`. A user `deny` hides that tool. A Plan-style or custom deny such as `{ "action": "gws.*", "resource": "*", "effect": "deny" }` still wins, because it is later than the inserted block.
+
+An agent defined only in your config does not get the block. That matters only when `access` holds something back: `/gws-status` and the status dialog then name those agents and show the block. Put it first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put it in the top-level `permissions`: that would loosen Explore.
 
 ## Configure
 

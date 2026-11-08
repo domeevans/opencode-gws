@@ -19,12 +19,15 @@ writes each declared `ask` or `deny` as that tool's default instead (the person'
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
 changes nothing in Jelly.
 
-- Ask: `gws.write`, `gws.export`, `gws.send`, `gws.share`, `gws.delete`, `gws.admin`.
-- Everything else runs, as the plugin's own rules let it.
+- Ask: none: every declared tool is allowed, as the plugin's default `access` is.
+- Everything else runs.
 
-`gws.admin` is declared `ask`, as the plugin's own rule is: the admin gate is on by default, and each admin plan still needs an allowed service and a reason.
+A commit still needs its plan: `gws_plan` returns a `planId`, and only the matching commit tool
+applies it. The admin gate is on by default, and each admin plan needs an allowed service and a
+reason. To make the commits ask, or stop them, the person sets the plugin's `access` option, or a
+tool rule of their own in Jelly.
 
-`test/jelly.test.ts` checks each declared effect against the plugin's own default rules.
+`test/jelly.test.ts` checks each declared effect against `defaultRules("all")`.
 
 ## Skills
 

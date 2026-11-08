@@ -61,8 +61,8 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
   }
   try {
     await registerIntegrations(ctx, config, ids)
-    await registerApprovalRules(ctx)
-    const status = statusSource(runtime, agentLister(ctx), skillLister(ctx))
+    await registerApprovalRules(ctx, config.access)
+    const status = statusSource(runtime, agentLister(ctx), skillLister(ctx), config.access)
     await registerTools(ctx, runtime, status)
     await registerSkills(ctx, config)
     stopRpc = await registerRpc(ctx, runtime, status)

@@ -115,17 +115,17 @@ describe("tools RPC on a real host", () => {
     expect(await run("read", sessions.narrow!, get)).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
   })
 
-  it("plans as a session, and only an approved commit in that session applies it", async () => {
+  it("plans as a session, and the model commits it with no prompt at the default access", async () => {
     const planned = await run("plan", sessions.build!, request("gmail.users.labels.create", { params: { userId: "me" }, body: { name: "scripted" } }))
     expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
     const writes = () => host.invocations().filter((argv) => argv.includes("create") && !argv.includes("--dry-run"))
     const before = writes().length
+    const prompts = asked(sessions.build!).length
     host.model.script({ tool: "gws_write", input: { planId: planned.value.planId } })
     await host.opencode.sessions.prompt({ sessionID: sessions.build!, text: "commit" } as never)
-    const asking = await host.waitForEvent((event) => event.type === "permission.asked" && event.data?.action === "gws.write" && event.data?.sessionID === sessions.build)
-    await host.opencode.permission.reply({ sessionID: sessions.build!, requestID: asking.data!.id as string, decision: "once" } as never)
     await host.opencode.sessions.wait({ sessionID: sessions.build! } as never)
     expect(writes().length).toBe(before + 1)
+    expect(asked(sessions.build!).length).toBe(prompts)
   })
 
   it("names an unknown session with SESSION_UNKNOWN, and a session without an agent with SESSION_AGENT_REQUIRED", async () => {
@@ -149,15 +149,23 @@ describe("tools RPC on a real host", () => {
     expect((await raw("describe", 1)).message).toContain("describe takes nothing")
   })
 
-  it("has the six commit tools as methods: a commit is refused before anything runs unless the session allows it", async () => {
+  it("has the six commit tools as methods: at the default access the agent allows the commit, and a session that asks is refused before anything runs", async () => {
     const planned = await run("plan", sessions.build!, request("gmail.users.labels.create", { params: { userId: "me" }, body: { name: "scripted-two" } }))
     expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
     const writes = () => host.invocations().filter((argv) => argv.includes("create") && !argv.includes("--dry-run"))
     const before = writes().length
-    const refused = await run("write", sessions.build!, { planId: planned.value.planId })
+    const committed = await run("write", sessions.build!, { planId: planned.value.planId })
+    expect(committed.value, committed.message).toMatchObject({ ok: true })
+    expect(writes().length).toBe(before + 1)
+    // A session's own rules come after the agent's, so a session can make a commit ask. A script cannot answer.
+    const asking = (await host.opencode.sessions.create({ location: host.location, agent: "build", permissions: [{ action: "gws.write", resource: "*", effect: "ask" }] } as never)).id
+    const second = await run("plan", asking, request("gmail.users.labels.create", { params: { userId: "me" }, body: { name: "scripted-ask" } }))
+    expect(second.value, second.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
+    const afterCommit = writes().length
+    const refused = await run("write", asking, { planId: second.value.planId })
     expect(refused).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
     expect(refused.message).toMatch(/would ask/)
-    expect(writes().length).toBe(before)
+    expect(writes().length).toBe(afterCommit)
   })
 
   it("commits a plan as the session that planned it, when that session's rules allow the commit", async () => {

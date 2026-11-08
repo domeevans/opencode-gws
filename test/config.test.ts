@@ -29,6 +29,12 @@ describe("config", () => {
     expect(() => testConfig({ allowUntestedHost: "yes" })).toThrow()
   })
 
+  it("takes access as one of the three values, and defaults to all", () => {
+    expect(testConfig().access).toBe("all")
+    for (const access of ["all", "ask-changes", "read-only"] as const) expect(testConfig({ access }).access).toBe(access)
+    expect(() => testConfig({ access: "sometimes" })).toThrow(/access: Invalid option: expected one of "all"\|"ask-changes"\|"read-only"/)
+  })
+
   it.each([false, true])("strictly rejects unsupported allowScriptWrapper=%s", value => {
     expect(() => testConfig()).not.toThrow()
     expect(() => testConfig({ binary: { allowScriptWrapper: value } })).toThrow(/allowScriptWrapper/)

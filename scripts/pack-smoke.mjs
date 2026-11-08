@@ -73,14 +73,21 @@ const SMOKE_CLIENT = { clientId: "123-smoke.apps.googleusercontent.com", clientS
 const STOCK_OPTIONS = {
   audit: { enabled: false },
   accounts: { default: { enabledServices: ["gmail"] }, work: { enabledServices: ["drive"], oauthClient: SMOKE_CLIENT } },
+  // `ask-changes` exercises the option end to end on the installed package: its block asks for each commit.
+  access: "ask-changes",
 }
 // The tested hosts: the one list, TESTED_HOSTS in src/domain/host.ts.
 const STOCK_HOSTS = JSON.parse(/TESTED_HOSTS: readonly string\[\] = (\[[^\]]*\])/.exec(readFileSync(join(ROOT, "src", "domain", "host.ts"), "utf8"))[1])
 const HOST_RANGE = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).opencode.host
 const HOST_TIMEOUT_MS = 180_000
 const OFFLINE = { OPENCODE_DISABLE_MODELS_FETCH: "1", OPENCODE_DISABLE_AUTOUPDATE: "1", OPENCODE_DISABLE_FREE_MODELS: "1" }
-// Same six rules as ASK_RULES in src/host/agents.ts. A stock load fails if the installed plugin inserts anything else.
-const ASK_RULES = ["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"].map((action) => ({ action, resource: "*", effect: "ask" }))
+// The block `defaultRules("ask-changes")` in src/host/agents.ts gives: the namespace and each read allowed, each commit
+// asking. A stock load fails if the installed plugin inserts anything else after the base allow.
+const ASK_RULES = [
+  { action: "gws.*", resource: "*", effect: "ask" },
+  ...["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan"].map((action) => ({ action, resource: "*", effect: "allow" })),
+  ...["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"].map((action) => ({ action, resource: "*", effect: "ask" })),
+]
 const BLANK_PROVIDERS = { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } }
 
 function check(condition, message) {
@@ -405,7 +412,7 @@ function insideRoot(path, root) {
 const sameRule = (left, right) => left?.action === right.action && left?.resource === right.resource && left?.effect === right.effect
 const isBaseAllow = (rule) => sameRule(rule, { action: "*", resource: "*", effect: "allow" })
 
-function hasAskRules(rules) {
+function hasDefaultRules(rules) {
   const base = rules.findIndex(isBaseAllow)
   const index = base >= 0 ? base + 1 : 0
   return ASK_RULES.every((rule, offset) => sameRule(rules[index + offset], rule))
@@ -540,7 +547,7 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
       const withBase = agents.filter((agent) => agent.permissions?.some(isBaseAllow))
       check(withBase.length > 0, `opencode ${version} has no agent with a base allow rule`)
       for (const agent of withBase) {
-        check(hasAskRules(agent.permissions), `opencode ${version}: agent ${agent.id} lacks the ask rules after its base allow`)
+        check(hasDefaultRules(agent.permissions), `opencode ${version}: agent ${agent.id} lacks the access block after its base allow`)
       }
 
       await checkSignIn(version, api)
@@ -558,7 +565,7 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
       )
       check(proxy.attempts.length === 0, `opencode ${version} tried to reach the network: ${proxy.attempts.join(", ")}`)
       passed = true
-      console.log(`ok stock opencode ${version}: ${PLUGIN_ID} active, server registered, ask rules after the base allow, /connect entries and forms, skills and manifest from the package, gws 0.22.5 from ${expected.binary}`)
+      console.log(`ok stock opencode ${version}: ${PLUGIN_ID} active, server registered, the access block after the base allow, /connect entries and forms, skills and manifest from the package, gws 0.22.5 from ${expected.binary}`)
     } catch (error) {
       const extra = proxy.attempts.length > 0 ? `\nproxy attempts: ${proxy.attempts.join(", ")}` : ""
       throw new Error(`${error.message}\nserver log tail:\n${log}${extra}`)

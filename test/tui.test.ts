@@ -85,7 +85,7 @@ const ACCOUNTS = {
 } satisfies Record<string, GwsAccount>
 
 function status(accounts: readonly GwsAccount[], extra: Partial<GwsStatus> = {}): GwsStatus {
-  return { version: "1.2.3", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/fixture/gws", version: "gws 0.22.5" }, services: SERVICES, accounts: [...accounts], auditDegraded: false, unguardedAgents: [], ...extra }
+  return { version: "1.2.3", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "connected", access: "all", nextStep: "Nothing to do.", gws: { path: "/fixture/gws", version: "gws 0.22.5" }, services: SERVICES, accounts: [...accounts], auditDegraded: false, unguardedAgents: [], ...extra }
 }
 
 function fake({ location }: { readonly location: Location | undefined } = { location: LOCATION }) {
@@ -254,6 +254,7 @@ describe("status dialog", () => {
         "Client\nfrom the plugin's oauthClient option",
         "Services\ngmail, drive, calendar, docs, sheets",
         "Tools\ngws tools for gmail, drive, calendar, docs, sheets (gws 0.22.5)",
+        "Permissions\nevery tool runs without asking, the six commit tools included (all)",
         "Agents without default rules\nnone",
         "OpenCode\n2.2.3 (tested)",
         `Next step\nSign in: ${CONNECT}`,

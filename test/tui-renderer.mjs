@@ -28,6 +28,7 @@ const status = (account, extra = {}) => ({
   version: "1.2.3",
   host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true },
   state: "connected",
+  access: "all",
   nextStep: "Nothing to do.",
   gws: { path: "/fixture/gws", version: "gws 0.22.5" },
   services: SERVICES,

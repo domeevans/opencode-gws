@@ -1,4 +1,4 @@
-import { DELEGATION_LABEL, SHADOWED_LABEL, SHELL_LABEL, shadowedText, shellText, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
+import { DELEGATION_LABEL, PERMISSIONS_LABEL, SHADOWED_LABEL, SHELL_LABEL, accessText, shadowedText, shellText, connectionLabel, delegationText, openCodeLabel, type GwsAccount, type GwsStatus } from "../rpc.js"
 import type { PluginContext } from "./context.js"
 import type { DoctorOutcome, DoctorTarget } from "../auth/doctor.js"
 import { GOOGLE_LINKS, enableApisUrl } from "../auth/setup.js"
@@ -125,6 +125,7 @@ export function formatStatus(status: GwsStatus, plans: readonly PlanSummary[] = 
   if (status.shadowedSkills?.length) lines.push(`${SHADOWED_LABEL}: ${shadowedText(status)}`)
   if (status.shellSkills?.length) lines.push(`${SHELL_LABEL}: ${shellText(status)}`)
   lines.push(`Tools: gws tools for ${status.services.join(", ") || "no services"} (${status.gws.version})`)
+  lines.push(`${PERMISSIONS_LABEL}: ${accessText(status)}`)
   if (status.unguardedAgents.length === 0) {
     lines.push("Agents without default rules: none")
   } else {

@@ -48,6 +48,8 @@ export interface GwsStatus {
   host: { version: string | null; range: string; tested: boolean }
   /** sign_in_required or not_configured when an account needs it, else connected. */
   state: GwsState
+  /** What the generated default rules allow: `all`, `ask-changes` or `read-only`. */
+  access: "all" | "ask-changes" | "read-only"
   gws: { path: string; version: string }
   services: string[]
   accounts: GwsAccount[]
@@ -71,6 +73,7 @@ const object = (properties: Record<string, object>, required: readonly string[])
 
 const MODES: readonly unknown[] = ["interactive", "credentials_file", "access_token"]
 const ACCESS: readonly unknown[] = ["read", "write"]
+const POLICY_ACCESS: readonly unknown[] = ["all", "ask-changes", "read-only"]
 const CLIENT_SOURCES: readonly unknown[] = ["account", "plugin", "pasted"]
 const STATES: readonly unknown[] = ["connected", "sign_in_required", "not_configured"]
 
@@ -97,6 +100,7 @@ const status = object(
     version: text,
     host: object({ version: { type: ["string", "null"] }, range: text, tested: { type: "boolean" } }, ["version", "range", "tested"]),
     state: { enum: STATES },
+    access: { enum: POLICY_ACCESS },
     gws: object({ path: text, version: text }, ["path", "version"]),
     services: texts,
     accounts: { type: "array", items: account },
@@ -107,7 +111,7 @@ const status = object(
     permissionsBlock: text,
     nextStep: text,
   },
-  ["version", "host", "state", "gws", "services", "accounts", "unguardedAgents", "nextStep"],
+  ["version", "host", "state", "access", "gws", "services", "accounts", "unguardedAgents", "nextStep"],
 )
 
 export const Gws = Rpc.define({
@@ -156,6 +160,7 @@ export function isStatus(value: unknown): value is GwsStatus {
     isText(value["host"]["range"]) &&
     typeof value["host"]["tested"] === "boolean" &&
     STATES.includes(value["state"]) &&
+    POLICY_ACCESS.includes(value["access"]) &&
     isRecord(value["gws"]) &&
     isText(value["gws"]["path"]) &&
     isText(value["gws"]["version"]) &&
@@ -202,6 +207,14 @@ export function shadowedText(status: GwsStatus): string {
 export const SHELL_LABEL = "Shell gws skills"
 export function shellText(status: GwsStatus): string {
   return (status.shellSkills ?? []).map((skill) => `${skill.id} (${skill.path})`).join(", ")
+}
+
+/** The Permissions row: what the generated default rules allow, from the `access` option. */
+export const PERMISSIONS_LABEL = "Permissions"
+export function accessText(status: Pick<GwsStatus, "access">): string {
+  if (status.access === "read-only") return "reads run; every commit is denied until you change access (read-only)"
+  if (status.access === "ask-changes") return "reads run; each commit asks first (ask-changes)"
+  return "every tool runs without asking, the six commit tools included (all)"
 }
 
 /** The row naming services that need domain-wide delegation. */

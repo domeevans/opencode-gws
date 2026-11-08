@@ -1,4 +1,5 @@
 import { Gws, NOTHING_TO_DO, SHELL_LABEL, UNGUARDED_NEXT_STEP, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
+import type { Access } from "../domain/access.js"
 import type { Runtime } from "../runtime/index.js"
 import { permissionsBlock, unguardedAgents, type Rule } from "./agents.js"
 import type { PluginContext } from "./context.js"
@@ -44,10 +45,10 @@ function stateOf(accounts: readonly GwsAccount[]): GwsState {
 }
 
 /** Plugin status with each account's sign-in state and the unguarded agents. Never a token or a client secret. */
-export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills: SkillList = async () => []): StatusSource {
+export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills: SkillList = async () => [], access: Access = "all"): StatusSource {
   return async (signal) => {
     const base = await runtime.status(signal)
-    const agents = unguardedAgents(await runtime.wait(() => listAgents(), signal))
+    const agents = unguardedAgents(await runtime.wait(() => listAgents(), signal), access)
     const skills = await runtime.wait(() => listSkills(), signal)
     const shadowed = shadowedSkills(skills)
     const shell = shellSkills(skills)
@@ -60,10 +61,11 @@ export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills
       services: base.services,
       accounts: base.accounts,
       auditDegraded: base.auditDegraded,
+      access,
       ...(shadowed.length > 0 ? { shadowedSkills: shadowed } : {}),
       ...(shell.length > 0 ? { shellSkills: shell } : {}),
       unguardedAgents: agents,
-      ...(agents.length > 0 ? { permissionsBlock: permissionsBlock(agents) } : {}),
+      ...(agents.length > 0 ? { permissionsBlock: permissionsBlock(agents, access) } : {}),
       nextStep: next ?? NOTHING_TO_DO,
     }
   }

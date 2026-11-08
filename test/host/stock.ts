@@ -117,6 +117,8 @@ export async function startStock(version: string): Promise<StockHost> {
     binary: { path: launcher },
     accounts: { [ACCOUNT]: { mode: "access_token", tokenEnv: "GWS_TEST_TOKEN", enabledServices: ["gmail", "drive"] } },
     audit: { enabled: false },
+    // The ask refusal is the RPC path's own case: at ask-changes a commit needs a rule the session does not have.
+    access: "ask-changes",
   }
   const providers = { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } }
   writeFileSync(join(home, ".config/opencode/opencode.json"), JSON.stringify({ agents: AGENTS }, null, 2))

@@ -135,7 +135,7 @@ describe("commands", () => {
 
 describe("/gws-status", () => {
   it("names a config-only agent and gives the per-agent block, first in its own permissions", () => {
-    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: ["notes"], permissionsBlock: '{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}' }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: ["notes"], permissionsBlock: '{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}' }
     const text = formatStatus(status)
     // The row lists names only, then the block; the one fixed sentence is the Next step.
     expect(text).toContain('Agents without default rules: notes\n{"agents":{"notes":{"permissions":[{"action":"gws.write","resource":"*","effect":"ask"}]}}}\nOpenCode:')
@@ -171,24 +171,24 @@ describe("/gws-status", () => {
   })
 
   it("names a skill that hides the plugin's own, before Tools", () => {
-    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Move it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shadowedSkills: [{ id: "opencode-gws", path: "/u/skills/opencode-gws/SKILL.md" }], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Move it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shadowedSkills: [{ id: "opencode-gws", path: "/u/skills/opencode-gws/SKILL.md" }], unguardedAgents: [] }
     expect(formatStatus(status)).toMatch(/\nHidden skills: opencode-gws \(hidden by \/u\/skills\/opencode-gws\/SKILL\.md\)\nTools: /)
   })
 
   it("names the skills that run gws in a shell, before Tools", () => {
-    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Remove it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shellSkills: [{ id: "gws-gmail", path: "/u/skills/gws-gmail/SKILL.md" }, { id: "gws-drive", path: "/u/skills/gws-drive/SKILL.md" }], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Remove it.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], shellSkills: [{ id: "gws-gmail", path: "/u/skills/gws-gmail/SKILL.md" }, { id: "gws-drive", path: "/u/skills/gws-drive/SKILL.md" }], unguardedAgents: [] }
     expect(formatStatus(status)).toMatch(/\nShell gws skills: gws-gmail \(\/u\/skills\/gws-gmail\/SKILL\.md\), gws-drive \(\/u\/skills\/gws-drive\/SKILL\.md\)\nTools: /)
   })
 
   it("says Nothing to do. and marks an untested host", () => {
-    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: { version: "2.3.0", range: ">=2.2.3 <2.3.0", tested: false }, state: "connected", access: "all", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     const text = formatStatus(status)
     expect(text).toContain("OpenCode: 2.3.0 (host untested; supported range >=2.2.3 <2.3.0)")
     expect(text).toMatch(/Next step: Nothing to do\.$/)
   })
 
   it("summarises status in one transcript line", () => {
-    const base = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], unguardedAgents: [] }
+    const base = { version: "1", host: TESTED, state: "connected" as const, access: "all" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], unguardedAgents: [] }
     const ready = { alias: "a", mode: "interactive" as const, services: [], integrationID: "gws-a", connected: true, missingScopes: [] }
     expect(summarizeStatus({ ...base, accounts: [] })).toBe("Google Workspace: no accounts configured")
     expect(summarizeStatus({ ...base, accounts: [ready] })).toBe("Google Workspace: 1 account connected")
@@ -199,13 +199,13 @@ describe("/gws-status", () => {
 
   it("shows the services that need domain-wide delegation, and how to add their scopes", () => {
     const notes = { alias: "notes", mode: "interactive" as const, services: ["keep"], integrationID: "gws-notes", connected: true, missingScopes: [], delegationRequired: ["keep"] }
-    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [notes], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [notes], unguardedAgents: [] }
     expect(formatStatus(status)).toContain("Services: keep\nNeeds domain-wide delegation: keep (a Workspace admin sets it up; then add the scopes to accounts.notes.scopes)")
   })
 
   it("shows a headless account as connected or not configured, never as signed in", () => {
     const headless = { alias: "ci", mode: "credentials_file" as const, services: ["drive"], connected: false }
-    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [headless], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [headless], unguardedAgents: [] }
     expect(formatStatus(status)).toContain("Connection: not configured\nAccount: ci (credentials file)\nServices: drive")
     expect(formatStatus({ ...status, accounts: [{ ...headless, connected: true }] })).toContain("Connection: connected\nAccount: ci (credentials file)")
   })
@@ -232,7 +232,7 @@ describe("/gws-status pending plans", () => {
   })
 
   it("formats an empty plan list and every preview field", () => {
-    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
     expect(formatStatus(status)).toContain("No pending plans in this session.")
     expect(summarizeStatus(status)).toBe("Google Workspace: no accounts configured")
     const text = formatStatus(

@@ -3,14 +3,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { request } from "../support/requests.js"
-import { hasAskRules } from "../../src/host/agents.js"
+import { defaultRules, hasDefaultRules } from "../../src/host/agents.js"
 import { ACCOUNT, prompt, startHost, type Harness } from "./harness.js"
 import { Gws, isStatus } from "./package.js"
 
 /**
  * One host, so the embedded SDK's process-wide paths stay inside this root.
- * User allow on gws.export, user deny on gws.admin, a config-only agent, and
- * a custom deny agent. Built-in agents still receive the ask rules.
+ * The host runs at `access: "ask-changes"`, so each commit asks and the
+ * reads run: user allow on gws.export, user deny on gws.admin, a config-only
+ * agent, and a custom deny agent. Built-in agents still receive the rules.
  */
 
 let host: Harness
@@ -28,6 +29,7 @@ beforeAll(async () => {
       locked: { permissions: [{ action: "gws.*", resource: "*", effect: "deny" }] },
       notes: { permissions: [{ action: "*", resource: "*", effect: "allow" }] },
     },
+    options: { access: "ask-changes" },
   })
   sessionID = (await host.opencode.sessions.create({ location: host.location })).id
 })
@@ -50,12 +52,12 @@ function call(tool: string, input: unknown): string {
 const asked = () => host.events.filter((event) => event.type === "permission.asked" && event.data?.sessionID === sessionID)
 
 describe("agent ask rules", () => {
-  it("puts the ask rules immediately after each built-in agent's base allow", async () => {
+  it("puts the rules immediately after each built-in agent's base allow", async () => {
     const { data } = await host.opencode.agent.list({ location: host.location })
     const builtins = data.filter((agent) => agent.id !== "locked" && agent.id !== "notes")
     expect(builtins.length).toBeGreaterThan(0)
     for (const agent of builtins) {
-      expect(hasAskRules(agent.permissions), agent.id).toBe(true)
+      expect(hasDefaultRules(agent.permissions, "ask-changes"), agent.id).toBe(true)
     }
   })
 
@@ -63,9 +65,11 @@ describe("agent ask rules", () => {
     const { data } = await host.opencode.agent.list({ location: host.location })
     const notes = data.find((agent) => agent.id === "notes" || agent.name === "notes")
     expect(notes, "config-only agent").toBeDefined()
-    expect(hasAskRules(notes!.permissions)).toBe(false)
+    expect(hasDefaultRules(notes!.permissions, "ask-changes")).toBe(false)
     const rpc = await host.opencode.rpc(Gws).status({}, { location: host.location })
     if (!isStatus(rpc)) throw new Error(`not a status: ${JSON.stringify(rpc)}`)
+    expect(rpc.access).toBe("ask-changes")
+    expect(rpc.permissionsBlock).toContain(JSON.stringify(defaultRules("ask-changes")[0]))
     expect(rpc.unguardedAgents).toEqual(["notes"])
     expect(rpc.permissionsBlock).toContain('"resource":"*"')
     const status = await execute(call("status", {}))
