@@ -219,7 +219,7 @@ export function signInForm(alias: string, profile: AccountProfile, configured: C
       key: "confirmWrite",
       type: "boolean",
       title: `I understand this grants write access to: ${write.join(", ") || "no additional scopes"}`,
-      description: "Agents can then plan changes, sends, shares, and deletes. Each one still asks before it runs.",
+      description: "Agents can then plan changes, sends, shares, and deletes. Each change is a plan; a commit runs without a prompt at the default access, and asks at ask-changes.",
       required: true,
       default: false,
       when: [{ key: "access", op: "eq", value: "write" }],
