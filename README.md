@@ -170,6 +170,8 @@ What each commit asserts: `gws.<category>` on `<account>:<operation>`. Write and
 { "action": "gws.write", "resource": "work:*", "effect": "allow" }
 ```
 
+A download outside the project asserts OpenCode's own `external_directory` permission as well, because the file lands there: allow the folder with `{ "action": "external_directory", "resource": "<folder>/*", "effect": "allow" }`, or download inside the project. An agent whose base rule allows everything allows it too, so nothing asks unless your rules restrict it.
+
 `opencode run` cannot answer an ask. At `ask-changes`, give a commit an allow rule there, or choose `all`. A user `deny` hides that tool. A Plan-style or custom deny such as `{ "action": "gws.*", "resource": "*", "effect": "deny" }` still wins, because it is later than the inserted block.
 
 An agent defined only in your config does not get the block. That matters only when `access` holds something back: `/gws-status` and the status dialog then name those agents and show the block. Put it first in each listed agent's own `permissions`, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Google Workspace tools. Do not put it in the top-level `permissions`: that would loosen Explore.
@@ -249,6 +251,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `UPLOAD_CHANGED` | An upload or attachment changed between the plan and the commit, so the plan expired. | Plan again and show the new preview. |
 | `DOWNLOAD_EXISTS` | The download destination exists and download.overwrite is not true. | Choose another path, or plan again with download.overwrite set to true after the user agrees. |
 | `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
+| `DOWNLOAD_NOT_PERMITTED` | The destination is outside the project, so OpenCode asks for its own external_directory permission as well, and the rules denied it or the person rejected the prompt. Nothing was written, and the plan is still ready. | Allow the folder with {"action": "external_directory", "resource": "<folder>/*", "effect": "allow"} in OpenCode's permissions, or download to a path inside the project. |
 | `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
 | `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0). | Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true. |
 | `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |

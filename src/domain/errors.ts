@@ -191,6 +191,12 @@ export const ErrorCode = {
     meaning: "The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file.",
     next: "Fix the destination path; if gws wrote no file, tell the user.",
   },
+  DOWNLOAD_NOT_PERMITTED: {
+    meaning:
+      "The destination is outside the project, so OpenCode asks for its own external_directory permission as well, and the rules denied it or the person rejected the prompt. Nothing was written, and the plan is still ready.",
+    next:
+      'Allow the folder with {"action": "external_directory", "resource": "<folder>/*", "effect": "allow"} in OpenCode\'s permissions, or download to a path inside the project.',
+  },
   DOWNLOAD_LIMIT: {
     meaning: "The download is larger than execution.maxDownloadBytes; nothing was written to the destination.",
     next: "Tell the user; they can raise execution.maxDownloadBytes. The plan is used up.",

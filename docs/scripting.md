@@ -113,7 +113,9 @@ or `gmail.read` (text unless `format` is `json`). Workspace content in it is unt
 
 `plan` returns a plan bound to the account, the session and its agent, as `gws_plan` does. A commit takes only
 `{"planId": "…"}`, and is refused unless the session's agent allows that commit's action (`gws.write`, `gws.send`,
-`gws.share`, `gws.delete`, `gws.export` or `gws.admin`). Plan and commit in the same run session: another session
+`gws.share`, `gws.delete`, `gws.export` or `gws.admin`). An export whose destination is outside the project asserts
+OpenCode's own `external_directory` as well, so a session that asks for that folder refuses the export
+(`DOWNLOAD_NOT_PERMITTED`) before gws runs. Plan and commit in the same run session: another session
 cannot commit the plan (`PLAN_CALLER_MISMATCH`), and a plan is single-use.
 
 ## Errors

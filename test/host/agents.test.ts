@@ -90,7 +90,8 @@ describe("agent ask rules", () => {
   })
 
   it("lets a user allow rule remove the export prompt, and a user deny hide admin", async () => {
-    const destination = join(root, "export.txt")
+    // Inside the project: a destination outside it asks external_directory as well (external-directory.test.ts).
+    const destination = join(host.location.directory, "export.txt")
     const planned = (await execute(call("plan", request("drive.files.export", { params: { fileId: "f-1", mimeType: "text/plain" }, download: { path: destination } })))).value as Record<string, unknown>
     expect(planned).toMatchObject({ ok: true, category: "export" })
     const before = asked().length

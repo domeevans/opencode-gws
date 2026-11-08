@@ -117,6 +117,16 @@ Plugin `policy` rules can only deny. They constrain recipients, public sharing, 
 
 Every permission rule in this document includes `resource`. A rule without it is skipped.
 
+### Downloads outside the project
+
+A download is written by the plugin, not by OpenCode's file tools, so the plugin asserts OpenCode's own `external_directory` permission for a destination outside the project, as well as `gws.export`. The resource is the destination's folder, and it is offered to Always:
+
+```json
+{ "action": "external_directory", "resource": "/Users/me/Downloads/*", "effect": "allow" }
+```
+
+A destination inside the project directory asserts nothing extra. An agent whose base rule allows everything allows `external_directory` too, so nothing asks there; a rule that asks or denies it makes the download ask, or refuse with `DOWNLOAD_NOT_PERMITTED`, whose next step is the rule above. The plugin's own `execution.allowedWriteRoots` still applies: it is checked before the host permission, and a path outside every root is `POLICY_DENIED`.
+
 ## Admin
 
 | Key | Default | Meaning |
@@ -220,6 +230,7 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `UPLOAD_CHANGED` | An upload or attachment changed between the plan and the commit, so the plan expired. | Plan again and show the new preview. |
 | `DOWNLOAD_EXISTS` | The download destination exists and download.overwrite is not true. | Choose another path, or plan again with download.overwrite set to true after the user agrees. |
 | `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
+| `DOWNLOAD_NOT_PERMITTED` | The destination is outside the project, so OpenCode asks for its own external_directory permission as well, and the rules denied it or the person rejected the prompt. Nothing was written, and the plan is still ready. | Allow the folder with {"action": "external_directory", "resource": "<folder>/*", "effect": "allow"} in OpenCode's permissions, or download to a path inside the project. |
 | `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
 | `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0). | Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true. |
 | `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |

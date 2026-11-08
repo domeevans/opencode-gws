@@ -1,3 +1,5 @@
+import { dirname } from "node:path"
+import { underRoot } from "../domain/files.js"
 import { redactedPreview } from "../domain/plans.js"
 import type { Plan } from "../domain/types.js"
 import type { Target } from "../runtime/operations.js"
@@ -87,6 +89,19 @@ export function commitRequests(call: Caller, action: string, plan: Plan): Permis
   const request: PermissionRequest = { ...base(call, action), resources: [id], metadata: planMetadata(plan) }
   if (SAVABLE.has(plan.category)) request.save = [id]
   return [request]
+}
+
+/**
+ * OpenCode asks for its own `external_directory` permission as well as the
+ * plugin's action before anything is written outside the project, so an
+ * export to such a path asserts it. The resource is the destination's
+ * folder, saved whole. Absent inside the project, where the host's own file
+ * rules do not ask.
+ */
+export function externalDirectoryRequest(call: Caller, destination: string, directory: string): PermissionRequest | undefined {
+  if (underRoot(destination, directory)) return undefined
+  const folder = dirname(destination)
+  return { ...base(call, "external_directory"), resources: [`${folder}/*`], save: [`${folder}/*`], metadata: { destination } }
 }
 
 function compact(record: Record<string, unknown>): Record<string, unknown> {

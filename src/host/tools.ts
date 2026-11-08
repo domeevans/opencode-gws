@@ -21,7 +21,7 @@ import type { CallContext } from "../runtime/accounts.js"
 import type { Runtime } from "../runtime/index.js"
 import type { PluginContext, ToolContext, ToolEditor, ToolInfo } from "./context.js"
 import type { StatusSource } from "./rpc.js"
-import { commitRequests, localRequest, operationRequest } from "./permissions.js"
+import { commitRequests, externalDirectoryRequest, localRequest, operationRequest } from "./permissions.js"
 import type { Caller, PermissionRequest } from "./permissions.js"
 
 /**
@@ -251,6 +251,21 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
           const plan = runtime.inspectPlan(category, input, call.runtime)
           report(call, plan.operation)
           for (const request of commitRequests(call.host, `gws.${category}`, plan)) await authorize(call, request)
+          // A download outside the project is the host's own external_directory case as well as this plugin's.
+          const destination = plan.files?.output?.destination ?? plan.preview.destination
+          const external = destination ? externalDirectoryRequest(call.host, destination, runtime.options.projectDirectory ?? "") : undefined
+          if (external) {
+            const folder = external.resources[0]!.slice(0, -2)
+            try {
+              await authorize(call, external)
+            } catch (error) {
+              const known = GwsError.from(error)
+              if (known) throw known
+              throw new GwsError("DOWNLOAD_NOT_PERMITTED", `The host's rules refused the download folder ${folder}, which is outside the project`, {
+                next: `Allow it with {"action": "external_directory", "resource": "${folder}/*", "effect": "allow"} in OpenCode's permissions, or download to a path inside the project.`,
+              })
+            }
+          }
           const output = await runtime.commit(category, input, call.runtime)
           return { output, metadata: { operation: plan.operation, category, account: plan.account } }
         },

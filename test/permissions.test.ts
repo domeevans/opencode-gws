@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { commitRequests, localRequest, operationRequest, planMetadata } from "../src/host/permissions.js"
+import { commitRequests, externalDirectoryRequest, localRequest, operationRequest, planMetadata } from "../src/host/permissions.js"
 import type { Plan } from "../src/domain/types.js"
 
 const call = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1" }
@@ -33,6 +33,19 @@ const plan = (overrides: Partial<Plan> = {}): Plan => ({
 })
 
 describe("permission requests", () => {
+  it("asserts OpenCode's external_directory for a download outside the project, and nothing inside it", () => {
+    expect(externalDirectoryRequest(call, "/work/project/out.txt", "/work/project")).toBeUndefined()
+    expect(externalDirectoryRequest(call, "/elsewhere/out.txt", "/work/project")).toEqual({
+      sessionID: "ses_1",
+      agent: "build",
+      action: "external_directory",
+      resources: ["/elsewhere/*"],
+      save: ["/elsewhere/*"],
+      metadata: { destination: "/elsewhere/out.txt" },
+      source,
+    })
+  })
+
   it("asserts local tools on the wildcard resource", () => {
     expect(localRequest(call, "gws.status")).toEqual({
       sessionID: "ses_1",
