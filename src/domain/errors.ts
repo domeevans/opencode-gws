@@ -38,6 +38,11 @@ export const ErrorCode = {
       "The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected.",
     next: "Fix the request as the message says; gws_schema shows the parameters and request body.",
   },
+  CURSOR_INVALID: {
+    meaning:
+      "The events_list cursor was not issued by events_list for this account and its mailbox: another account's or source's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran.",
+    next: "Call events_list without cursor, with since where the listing should start; Memory drops events it already has.",
+  },
   FIELDS_INVALID: {
     meaning: "The fields mask's parentheses do not balance, so gws was not called.",
     next: "Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry.",
@@ -239,6 +244,8 @@ interface ErrorOptions {
   next?: string
   /** For API_DISABLED: where to enable the API. */
   enableUrl?: string
+  /** For GWS_API_ERROR: the HTTP status Google answered with, such as 404. */
+  status?: number
 }
 
 /**
@@ -249,6 +256,8 @@ export class GwsError extends Error {
   readonly code: ErrorCode
   readonly next: string
   readonly enableUrl?: string
+  /** For GWS_API_ERROR: the HTTP status Google answered with, such as 404 for a message or history id it no longer has. */
+  readonly status?: number
 
   constructor(code: ErrorCode, detail: string, options: ErrorOptions = {}) {
     const next = options.next ?? ErrorCode[code].next
@@ -256,6 +265,7 @@ export class GwsError extends Error {
     this.code = code
     this.next = next
     if (options.enableUrl) this.enableUrl = options.enableUrl
+    if (options.status !== undefined) this.status = options.status
   }
 
   /**

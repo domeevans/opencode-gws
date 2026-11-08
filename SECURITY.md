@@ -67,6 +67,7 @@ The tools RPC (`google-workspace.gws.tools`, see [docs/scripting.md](https://git
 
 - A script names a session that names an agent, and runs as them. Every call asserts the same action and resource as the tool, against that agent's rules and the session's own.
 - An ask on a script's call is denied, not prompted: no one is there to answer it. A script needs an allow rule, or no rule, for what it does.
-- Only `status`, `catalog`, `schema`, `read` and `plan` are methods. The six commit tools are never methods, whatever their exposure, so a script can plan but never commit; a plan binds to the session and agent, and only an approved commit tool in that session applies it.
+- Only `status`, `catalog`, `schema`, `read`, `plan` and `events_list` are methods. The six commit tools are never methods, whatever their exposure, so a script can plan but never commit; a plan binds to the session and agent, and only an approved commit tool in that session applies it.
 - The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The session is not a login: it scopes a script to what its agent may do.
 - Audit records of a script's reads and plans carry `caller: "rpc"`.
+- `events_list` is how Memory's collector reads Gmail unattended. It is reads only: it asserts `gws.events_list`, then `gws.read` on each Gmail operation it runs (`getProfile`, `history.list`, `messages.list`, `messages.get`), each under the plugin's read policy and audit. Its events carry the senders' and recipients' addresses as `mailto:` ids and up to 4,096 characters of each message's own text, marked untrusted; the owner is the account's own address. A deny rule on `gws.events_list` stops it without stopping `gws_read`.

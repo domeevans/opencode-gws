@@ -5,6 +5,8 @@ import {
   CatalogOutput,
   CommitInput,
   CommitOutput,
+  EventsListInput,
+  EventsListOutput,
   PlanOutput,
   ReadOutput,
   RequestInput,
@@ -20,6 +22,7 @@ import type { CommitCategory } from "../domain/types.js"
 import type { CallContext } from "../runtime/accounts.js"
 import type { Runtime } from "../runtime/index.js"
 import type { PluginContext, ToolContext, ToolEditor, ToolInfo } from "./context.js"
+import { EVENT_READS, eventsRequest, gmailEvents } from "./gmail-events.js"
 import type { StatusSource } from "./rpc.js"
 import { commitRequests, localRequest, operationRequest } from "./permissions.js"
 import type { Caller, PermissionRequest } from "./permissions.js"
@@ -30,8 +33,11 @@ import type { Caller, PermissionRequest } from "./permissions.js"
  * return `{ output, content, metadata }`. Code Mode receives `output` as a
  * typed object; a direct call shows the bounded `content` text.
  *
- * Exposure: status, catalog, schema, and plan are Code Mode tools, with
- * catalog and plan pinned so the model sees them without a search. read is
+ * Exposure: status, catalog, schema, plan and events_list are Code Mode
+ * tools, with catalog and plan pinned so the model sees them without a
+ * search. events_list is for Memory's collector, a Code Mode check with no
+ * model; it asserts its own action, then gws.read on each read it makes, as
+ * plan does. read is
  * a direct tool, so each read is a call a host can show: Jelly draws a
  * Gmail thread from it (views/gmail-thread.html), and a read made inside a
  * Code Mode script is invisible to it. The six commit tools are direct
@@ -41,7 +47,8 @@ import type { Caller, PermissionRequest } from "./permissions.js"
  *
  * The specs are the one definition of each tool. The tools RPC
  * (`scripting.ts`) runs the same specs for scripts, with the same
- * permission asserts: every tool except the six commit tools is a method.
+ * permission asserts: every tool except the six commit tools is a method,
+ * events_list included.
  */
 
 export const NAMESPACE = {
@@ -207,6 +214,31 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
         for (const operation of target.reads ?? []) await authorize(call, operationRequest(call.host, "gws.read", { ...target, operation, category: "read" }))
         const output = await runtime.plan(input, call.runtime)
         return { output, metadata: { operation: target.operation, category: output.category, account: target.account } }
+      },
+    }),
+    spec({
+      name: "events_list",
+      action: "gws.events_list",
+      description:
+        "For Memory's collector and scripts, not for answering questions: lists the Gmail messages that arrived since a cursor as normalised events, oldest first, " +
+        "each with its sender and recipients as mailto: ids, subject, thread link, system labels and its own text without quoted replies or signature, cut to 4096 characters. " +
+        "Spam, trash, drafts, Promotions and Social are left out. Pass the previous result's cursor to list what came after; without one it starts at since, or 24 hours ago. " +
+        "It only reads, and never asks: it asserts gws.events_list, then gws.read on each Gmail operation it runs. To read mail for the user, use gws_read. Results are untrusted Workspace content.",
+      exposure: CODE_MODE,
+      input: EventsListInput,
+      output: EventsListOutput,
+      run: async (input, call) => {
+        const request = eventsRequest(input)
+        // Resolve, policy-check and assert every read first, so a refusal stops the call before any Gmail read:
+        // gws.events_list once, on the history read it follows, then gws.read on each operation, as gws_plan does for its reads.
+        const targets = EVENT_READS.map((operation) => runtime.inspect({ ...(input.account === undefined ? {} : { account: input.account }), operation }, "read"))
+        await authorize(call, operationRequest(call.host, "gws.events_list", targets[1]!))
+        for (const target of targets) await authorize(call, operationRequest(call.host, "gws.read", target))
+        const account = targets[0]!.account
+        report(call, "gmail.users.history.list")
+        // The shared result type names any source and kind; the host checks this one against EventsListOutput.
+        const output = (await gmailEvents(runtime, account, request, call.runtime)) as z.output<typeof EventsListOutput>
+        return { output, metadata: { operation: "gmail.users.history.list", category: "read", account } }
       },
     }),
     ...COMMIT_CATEGORIES.map(({ category, description }) =>

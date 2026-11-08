@@ -15,7 +15,7 @@ const Tools = Rpc.define({
   id: "google-workspace.gws.tools",
   methods: {
     describe: { input: open, output: open },
-    ...Object.fromEntries(["status", "catalog", "schema", "read", "plan", "write"].map((name) => [name, { input: open, output: open, errors: { failed: open } }])),
+    ...Object.fromEntries(["status", "catalog", "schema", "read", "plan", "events_list", "write"].map((name) => [name, { input: open, output: open, errors: { failed: open } }])),
   },
   events: {},
 })
@@ -63,7 +63,7 @@ const asked = (session: string) => host.events.filter((event) => event.type === 
 describe("tools RPC on a real host", () => {
   it("describes exactly the non-commit tools", async () => {
     const description = (await tools().describe!({}, at())) as { methods: Array<{ name: string }> }
-    expect(description.methods.map((method) => method.name)).toEqual(["status", "catalog", "schema", "read", "plan"])
+    expect(description.methods.map((method) => method.name)).toEqual(["status", "catalog", "schema", "read", "plan", "events_list"])
   })
 
   it("reads as a session whose agent allows it, with no model turn", async () => {

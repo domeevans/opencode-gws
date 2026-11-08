@@ -98,7 +98,7 @@ describe("tools RPC contract", () => {
     const h = await setup()
     expect(h.contract.id).toBe(TOOLS_RPC_ID)
     expect(TOOLS_RPC_ID).toBe("google-workspace.gws.tools")
-    expect(Object.keys(h.contract.methods).sort()).toEqual(["catalog", "describe", "plan", "read", "schema", "status"])
+    expect(Object.keys(h.contract.methods).sort()).toEqual(["catalog", "describe", "events_list", "plan", "read", "schema", "status"])
     for (const commit of ["write", "send", "share", "delete", "export", "admin"]) expect(h.handlers[commit]).toBeUndefined()
   })
 
@@ -123,6 +123,7 @@ describe("tools RPC contract", () => {
       ["schema", "gws.schema"],
       ["read", "gws.read"],
       ["plan", "gws.plan"],
+      ["events_list", "gws.events_list"],
     ])
     const read = description.methods.find((method) => method.name === "read")!
     expect(read.input).toMatchObject({ type: "object", properties: { operation: expect.any(Object) } })

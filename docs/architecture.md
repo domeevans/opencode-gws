@@ -38,7 +38,9 @@ src/
     accounts.ts     tokens, spawn, status
   host/             the only other modules that import @opencode/plugin
     agents.ts       default ask rules
-    tools.ts        the 11 tool adapters
+    tools.ts        the 12 tool adapters
+    gmail-events.ts events_list for Gmail: search, then history, as events
+    events-list.ts  the shared events_list contract (a copy every source plugin carries; check-copies pins it)
     permissions.ts  permission.assert inputs; no signal field
     skills.ts       the two skills
     integrations.ts sign-in
@@ -52,6 +54,7 @@ src/
     policy.ts       deny-only constraints and the admin gate
     errors.ts       the error table; the Errors section of docs/configuration.md is generated from it
     manifest.ts     catalog and coverage
+    gmail.ts        what events_list takes from a message: noise, people, text
   process/          the only spawn site
   auth/             OAuth client, form, setup, doctor; no host import
 ```

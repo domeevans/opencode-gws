@@ -111,6 +111,12 @@
         "readOnly": true
       },
       {
+        "name": "gws.events_list",
+        "permission": "gws.events_list",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
         "name": "gws.write",
         "permission": "gws.write",
         "effect": "ask",
