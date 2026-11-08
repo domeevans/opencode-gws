@@ -152,6 +152,53 @@ function errorsDoc(source) {
   ].join("\n")
 }
 
+/** The rule block for one `access` value: the namespace, then every read, then the six commits. */
+function rulesDoc(accessSource) {
+  const values = evalSource(extractArray(accessSource, "export const ACCESS_VALUES"))
+  const effect = evalSource(extractBraces(accessSource, "export const ACCESS_EFFECT"))
+  const namespace = evalSource(/export const NAMESPACE_ACTION = ("(?:[^"\\]|\\.)*")/.exec(accessSource)[1])
+  const reads = evalSource(extractArray(accessSource, "export const READ_ACTIONS"))
+  const changes = evalSource(extractArray(accessSource, "export const CHANGING_ACTIONS"))
+  const blocks = values.map((access) => {
+    const rules = [
+      { action: namespace, resource: "*", effect: effect[access] },
+      ...reads.map((action) => ({ action, resource: "*", effect: "allow" })),
+      ...changes.map((action) => ({ action, resource: "*", effect: effect[access] })),
+    ]
+    return [
+      begin(`rules-${access}`),
+      "",
+      `\`access: "${access}"\``,
+      "",
+      "| Action | Resource | Effect |",
+      "| --- | --- | --- |",
+      ...rules.map((rule) => `| \`${rule.action}\` | \`${rule.resource}\` | \`${rule.effect}\` |`),
+      "",
+      end(`rules-${access}`),
+    ].join("\n")
+  })
+  return blocks
+}
+
+/** Every code the plugin reports, from the one typed table: what it means, and the next step the message carries. */
+function codesDoc(source) {
+  const table = evalSource(extractBraces(source, "export const ErrorCode ="))
+  const rows = Object.entries(table).map(
+    ([code, entry]) => `| \`${code}\` | ${entry.meaning.replaceAll("|", "\\|")} | ${entry.next.replaceAll("|", "\\|")} |`,
+  )
+  return [
+    begin("codes"),
+    "",
+    "Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit this section by hand.",
+    "",
+    "| Code | Meaning | Next step |",
+    "| --- | --- | --- |",
+    ...rows,
+    "",
+    end("codes"),
+  ].join("\n")
+}
+
 function coverageDoc(manifest, helpers) {
   const runnable = new Set(runnableHelpers(helpers))
   const methodTotal = manifest.services.reduce((sum, service) => sum + service.methods.length, 0)
@@ -242,4 +289,12 @@ const manifest = expandManifest(JSON.parse(read("manifest/generated.json")))
 emit("docs/coverage.md", coverageDoc(manifest, read("src/domain/helpers.ts")))
 emit("docs/configuration.md", replaceMarked(read("docs/configuration.md"), "errors", errorsDoc(read("src/domain/errors.ts"))))
 emit("docs/auth.md", replaceMarked(read("docs/auth.md"), "scopes", scopeTable(read("src/domain/scopes.ts"), read("src/domain/restricted.ts"))))
+// The README prints the default-rules block for every access value, and every code, in full.
+const accessSource = read("src/domain/access.ts")
+let readme = read("README.md")
+for (const block of rulesDoc(accessSource)) {
+  const name = /<!-- generated:([^ ]+) -->/.exec(block)[1]
+  readme = replaceMarked(readme, name, block)
+}
+emit("README.md", replaceMarked(readme, "codes", codesDoc(read("src/domain/errors.ts"))))
 if (process.exitCode) process.exit(process.exitCode)

@@ -202,25 +202,75 @@ Members then only run `/connect`, choose Google Workspace, and pick an access le
 
 ## Troubleshooting
 
-`/gws-status` shows each account as `connected`, `sign-in required` or `not configured`, with one next step. Common error codes:
+`/gws-status` shows each account as `connected`, `sign-in required` or `not configured`, with one next step. Every code this plugin reports, with what it means and the next step its message carries:
 
-| Code | What to do |
-| --- | --- |
-| `AUTH_REQUIRED` | Run `/connect` and choose Google Workspace, or run `opencode auth login gws-<alias>`. |
-| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but the account is not a Workspace admin with the privilege the API needs, such as Reports for `admin-reports`. Signing in again as the same account does not help: add a separate account alias for an admin who has it and sign in to that, or remove the service from `enabledServices`. |
-| `AUTH_SCOPE_MISSING` | Sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` (`restriction: "app-only"`) needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in. A Keep method (`restriction: "domain-wide-delegation"`) needs domain-wide delegation that a Workspace admin sets up. Nothing ran. |
-| `AUTH_CLIENT_REQUIRED` | Run `/connect` and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
-| `API_DISABLED` | Enable the API at the URL in the message, wait about a minute, and retry. `/gws-doctor` checks every service. |
-| `HOST_UNTESTED` | The plugin does not start. Use OpenCode 2.2.3 or a later 2.2.x release, or set `"allowUntestedHost": true`. |
-| `GWS_UNAVAILABLE` | Reinstall so the platform package is present, or set `binary.path` to a `gws` executable of the pinned version ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). |
-| `POLICY_DENIED` | A policy rule or the admin gate refused the call. A deny is final. |
-| `RECIPIENTS_UNKNOWN` | A recipient rule applies, and the plugin could not tell who the send or share reaches. |
+<!-- generated:codes -->
+
+Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit this section by hand.
+
+| Code | Meaning | Next step |
+| --- | --- | --- |
+| `ACCOUNT_REQUIRED` | More than one account is configured and the call named none. | Pass account with one of the configured aliases; gws_status lists them. |
+| `ACCOUNT_UNKNOWN` | The account alias is not configured. | Pass a configured alias; gws_status lists them. |
+| `OPERATION_UNKNOWN` | The operation id is not in the gws manifest. | Find the exact method or helper id with gws_catalog, then retry. |
+| `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
+| `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
+| `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
+| `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
+| `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |
+| `ACCOUNT_DOMAIN_UNKNOWN` | A policy rule sets allowExternalRecipients to false, and the account's own email domain is unknown: accounts.<alias>.domains is unset and the signed-in address could not be read. Nothing ran. | Ask the user to set accounts.<alias>.domains to the account's email domains, or to enable Gmail, Drive or Calendar for the account so the plugin can read its address. |
+| `PLAN_NOT_FOUND` | No plan has this planId: it never existed, or its time limit passed and it was removed. | Create a plan with gws_plan, then commit its planId. |
+| `PLAN_ALREADY_USED` | The plan was committed, or is being committed. Plans are single-use. | Check the result of the earlier commit with gws_read before planning the change again. |
+| `PLAN_EXPIRED` | The plan's time limit passed, or a failed commit expired it. | Check the current state with gws_read, then plan again and show the new preview. |
+| `PLAN_CALLER_MISMATCH` | Another session, agent, or account created the plan. | Plan again from the session and agent that will commit it. |
+| `CATEGORY_MISMATCH` | The tool does not match the operation's or the plan's category: a change sent to gws_read, a read sent to gws_plan, or a plan committed with another category's tool. | Call the tool the message names. |
+| `SESSION_UNKNOWN` | A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
+| `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
+| `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. | Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it. |
+| `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
+| `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
+| `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code. | Ask the user to add a separate account alias for a Workspace admin who has the needed privilege (Reports for admin-reports) and sign in to it, or to remove the service from enabledServices. |
+| `AUTH_CLIENT_REQUIRED` | No OAuth client is configured for the sign-in, none was entered in the form, and no earlier sign-in has one. | Run /connect and choose Google Workspace, then enter your Desktop OAuth client ID and secret, or ask your administrator. |
+| `AUTH_CLIENT_INVALID` | The sign-in form has only one of the client ID and secret, a value in the wrong format, or a client JSON that is not Google's downloaded client JSON. | Enter both the client ID and the secret of the same Desktop app OAuth client; /gws-status lists the steps. |
+| `AUTH_REDIRECT_INVALID` | The sign-in's redirectUri is not an absolute https (or loopback http) URL, or callbackPort is missing or not a port. | Set redirectUri to an absolute https URL and callbackPort to a port from 1 to 65535, or leave both unset for a loopback redirect. |
+| `AUTH_REDIRECT_MISMATCH` | Google would refuse the redirect for this client: a Desktop app client accepts only a loopback redirect, and a Web application client accepts only a redirect URI registered on it, exactly. Nothing was opened in the browser. | Use a Web application client that lists the redirect, as its downloaded client JSON, or leave redirectUri unset for a Desktop app client. |
+| `AUTH_WRITE_UNCONFIRMED` | Read and write access was chosen in the sign-in form without confirming the write scopes. | Sign in again and confirm the write scopes, or choose Read-only. |
+| `API_DISABLED` | The Google API is not enabled in the Google Cloud project of the OAuth client. | Ask the user to enable the API in the Google Cloud console, wait about a minute, and retry. |
+| `GWS_API_ERROR` | Google returned an error; the message carries Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
+| `GWS_DISCOVERY_ERROR` | gws could not load the API description (the Discovery document) it builds requests from. | Check that this machine can reach www.googleapis.com, then retry. |
+| `GWS_INTERNAL_ERROR` | gws failed unexpectedly. | Retry once; if it fails again, report the message. |
+| `TIMEOUT` | gws did not finish within execution.timeoutMs. | Narrow the request with fields, a smaller page size, maxPages, or maxItems, then retry. |
+| `OUTPUT_LIMIT` | gws output exceeded execution.maxStdoutBytes or execution.maxStderrBytes. | Narrow the request with fields, a smaller page size, maxPages, or maxItems, then retry. |
+| `CANCELLED` | The call was cancelled and the gws process stopped. A commit stopped while gws ran may or may not have been applied. | Do not retry unless the user asks; check the state with gws_read before planning again. |
+| `SCHEMA_INVALID` | gws schema returned no usable JSON. | Retry once; if it fails again, report the message. |
+| `SCHEMA_NOT_FOUND` | gws schema does not know this method. | Check the operation id with gws_catalog. |
+| `UPLOAD_INVALID` | An upload or attachment path is not absolute, does not exist, or is not a regular file. | Use the absolute path of an existing regular file. |
+| `UPLOAD_LIMIT` | The upload is larger than execution.maxUploadBytes. | Use a smaller file, or ask the user to raise execution.maxUploadBytes. |
+| `UPLOAD_CHANGED` | An upload or attachment changed between the plan and the commit, so the plan expired. | Plan again and show the new preview. |
+| `DOWNLOAD_EXISTS` | The download destination exists and download.overwrite is not true. | Choose another path, or plan again with download.overwrite set to true after the user agrees. |
+| `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
+| `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
+| `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0). | Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true. |
+| `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
+| `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
+| `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
+| `GWS_UNAVAILABLE` | No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist. | Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable. |
+| `GWS_VERSION_MISMATCH` | The gws version check failed, or gws is not the version the manifest was generated from. | Reinstall the plugin, or point binary.path at gws 0.22.5. |
+| `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Reinstall the plugin, or move the binary.path executable to a location only you can write. |
+
+<!-- /generated:codes -->
+
+Three need more than a line:
+
+- `AUTH_SCOPE_MISSING`: sign in again, approve every scope Google lists, and choose Read and write. A method marked `appOnly` needs a Chat app's or Classroom add-on's own credentials and cannot run with a Google sign-in; a Keep method needs domain-wide delegation that a Workspace admin sets up. Nothing ran.
+- `ADMIN_PRIVILEGE_REQUIRED`: the sign-in is valid, but the account is not a Workspace admin with the privilege the API needs, such as Reports for `admin-reports`. Signing in again does not help: add an account alias for an admin who has it, or remove the service from `enabledServices`.
+- `POLICY_DENIED`: a deny rule or the admin gate refused the call. A deny is final.
 
 A skill of your own named `opencode-gws` or `opencode-gws-recipes` (for example in `~/.claude/skills`) hides the plugin's skill of that name; `/gws-status` names it under **Hidden skills**, and the fix is to move or rename it. A skill that tells agents to run `gws` in a shell, such as the gws CLI's own `gws-*` skills, leads them around the plugin's plans and approvals; `/gws-status` names each one under **Shell gws skills**, and the fix is to remove it or move it out of its skills folder.
 
 Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`, and removes it when it stops. A server that stopped without closing leaves its folder behind; the next start removes such folders once they are a day old and their process is gone.
 
-`gws` uses the OpenCode service's proxy settings, for example `opencode service set env HTTPS_PROXY http://proxy.example:8080`. All codes: [Errors](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#errors).
+`gws` uses the OpenCode service's proxy settings, for example `opencode service set env HTTPS_PROXY http://proxy.example:8080`. The same code table is in [Errors](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#errors).
 
 ## Uninstall
 
