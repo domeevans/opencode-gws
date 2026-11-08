@@ -1,12 +1,12 @@
 # Google Workspace for OpenCode
 
-Gives OpenCode agents Gmail, Drive, Calendar, Docs, Sheets and the rest of Google Workspace through Google's open-source [`gws`](https://github.com/googleworkspace/cli) CLI, with every change planned first and committed only after you approve it.
+Gives OpenCode agents Gmail, Drive, Calendar, Docs, Sheets and the rest of Google Workspace through Google's open-source [`gws`](https://github.com/googleworkspace/cli) CLI, with every change planned first and committed as a second, visible step.
 
 Unofficial; not affiliated with Google.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Another release in that range works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Another release in that range, such as 2.2.99, works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
 - macOS (arm64, x64) or Linux (arm64, x64, glibc).
 - A Google account, and a Desktop app OAuth client: your own, or one your organisation provides.
 
@@ -20,7 +20,7 @@ Run `opencode reload`, or restart OpenCode. Then run `/gws-status`.
 
 npm also installs the matching `@joe-broadhead/opencode-gws-bin-<target>` package, which holds the unmodified `gws` binary at the version the plugin pins ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
 
-With no options, the plugin creates one account, `default`, with every Workspace service a Google sign-in can use at Read and write, so one consent grants every scope it can use. Keep is left out: Google grants its scopes only through domain-wide delegation, which a Workspace admin sets up ([Keep](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#keep-needs-domain-wide-delegation)). Admin reports, which need a Workspace admin, and Model Armor, which cannot run, are left out too. Every change still needs a plan and your approval. To narrow it, set `accounts` ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#accounts)).
+With no options, the plugin creates one account, `default`, with every Workspace service a Google sign-in can use at Read and write, so one consent grants every scope it can use. Keep is left out: Google grants its scopes only through domain-wide delegation, which a Workspace admin sets up ([Keep](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#keep-needs-domain-wide-delegation)). Admin reports, which need a Workspace admin, and Model Armor, which cannot run, are left out too. Every change still needs a plan and an explicit commit; at the default `access` the commit runs without a prompt, and `"ask-changes"` asks first. To narrow it, set `accounts` ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#accounts)).
 
 ## Sign in
 

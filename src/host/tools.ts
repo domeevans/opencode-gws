@@ -49,7 +49,7 @@ export const NAMESPACE = {
   name: "gws",
   description:
     "The user's Google Workspace: Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, Chat, Contacts and more. " +
-    "Use these tools, never a gws command in a shell: a shell gws has its own credentials and skips plans, approvals and policy. " +
+    "Use these tools, never a gws command in a shell: a shell gws has its own credentials and skips the plan, the permission rules and the policy. " +
     "Find an operation id with catalog and check its parameters with schema; run a read with the direct tool gws_read. " +
     "A change takes two steps: plan returns a single-use planId with a redacted preview, then the direct tool named by the plan's category " +
     "(gws_write, gws_send, gws_share, gws_delete, gws_export, or gws_admin) commits it with only the planId. " +
@@ -242,8 +242,9 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
         action: `gws.${category}`,
         class: COMMIT_CLASSES[category],
         description:
-          `${description} Input is only {planId}. Call it after showing the plan's preview; ` +
-          "OpenCode may ask the user to approve it. Returns Google's response.",
+          `${description} Input is only {planId}. Call it after showing the plan's preview. ` +
+          "It runs without a prompt at the default access; with access: \"ask-changes\" OpenCode asks first, and " +
+          "\"read-only\" denies it. Returns Google's response.",
         exposure: DIRECT,
         input: CommitInput,
         output: CommitOutput,

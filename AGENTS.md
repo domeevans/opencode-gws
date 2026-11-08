@@ -3,8 +3,9 @@
 `@joe-broadhead/opencode-gws` is an unofficial OpenCode plugin for Google
 Workspace, id `google-workspace.gws` (keep it stable: OpenCode keys plugin
 storage by it). It is a manifest-driven, security-critical adapter around
-Google's `gws` CLI, pinned at 0.22.5: typed tools, plan then approved commit
-for every change, one OpenCode sign-in per account, `/gws-status`,
+Google's `gws` CLI, pinned at 0.22.5: typed tools, plan then commit
+for every change (a commit runs without a prompt at the default `access`),
+one OpenCode sign-in per account, `/gws-status`,
 `/gws-doctor`, and one TUI status dialog. Layout and layers:
 [docs/architecture.md](docs/architecture.md). Setup and the check:
 [CONTRIBUTING.md](CONTRIBUTING.md).
