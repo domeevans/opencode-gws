@@ -93,12 +93,16 @@ describe("audit sink", () => {
 describe("audit file rotation", () => {
   it("moves a full audit.jsonl to audit.jsonl.1 and starts a new one, keeping one previous file", async () => {
     expect(AUDIT_MAX_BYTES).toBe(5 * 1024 * 1024)
+    // The sink quarantines a write that outlives its 100 ms budget. The suite runs its files in parallel, and real disk
+    // I/O under that load can exceed the budget, so this test freezes the sink's timers: the write is never cut short.
+    // The wait below uses real timers from node:timers/promises, which are not faked.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
     const { sink, path } = audit()
     writeFileSync(path, `${"x".repeat(AUDIT_MAX_BYTES - 10)}\n`)
     writeFileSync(`${path}.1`, "older\n")
     sink.emit({ event: "plugin.loaded", outcome: "success" })
-    // The full suite runs its files in parallel; under that load the rotation can take longer than vitest's 1 s default.
-    await vi.waitFor(() => expect(existsSync(path) && readFileSync(path, "utf8").includes("plugin.loaded")).toBe(true), { timeout: 10_000 })
+    const { setTimeout: pause } = await import("node:timers/promises")
+    for (let i = 0; i < 2000 && !(existsSync(path) && readFileSync(path, "utf8").includes("plugin.loaded")); i++) await pause(5)
     expect(readFileSync(path, "utf8").split("\n").filter(Boolean)).toHaveLength(1)
     expect(statSync(`${path}.1`).size).toBe(AUDIT_MAX_BYTES - 9)
     expect(statSync(path).mode & 0o777).toBe(0o600)
