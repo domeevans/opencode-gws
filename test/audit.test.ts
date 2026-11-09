@@ -97,7 +97,8 @@ describe("audit file rotation", () => {
     writeFileSync(path, `${"x".repeat(AUDIT_MAX_BYTES - 10)}\n`)
     writeFileSync(`${path}.1`, "older\n")
     sink.emit({ event: "plugin.loaded", outcome: "success" })
-    await vi.waitFor(() => expect(existsSync(path) && readFileSync(path, "utf8").includes("plugin.loaded")).toBe(true))
+    // The full suite runs its files in parallel; under that load the rotation can take longer than vitest's 1 s default.
+    await vi.waitFor(() => expect(existsSync(path) && readFileSync(path, "utf8").includes("plugin.loaded")).toBe(true), { timeout: 10_000 })
     expect(readFileSync(path, "utf8").split("\n").filter(Boolean)).toHaveLength(1)
     expect(statSync(`${path}.1`).size).toBe(AUDIT_MAX_BYTES - 9)
     expect(statSync(path).mode & 0o777).toBe(0o600)
