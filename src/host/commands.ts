@@ -121,7 +121,7 @@ export function formatStatus(status: GwsStatus, plans: readonly PlanSummary[] = 
   for (const account of status.accounts) lines.push(...accountLines(account), "")
   const setup = setupSteps(status)
   if (setup.length > 0) lines.push(...setup, "")
-  lines.push(...planLines(plans, now), "")
+  lines.push(...planLines(plans, now, status.access), "")
   if (status.shadowedSkills?.length) lines.push(`${SHADOWED_LABEL}: ${shadowedText(status)}`)
   if (status.shellSkills?.length) lines.push(`${SHELL_LABEL}: ${shellText(status)}`)
   lines.push(`Tools: gws tools for ${status.services.join(", ") || "no services"} (${status.gws.version})`)
@@ -137,7 +137,7 @@ export function formatStatus(status: GwsStatus, plans: readonly PlanSummary[] = 
 }
 
 /** This session's pending plans, redacted. */
-function planLines(plans: readonly PlanSummary[], now: number): string[] {
+function planLines(plans: readonly PlanSummary[], now: number, access: GwsStatus["access"]): string[] {
   const lines: string[] = []
   if (plans.length === 0) {
     lines.push("No pending plans in this session.")
@@ -153,9 +153,16 @@ function planLines(plans: readonly PlanSummary[], now: number): string[] {
       ].filter(Boolean)
       lines.push(`- ${plan.category} ${plan.operation} as ${plan.account}: ${details.join(" · ")} (${plan.planId})`)
     }
-    lines.push("Approval happens only in the OpenCode permission prompt when the agent commits a plan. Pending plans expire automatically.")
+    lines.push(`${commitText(access)} Pending plans expire automatically.`)
   }
   return lines
+}
+
+/** What `access` decides for a pending plan's commit, in one clause. */
+function commitText(access: GwsStatus["access"]): string {
+  if (access === "ask-changes") return 'Each commit asks in the OpenCode permission prompt (access "ask-changes").'
+  if (access === "read-only") return 'Commits are denied (access "read-only").'
+  return 'A commit runs without a prompt (access "all").'
 }
 
 function remaining(expiresAt: string, now: number): string {

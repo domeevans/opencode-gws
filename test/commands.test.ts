@@ -224,7 +224,7 @@ describe("/gws-status pending plans", () => {
     expect(h.synthetic[0]).toMatchObject({ description: "Google Workspace: sign-in required for personal · 1 pending plan" })
     expect(h.synthetic[0]!["text"]).toMatch(/Pending plans in this session \(1\)/)
     expect(h.synthetic[0]!["text"]).toContain("- send gmail.users.messages.send as personal")
-    expect(h.synthetic[0]!["text"]).toMatch(/permission prompt/)
+    expect(h.synthetic[0]!["text"]).toMatch(/A commit runs without a prompt \(access "all"\)/)
     for (const secret of [BODY, "launch code", "--json", "--params", "users/{userId}", "build"]) {
       expect(JSON.stringify(summary)).not.toContain(secret)
       expect(JSON.stringify(h.synthetic)).not.toContain(secret)
@@ -253,6 +253,25 @@ describe("/gws-status pending plans", () => {
     )
     expect(text).toContain("- share drive.permissions.create as work: to a@example.com · destination file 1 · body object(role) 20 bytes · expires in 4m 5s (plan_x)")
     expect(text).toContain("Pending plans expire automatically.")
+  })
+
+  it("says what access decides for a pending commit, for each value", () => {
+    const plan = {
+      planId: "plan_x",
+      sessionID: "ses_1",
+      category: "share" as const,
+      operation: "drive.permissions.create",
+      account: "work",
+      preview: { method: "POST", destination: "file 1", bodySummary: "object(role) 20 bytes" },
+      createdAt: "2026-10-27T11:59:00Z",
+      expiresAt: "2026-10-27T12:04:05Z",
+    }
+    const status: GwsStatus = { version: "1", host: TESTED, state: "connected" as const, access: "all", nextStep: "Nothing to do.", gws: { path: "/bin/gws", version: "gws 0.22.5" }, services: [], accounts: [], unguardedAgents: [] }
+    const phrase = (access: GwsStatus["access"]) => formatStatus({ ...status, access }, [plan], Date.parse("2026-10-27T12:00:00Z"))
+    expect(phrase("all")).toContain('A commit runs without a prompt (access "all").')
+    expect(phrase("ask-changes")).toContain('Each commit asks in the OpenCode permission prompt (access "ask-changes").')
+    expect(phrase("read-only")).toContain('Commits are denied (access "read-only").')
+    for (const access of ["all", "ask-changes", "read-only"] as const) expect(phrase(access), access).not.toContain("Approval happens only")
   })
 })
 
