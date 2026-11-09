@@ -23,7 +23,7 @@ const Account = z
   .string()
   .min(1)
   .optional()
-  .describe('Configured account alias, e.g. "work"; optional when only one account is configured (gws_status lists them)')
+  .describe('Account alias; omit with one account. gws_status lists aliases.')
 
 /** A method id is `service.resource….method`; a helper id is `service.name`. */
 export const OPERATION_ID = /^[a-z][a-z0-9-]*(?:\.[A-Za-z][A-Za-z0-9-]*)+$/
@@ -32,24 +32,24 @@ const OperationId = z
   .string()
   .max(200)
   .regex(OPERATION_ID, "must be a method or helper id from gws_catalog")
-  .describe('Method or helper id from gws_catalog, e.g. "gmail.users.messages.list" or the helper "gmail.triage"')
+  .describe("Method or helper id from gws_catalog")
 
 export const RequestInput = z
   .strictObject({
     account: Account,
     operation: OperationId,
-    input: JsonObject.optional().describe('Helper flags, only for a helper operation; gws_schema shows them, e.g. {"max": 5} for "gmail.triage"'),
-    params: JsonObject.optional().describe('Method path and query parameters, e.g. {"userId": "me", "maxResults": 10}'),
-    body: z.unknown().optional().describe("Method JSON request body, for methods that take one (gws_schema shows requestBody)"),
+    input: JsonObject.optional().describe("Helper flags; see gws_schema"),
+    params: JsonObject.optional().describe("Method path and query parameters; see gws_schema"),
+    body: z.unknown().optional().describe("Method JSON request body; see gws_schema"),
     fields: z
       .string()
       .max(2048)
       .optional()
-      .describe('Method partial-response field mask; required for list and search, e.g. "files(id,name),nextPageToken" for drive.files.list'),
+      .describe('Method field mask; required for list/search, e.g. "files(id,name),nextPageToken"'),
     pagination: z
       .strictObject({
-        all: z.boolean().optional().describe("Follow nextPageToken; data becomes one array element per page"),
-        maxPages: z.number().int().min(1).max(1000).optional().describe("Page cap; clamped to execution.maxPages (10 by default) and policy maxPages"),
+        all: z.boolean().optional().describe("Follow nextPageToken; data has one element per page"),
+        maxPages: z.number().int().min(1).max(1000).optional().describe("Page cap; clamped to execution and policy caps (default 10)"),
         maxItems: z
           .number()
           .int()
@@ -57,17 +57,16 @@ export const RequestInput = z
           .max(1_000_000)
           .optional()
           .describe(
-            "Item cap across pages (follows pages); clamped to execution.maxItems (1000 by default) and policy maxItems. " +
-              "Counts each page's `items` array, or its only top-level array",
+            "Item cap across pages; clamped to execution and policy caps (default 1000). Counts each page's items array or sole top-level array.",
           ),
         delayMs: z.number().int().min(0).max(60_000).optional().describe("Delay between page requests in ms; 100 by default"),
       })
       .optional()
-      .describe("Auto-pagination for list methods; without it a read returns one page"),
+      .describe("List pagination; without it a read returns one page"),
     upload: z
       .strictObject({
         path: z.string().min(1).describe("Absolute local file path inside an allowed read root"),
-        mime: z.string().min(1).optional().describe('Upload content type, e.g. "text/plain"'),
+        mime: z.string().min(1).optional().describe("Upload content type"),
       })
       .optional()
       .describe("Media upload for a planned write"),
@@ -77,7 +76,7 @@ export const RequestInput = z
         overwrite: z
           .boolean()
           .optional()
-          .describe("Replace an existing file at path; default false, so plan and commit refuse with DOWNLOAD_EXISTS"),
+          .describe("Replace existing file; default false (DOWNLOAD_EXISTS)"),
       })
       .optional()
       .describe("Persistent download; makes the request an export (plan, then gws_export)"),
@@ -86,14 +85,14 @@ export const RequestInput = z
         mode: z
           .enum(["summary", "full"])
           .optional()
-          .describe('"summary" (default) flags output over execution.maxInlineBytes; "full" raises that to 5 MiB'),
+          .describe('"summary" (default) uses execution.maxInlineBytes; "full" allows 5 MiB'),
         maxInlineBytes: z
           .number()
           .int()
           .min(1)
           .max(5 * 1024 * 1024)
           .optional()
-          .describe("Lower the inline cap for this read; never above the mode's cap"),
+          .describe("Lower the inline cap; never above the mode's cap"),
       })
       .optional()
       .describe("Read result sizing"),
