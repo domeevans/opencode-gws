@@ -198,6 +198,11 @@ describe("tool registration", () => {
       expect(NAMESPACE.description).toContain(name)
       expect(tool(h, "plan").description).toContain(name)
     }
+    for (const name of ["write", "send", "share", "delete", "export", "admin"] as const) {
+      const description = tool(h, name).description
+      expect(description).toMatch(/Show the preview first; pass only \{planId\}/)
+      expect(description).toMatch(/Default access allows without a prompt; "ask-changes" asks and "read-only" denies/)
+    }
     expect(tool(h, "status").description).toMatch(/sign-in/)
     expect(tool(h, "status").description).not.toMatch(/no network/i)
   })

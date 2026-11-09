@@ -240,9 +240,8 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
         action: `gws.${category}`,
         class: COMMIT_CLASSES[category],
         description:
-          `${description} Input is only {planId}. Call it after showing the plan's preview. ` +
-          "It runs without a prompt at the default access; with access: \"ask-changes\" OpenCode asks first, and " +
-          "\"read-only\" denies it. Returns Google's response.",
+          `${description} Show the preview first; pass only {planId}. ` +
+          'Default access allows without a prompt; "ask-changes" asks and "read-only" denies. Returns Google\'s response.',
         exposure: DIRECT,
         input: CommitInput,
         output: CommitOutput,
