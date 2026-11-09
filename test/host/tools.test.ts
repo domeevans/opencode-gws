@@ -42,14 +42,15 @@ describe("the eleven tools", () => {
     await d?.host.close()
   })
 
-  it("offers status, catalog, schema, and plan in Code Mode, with catalog and plan pinned, and read and the commits as direct tools", async () => {
+  it("offers status, catalog, schema, and plan in Code Mode, and read and the commits as direct tools", async () => {
     const found = await codeMode(d, `return search({ namespace: "gws", limit: 50 })`)
     const paths = (found["items"] as Array<{ path: string }>).map((item) => item.path).sort()
     expect(paths).toEqual(["tools.gws.catalog", "tools.gws.plan", "tools.gws.schema", "tools.gws.status"])
     const offered = d.host.model.requests.at(-1)!
     expect(offered.tools).toEqual(expect.arrayContaining(["gws_read", ...COMMITS.map((category) => `gws_${category}`)]))
     expect(offered.tools).not.toEqual(expect.arrayContaining(["gws_plan", "gws_catalog"]))
-    for (const name of ["catalog", "plan"]) expect(offered.system).toContain(`tools.gws.${name}(`)
+    expect(offered.system).toContain('search({ namespace: "gws", query })')
+    expect(offered.system).toContain("opencode-gws")
   })
 
   it("runs status, catalog, schema, read, and plan, with only the read and the dry run reaching gws", async () => {

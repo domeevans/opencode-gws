@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+- The Code Mode catalogue no longer pins `catalog` or `plan`. The Workspace skills describe call shapes, and Code Mode search finds full signatures. Both skills explain how to connect an account.
+
 - **Every tool is allowed by default.** The plugin inserts an allow for each of its actions, the six commit tools and
   the `gws.*` namespace included, so a tool a later release adds runs at once. The new `access` option restricts it:
   `"ask-changes"` asks before each commit, and `"read-only"` denies the commits while every read still runs. A commit

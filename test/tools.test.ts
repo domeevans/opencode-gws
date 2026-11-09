@@ -167,15 +167,15 @@ describe("tool registration", () => {
     }
   })
 
-  it("keeps commits and reads out of Code Mode and pins the entry points", async () => {
+  it("keeps commits and reads out of Code Mode and pins no entry points", async () => {
     const h = await setup({})
     const exposure = Object.fromEntries([...h.tools].map(([name, registered]) => [name, { codemode: registered.options.codemode, pinned: registered.options.pinned }]))
     expect(exposure).toEqual({
       status: { codemode: true, pinned: undefined },
-      catalog: { codemode: true, pinned: true },
+      catalog: { codemode: true, pinned: undefined },
       schema: { codemode: true, pinned: undefined },
       read: { codemode: false, pinned: undefined },
-      plan: { codemode: true, pinned: true },
+      plan: { codemode: true, pinned: undefined },
       write: { codemode: false, pinned: undefined },
       send: { codemode: false, pinned: undefined },
       share: { codemode: false, pinned: undefined },

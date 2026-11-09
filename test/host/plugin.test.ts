@@ -1,6 +1,7 @@
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import * as z from "zod"
 import { ACCOUNT, FAKE_GWS, PLUGIN_ID, SERVICES, prompt, startHost, type Harness } from "./harness.js"
 import { PLUGIN_PACKAGE, packageJson } from "./package.js"
 import { request } from "../support/requests.js"
@@ -91,7 +92,7 @@ describe("tool registry", () => {
     expect(tools.map((tool) => tool.id).sort()).toEqual(TOOLS.map((name) => `gws_${name}`).sort())
     for (const tool of tools) {
       expect(tool.options).toMatchObject({ namespace: "gws", permission: `gws.${tool.name}`, codemode: CODE_MODE.includes(tool.name) })
-      expect(tool.options?.pinned).toBe(["catalog", "plan"].includes(tool.name) ? true : undefined)
+      expect(tool.options?.pinned).toBeUndefined()
     }
   })
 
@@ -106,6 +107,49 @@ describe("tool registry", () => {
     // Still registered: the deny is enforced by the host permission layer.
     expect((await host.probe.tool.list()).some((tool) => tool.id === "gws_write")).toBe(true)
   })
+
+  it("refuses a denied plan inside Code Mode without reaching the fake binary", async () => {
+    const denied = await host.opencode.sessions.create({
+      location: host.location,
+      agent: "build",
+      permissions: [{ action: "gws.plan", resource: "*", effect: "deny" }],
+    } as never)
+    const before = host.invocations().length
+    host.model.script({ code: call("plan", labelRequest) })
+    await prompt(host, denied.id, "run")
+    const result = host.model.lastToolResult()
+    expect(result).toMatch(/denied|refus|unknown|not available/i)
+    expect(host.invocations()).toHaveLength(before)
+  })
+
+  it("keeps the forced Code Mode catalogue under 1,000 tokens", async () => {
+    const filler = await host.probe.tool.transform((editor) => {
+      editor.namespace({ name: "filler", description: "Spends the inline budget." })
+      editor.add({
+        name: "pad",
+        description: "pad",
+        input: z.object({ note: z.string().describe("x".repeat(9000)) }),
+        options: { namespace: "filler", permission: "filler_pad", pinned: true },
+        execute: async () => ({ content: "ok" }),
+      } as never)
+    })
+    try {
+      const session = await host.opencode.sessions.create({ location: host.location, agent: "build" } as never)
+      host.model.script({ text: "done" })
+      await prompt(host, session.id, "budget")
+      const system = host.model.requests.findLast((item) => item.system.includes("- gws ("))?.system ?? ""
+      const lines = system.split("\n")
+      const start = lines.findIndex((line) => line.startsWith("- gws ("))
+      const section = start < 0 ? [] : [lines[start]!]
+      for (let index = start + 1; start >= 0 && index < lines.length && lines[index]!.startsWith("  "); index += 1) section.push(lines[index]!)
+      const text = section.join("\n")
+      expect(text.startsWith("- gws (")).toBe(true)
+      expect(text).toContain("opencode-gws")
+      expect(Math.round(text.length / 4)).toBeLessThanOrEqual(1000)
+    } finally {
+      await filler.dispose()
+    }
+  }, 120_000)
 })
 
 describe("tool execution", () => {
