@@ -24,7 +24,7 @@ import { runProcess } from "../process/run.js"
  */
 
 /** Progress milestones reported while a call runs. */
-export interface Progress {
+interface Progress {
   status: "resolving" | "running" | "parsing"
   operation: string
   /** Pages received so far, for paginated reads. */

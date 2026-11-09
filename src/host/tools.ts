@@ -84,7 +84,7 @@ interface Outcome<O> {
   metadata?: { operation?: string; category?: string; account?: string; truncated?: boolean }
 }
 
-export interface ToolSpec<I extends z.ZodType, O extends z.ZodType> {
+interface ToolSpec<I extends z.ZodType, O extends z.ZodType> {
   name: string
   action: string
   class: ToolClass

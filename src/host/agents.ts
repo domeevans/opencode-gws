@@ -25,7 +25,7 @@ export interface Rule {
   effect: "allow" | "deny" | "ask"
 }
 
-export type Block = readonly Rule[]
+type Block = readonly Rule[]
 
 /** The rules the plugin inserts after each agent's base allow, for one `access` value. */
 export function defaultRules(access: Access = "all"): Block {
@@ -38,7 +38,7 @@ export function defaultRules(access: Access = "all"): Block {
 }
 
 /** The block every `access` value produces, for the docs and for replacing an earlier one on a rebuild. */
-export const BLOCKS: readonly { readonly access: Access; readonly rules: Block }[] = ACCESS_VALUES.map((access) => ({ access, rules: defaultRules(access) }))
+const BLOCKS: readonly { readonly access: Access; readonly rules: Block }[] = ACCESS_VALUES.map((access) => ({ access, rules: defaultRules(access) }))
 
 const same = (left: Rule | undefined, right: Rule) => left?.action === right.action && left?.resource === right.resource && left?.effect === right.effect
 

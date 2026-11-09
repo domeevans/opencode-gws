@@ -11,7 +11,7 @@ import type { Category, Request } from "./types.js"
  * recipient rule then refuses it: the gate fails closed.
  */
 
-export interface RecipientSet {
+interface RecipientSet {
   /** Lowercased addresses. */
   addresses: string[]
   /** Domains given access as a whole (a Drive or Calendar domain share), lowercased. */
