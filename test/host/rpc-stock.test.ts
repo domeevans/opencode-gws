@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
-import { available, binary, rpc, session, startStock, TESTED_HOSTS, type StockHost } from "./stock.js"
+import { available, rpc, session, startStock, TESTED_HOSTS, type StockHost } from "./stock.js"
 
 /**
  * The tools RPC v2 on the stock binaries 2.2.3, 2.2.4, 2.2.5 and 2.2.6: a read, an allowed write, a write that would ask
@@ -16,7 +16,7 @@ const createRequest = { operation: "gmail.users.labels.create", params: { userId
 for (const version of TESTED_HOSTS) {
   if (!available(version)) {
     it(`${version}: the stock binary is missing, so this version is skipped`, () => {
-      console.log(`no stock binary for ${version} at ${binary(version)}`)
+      console.log(`no stock binary for ${version}: set OPENCODE_BIN_${version.replaceAll(".", "_")} to run it`)
     })
     continue
   }
