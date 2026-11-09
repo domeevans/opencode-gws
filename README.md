@@ -294,6 +294,17 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
    `$XDG_STATE_HOME/opencode-gws` and `$XDG_CACHE_HOME/opencode-gws` replace them when those variables are set, and `audit.path` names its own file.
 4. Remove any permission block you copied into an agent's own `permissions`.
 
+## Known limits
+
+- **Platforms.** macOS (arm64, x64) and Linux (glibc, arm64, x64) only. Windows and musl have no `gws` package, so setup fails with `GWS_UNAVAILABLE` unless `binary.path` names a `gws` 0.22.5 executable.
+- **Operations.** The tools are the operations in the manifest generated from the pinned `gws` 0.22.5. A method that a later `gws` adds arrives with a plugin release, and `gws_catalog` lists only the manifest.
+- **Services the default sign-in leaves out.** Keep needs domain-wide delegation that a Workspace admin sets up, admin reports need a Workspace admin account, and Model Armor cannot run. A method that only a Chat app or a Classroom add-on can run (`appOnly`) fails with `AUTH_SCOPE_MISSING` under a Google sign-in.
+- **Unverified OAuth apps.** An External client left in Testing shows unverified-app warnings, and its refresh tokens expire after 7 days, so each account signs in again weekly.
+- **A cancelled commit may have been applied.** `CANCELLED` means the call stopped while `gws` ran. Check the state with `gws_read` before planning the change again.
+- **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit there needs an allow rule for it, or `access: "all"`.
+- **Output and time limits.** A result that is too large stops with `OUTPUT_LIMIT`, and a slow call with `TIMEOUT`. Narrow the request with `fields`, a smaller page size, `maxPages` or `maxItems`.
+- **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release loads, and `/gws-status` marks it untested.
+
 ## Links
 
 - [Sign-in and scopes](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md)
