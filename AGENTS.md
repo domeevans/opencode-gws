@@ -121,6 +121,10 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   version; the only other backend is an explicit `binary.path`.
 - Releases come only from `.github/workflows/release.yml` on a `vX.Y.Z` tag,
   after the `release` environment is approved. Never publish by hand.
+- No personal email in anything we publish. Every commit, tag and package is authored and committed as
+  `joe-broadhead <91376460+joe-broadhead@users.noreply.github.com>`. Before committing or tagging, check
+  that `git config user.email` is that address: a fresh clone inherits the machine's global identity, which
+  is not that address. Never commit, tag or publish with a work or personal address, or with a local hostname.
 
 ## Tests
 
