@@ -122,7 +122,7 @@ Every permission rule in this document includes `resource`. A rule without it is
 A download is written by the plugin, not by OpenCode's file tools, so the plugin asserts OpenCode's own `external_directory` permission for a destination outside the project, as well as `gws.export`. The resource is the destination's folder, and it is offered to Always:
 
 ```json
-{ "action": "external_directory", "resource": "/Users/me/Downloads/*", "effect": "allow" }
+{ "action": "external_directory", "resource": "<folder>/*", "effect": "allow" }
 ```
 
 A destination inside the project directory asserts nothing extra. An agent whose base rule allows everything allows `external_directory` too, so nothing asks there; a rule that asks or denies it makes the download ask, or refuse with `DOWNLOAD_NOT_PERMITTED`, whose next step is the rule above. The plugin's own `execution.allowedWriteRoots` still applies: it is checked before the host permission, and a path outside every root is `POLICY_DENIED`.
