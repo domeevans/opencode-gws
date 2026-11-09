@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { CHANGING_ACTIONS } from "../src/domain/access.js"
+import { loadConfig } from "../src/domain/config.js"
 import { defaultRules } from "../src/host/agents.js"
 import { type Declaration, type DeclaredTool, declarationProblems, docProblems, effectFromRules, readPackage } from "./support/jelly-kit.js"
 
@@ -17,6 +18,11 @@ const READS = ["gws.catalog", "gws.plan", "gws.read", "gws.schema", "gws.status"
 const RULES = defaultRules("all")
 
 describe("the jelly declaration", () => {
+  it("declares the flat access option", () => {
+    const settings = (jelly.contributes as { settings: { key: string; type: string }[] }).settings
+    expect(settings.map(({ key, type }) => ({ key, type }))).toEqual([{ key: "access", type: "string" }])
+    expect(loadConfig({ access: "read-only" }).access).toBe("read-only")
+  })
   it("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
     expect(
       declarationProblems(ROOT, {
