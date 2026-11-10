@@ -57,15 +57,14 @@ The reads and `plan` are always allowed by the plugin's block, whatever `access`
 `access` for the model's commits: allowed by default, asking at `ask-changes`, denied at `read-only`. The session above
 denies the namespace and opts the reads and `plan` back in, so the script can look and plan, and nothing else.
 
-Ask `describe` with the session to see what it may run:
+Ask `describe` for the methods, with their input and output schemas:
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/describe \
-  -H "x-opencode-directory:$PWD" -d '{"input":{"sessionID":"ses_…"}}'
+  -H "x-opencode-directory:$PWD" -d '{"input":{}}'
 ```
 
-Each method then carries `permission`: `allow`, `ask` or `deny`, resolved exactly as a call would be. Without a
-session, the field is absent.
+`describe` takes no input. Each call is resolved against its session's agent when it runs, so a refusal names the rule.
 
 ## The location
 

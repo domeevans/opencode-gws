@@ -14,7 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
   still needs its plan and `planId`. `gws_status`, the status RPC and the dialog show the value.
 - The tools RPC follows the same default: a script runs every method unless `access` or a rule says otherwise.
 
-- The tools RPC, `google-workspace.gws.tools`, follows the family's shared v2.1 module (`src/host/tools-rpc.ts`). Its methods are the read tools, `status`, `catalog`, `schema`, `read`, `plan` and `events_list`, each with its input and output schema. The six commit tools are not methods: a script can plan a change, and a commit runs only from the model's approved tool. A call resolves the rule before dispatch: an `ask` is refused, and a `deny` is refused, with no gws call and no prompt. With a session, `describe` reports each method's resolved `permission`.
+- The tools RPC, `google-workspace.gws.tools`, follows the family's shared v2.1 module (`src/host/tools-rpc.ts`). Its methods are the read tools, `status`, `catalog`, `schema`, `read`, `plan` and `events_list`, each with its input and output schema. The six commit tools are not methods: a script can plan a change, and a commit runs only from the model's approved tool. A call resolves the rule before dispatch: an `ask` is refused, and a `deny` is refused, with no gws call and no prompt.
 - `events_list` is a read, so it is allowed at every `access` value, as the other reads are.
 - A saved "Always allow" no longer authorises an ad-hoc script. A script's grant is a rule in config, or a Jobs run
   session; `docs/scripting.md` says so, and names the Jobs one-off as the way to get an approval-bound grant.
