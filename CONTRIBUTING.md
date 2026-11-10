@@ -2,7 +2,7 @@
 
 ## Setup
 
-Node 24 or later. The TUI render check needs Bun 1.3.14 or later. `gws` is fetched by the script below; do not install a different version on `PATH` and expect the plugin to use it.
+Node 24 or later. The TUI render check needs Bun 1.4.4 or later, the version CI runs. `gws` is fetched by the script below; do not install a different version on `PATH` and expect the plugin to use it.
 
 ```bash
 npm ci
