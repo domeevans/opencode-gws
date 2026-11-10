@@ -5,26 +5,19 @@ Unofficial plugin. Not affiliated with Google.
 A script can call the gws tools with no model: a cron job, a shell script, or any program that can reach the OpenCode
 server. It uses the tools RPC, `google-workspace.gws.tools`, through `opencode api` or an OpenCode client.
 
-Every tool is a method, with the same name, input and output. A `gws_read` call and the `read` method with the same
-input are the same call: the same policy, errors and permission checks. The commit tools are methods too, so a script
-can plan and commit in one run.
+Each read tool is a method, with the same name, input and output. A `gws_read` call and the `read` method with the same
+input are the same call: the same policy, errors and permission checks. The six commit tools are not methods. A script
+can plan a change, but only the model's approved commit tool runs the plan, so a script never commits on its own.
 
-| Method | The tool | Class |
-| --- | --- | --- |
-| `status` | `gws_status` | read |
-| `catalog` | `gws_catalog` | read |
-| `schema` | `gws_schema` | read |
-| `read` | `gws_read` | read |
-| `plan` | `gws_plan` | read |
-| `write` | `gws_write` | write |
-| `send` | `gws_send` | send |
-| `share` | `gws_share` | send: it changes who can reach the file or document |
-| `delete` | `gws_delete` | destructive |
-| `export` | `gws_export` | export: it writes a local file |
-| `admin` | `gws_admin` | destructive: it can remove data or access |
-| `describe` | none: lists the methods with their classes, schemas, and permissions | – |
-
-The class says the worst thing a method can do. It never decides whether a call runs: the rules do.
+| Method | The tool |
+| --- | --- |
+| `status` | `gws_status` |
+| `catalog` | `gws_catalog` |
+| `schema` | `gws_schema` |
+| `read` | `gws_read` |
+| `plan` | `gws_plan` |
+| `events_list` | Code Mode only: the Gmail messages since a cursor, as Memory's events ([configuration.md](configuration.md#events-list)) |
+| `describe` | none: lists the methods, their permission actions, and their input and output as JSON Schema |
 
 ## A script runs as a session
 
@@ -36,11 +29,9 @@ session's, with the host's order (the last matching rule wins). Only an `allow` 
 one is there to answer the prompt, and a `deny` is refused. A refusal costs nothing: no gws call, no credential, no
 prompt left waiting.
 
-A script gets the same default as the model: every method is allowed, the six commits included, because the agent's
-block allows them. Restrict a script with the plugin's `access` option (`"ask-changes"` asks for each commit, so a
-script's commit is refused; `"read-only"` denies them), or with a rule on the session the script runs as. A script
-that needs a commit at `ask-changes` runs as a session whose rules allow it, or as a Jobs run session that carries
-one.
+A script gets the same default as the model: every method is allowed, because the agent's block allows the reads. A rule
+on the agent or the session can still deny a method, and a denied method is refused before anything runs. A script
+never commits a plan, so the plugin's `access` option restricts the model's commits, not the script's calls.
 
 A saved **Always allow** does not authorise an ad-hoc script. It is not part of the agent's or the session's rules, so
 the resolve never sees it. That is deliberate: a script's permission must be reviewable in config. The supported way to
@@ -58,14 +49,13 @@ Session rules come after the agent's, so a session can narrow what its script ma
 opencode api post /api/session -d '{"title":"label sorter","agent":"build","permissions":[
   {"action":"gws.*","resource":"*","effect":"deny"},
   {"action":"gws.read","resource":"*","effect":"allow"},
-  {"action":"gws.plan","resource":"*","effect":"allow"},
-  {"action":"gws.write","resource":"*","effect":"allow"}
+  {"action":"gws.plan","resource":"*","effect":"allow"}
 ]}'
 ```
 
-The reads are always allowed. The six commit actions follow the plugin's `access`: allowed by default, asking at
-`ask-changes`, denied at `read-only`. The session above denies the namespace and opts back in, which is what a script
-needs at `ask-changes`.
+The reads and `plan` are always allowed by the plugin's block, whatever `access` is. The six commit actions follow
+`access` for the model's commits: allowed by default, asking at `ask-changes`, denied at `read-only`. The session above
+denies the namespace and opts the reads and `plan` back in, so the script can look and plan, and nothing else.
 
 Ask `describe` with the session to see what it may run:
 
@@ -111,12 +101,12 @@ or `gmail.read` (text unless `format` is `json`). Workspace content in it is unt
 
 ## Plans and commits
 
-`plan` returns a plan bound to the account, the session and its agent, as `gws_plan` does. A commit takes only
-`{"planId": "…"}`, and is refused unless the session's agent allows that commit's action (`gws.write`, `gws.send`,
-`gws.share`, `gws.delete`, `gws.export` or `gws.admin`). An export whose destination is outside the project asserts
-OpenCode's own `external_directory` as well, so a session that asks for that folder refuses the export
-(`DOWNLOAD_NOT_PERMITTED`) before gws runs. Plan and commit in the same run session: another session
-cannot commit the plan (`PLAN_CALLER_MISMATCH`), and a plan is single-use.
+`plan` returns a plan bound to the account, the session and its agent, as `gws_plan` does. A script cannot commit it: the
+six commit tools are not methods. The model commits the plan with its approved commit tool (`gws_write`, `gws_send`,
+`gws_share`, `gws_delete`, `gws_export` or `gws_admin`), which asserts that commit's action, and at `access: "ask-changes"`
+OpenCode asks the person first. An export whose destination is outside the project also asserts OpenCode's own
+`external_directory`, so a session that asks for that folder refuses the export (`DOWNLOAD_NOT_PERMITTED`) before gws
+runs. A plan is single-use and bound to its session: another session cannot commit it (`PLAN_CALLER_MISMATCH`).
 
 ## Errors
 

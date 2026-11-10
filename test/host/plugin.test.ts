@@ -14,7 +14,7 @@ import { request } from "../support/requests.js"
  * host; only the model and `gws` are scripted.
  */
 
-const CODE_MODE = ["status", "catalog", "schema", "plan"]
+const CODE_MODE = ["status", "catalog", "schema", "plan", "events_list"]
 const COMMITS = ["write", "send", "share", "delete", "export", "admin"]
 const TOOLS = [...CODE_MODE, "read", ...COMMITS]
 

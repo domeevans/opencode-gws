@@ -13,14 +13,14 @@ declaration, because that schema accepts no unknown keys.
 
 ## Tools and permissions
 
-11 tools are declared (5 read-only). Jelly's agents have no base "allow everything"
+12 tools are declared (6 read-only). Jelly's agents have no base "allow everything"
 rule, so this plugin's own default rules, which it puts after that rule, never reach them. Jelly
 writes each declared `ask` or `deny` as that tool's default instead (the person's own choice
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
 changes nothing in Jelly.
 
 - Ask: none: every declared tool is allowed, as the plugin's default `access` is.
-- Everything else runs.
+- Everything else runs. `gws.events_list` is for Memory's collector, which runs it unattended, so it never asks; it also asserts `gws.read` on each Gmail read it makes.
 
 A commit still needs its plan: `gws_plan` returns a `planId`, and only the matching commit tool
 applies it. The admin gate is on by default, and each admin plan needs an allowed service and a

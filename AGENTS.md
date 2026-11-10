@@ -48,8 +48,9 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 - **Every tool is allowed by default.** Setup inserts the block from
   `defaultRules(access)` (`src/host/agents.ts`, from the lists in
   `src/domain/access.ts`) into every agent through `ctx.agent.transform`,
-  right after its base `* * allow`: the `gws.*` namespace, then the five
-  reads, then the six commits. `access` is `"all"` (the default), so every
+  right after its base `* * allow`: the `gws.*` namespace, then the six
+  reads (`status`, `catalog`, `schema`, `read`, `plan` and `events_list`),
+  then the six commits. `access` is `"all"` (the default), so every
   rule allows; `"ask-changes"` asks for the commits and `"read-only"`
   denies them. The reads are always allowed. An agent counts as guarded
   when the whole block appears, in order, anywhere after that rule.
@@ -95,6 +96,14 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 - Do not weaken a security test to get a green run.
 
 ## Tools, errors, skills
+
+- `gws_events_list` is Gmail's side of Memory's sources funnel: a Code
+  Mode read that never asks, asserting `gws.events_list` and then
+  `gws.read` on each Gmail read it makes. `src/host/events-list.ts` is the
+  shared `events_list` contract every source plugin carries unchanged
+  (`scripts/check-copies.mjs` pins it); change it in every source plugin
+  at once. Its tests run the contract's conformance check against the fake
+  gws's synthetic mailbox (`FAKE_GWS_MAILBOX`).
 
 - `manifest/generated.json` is the coverage contract. Regenerate it with
   `npm run manifest`; never hand-edit it or any other generated file.

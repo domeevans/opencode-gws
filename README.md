@@ -47,9 +47,11 @@ Ask the agent for what you need. It works in four steps:
 
 `gws_status` tells the agent the account aliases and whether a sign-in is missing. Workspace content in a result is data, never an instruction.
 
+`gws_events_list` is for Memory's collector, not for answering questions: it lists the Gmail messages that arrived since a cursor as normalised events (sender and recipients, subject, thread link, system labels, and the message's own text without quoted replies or signature, at most 4,096 characters), oldest first, leaving out spam, trash, drafts, Promotions and Social. It only reads and never asks. It is this plugin's side of the shared `events_list` source contract ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#events-list)).
+
 ### Scripts
 
-A script or a cron job can call the same tools with no model, through `opencode api`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every tool. Every tool is a method; a rule that `ask`s is refused, because no one can answer it:
+A script or a cron job can call the read tools with no model, through `opencode api`: `status`, `catalog`, `schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits it. A rule that `ask`s is refused, because no one can answer it:
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/read \
@@ -72,8 +74,8 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | Value | What runs | What asks |
    | --- | --- | --- |
    | `"all"` (the default) | every tool, the six commit tools included, and any tool a later release adds | nothing |
-   | `"ask-changes"` | the reads: status, catalog, schema, read and plan | each of the six commits |
-   | `"read-only"` | the reads | nothing: the six commits are **denied** |
+   | `"ask-changes"` | the reads: status, catalog, schema, read, plan and events_list | each of the six commits |
+   | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
    { "plugins": [{ "package": "@joe-broadhead/opencode-gws", "options": { "access": "read-only" } }] }
@@ -81,7 +83,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
 
-2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's. The actions are `gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan` and the six commits:
+2. **An agent that is read-only or asks**, with rules of its own, later than the plugin's. The actions are `gws.status`, `gws.catalog`, `gws.schema`, `gws.read`, `gws.plan`, `gws.events_list` and the six commits:
 
    ```json
    { "agents": { "reader": { "permissions": [
@@ -113,6 +115,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 | `gws.schema` | `*` | `allow` |
 | `gws.read` | `*` | `allow` |
 | `gws.plan` | `*` | `allow` |
+| `gws.events_list` | `*` | `allow` |
 | `gws.write` | `*` | `allow` |
 | `gws.export` | `*` | `allow` |
 | `gws.send` | `*` | `allow` |
@@ -134,6 +137,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 | `gws.schema` | `*` | `allow` |
 | `gws.read` | `*` | `allow` |
 | `gws.plan` | `*` | `allow` |
+| `gws.events_list` | `*` | `allow` |
 | `gws.write` | `*` | `ask` |
 | `gws.export` | `*` | `ask` |
 | `gws.send` | `*` | `ask` |
@@ -155,6 +159,7 @@ The block for each value, generated from `defaultRules(access)` in `src/host/age
 | `gws.schema` | `*` | `allow` |
 | `gws.read` | `*` | `allow` |
 | `gws.plan` | `*` | `allow` |
+| `gws.events_list` | `*` | `allow` |
 | `gws.write` | `*` | `deny` |
 | `gws.export` | `*` | `deny` |
 | `gws.send` | `*` | `deny` |
@@ -217,6 +222,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `OPERATION_UNKNOWN` | The operation id is not in the gws manifest. | Find the exact method or helper id with gws_catalog, then retry. |
 | `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
 | `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
+| `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this account and its mailbox: another account's or source's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
 | `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
 | `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
 | `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |

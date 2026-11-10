@@ -269,6 +269,57 @@ export const CommitOutput = z.object({
   cleanupDegraded: z.boolean().optional().describe("The change succeeded, but private staging cleanup failed; do not retry the mutation"),
 })
 
+// ── events_list ─────────────────────────────────────────────────────────
+// The shared events_list contract (src/host/events-list.ts), as Zod. The
+// domain imports nothing outside it, so the limits are written out here;
+// test/gmail-events.test.ts keeps them equal to the shared module's.
+
+export const EventsListInput = z
+  .strictObject({
+    since: z
+      .string()
+      .max(40)
+      .regex(/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2}))?$/, "must be an ISO date, or an ISO date-time with Z or an offset")
+      .optional()
+      .describe("Where to start when there is no cursor: an ISO date (a UTC day) or an ISO date-time with Z or an offset. Default: 24 hours ago"),
+    cursor: z.string().min(1).max(1024).optional().describe("The cursor of the previous result, to list what arrived after it. It wins over since"),
+    limit: z.number().int().min(1).max(500).optional().describe("Most events to return, 1 to 500; 100 by default"),
+    account: Account,
+    source: z
+      .string()
+      .max(64)
+      .optional()
+      .describe('The source to list: "gmail", the only one until Calendar and Drive are added. Default: "gmail"'),
+  })
+  .describe("List Gmail messages since a cursor, as Memory's events")
+
+const EventActor = z.object({ role: z.string(), id: z.string().describe("mailto: and the address"), name: z.string().optional() })
+
+export const SourceEvent = z.object({
+  source: z.literal("gmail"),
+  account: z.string().describe("The account alias"),
+  external_id: z.string().describe("The Gmail message id"),
+  kind: z.literal("message"),
+  occurred_at: z.string().describe("When Gmail received it, UTC ISO"),
+  thread: z.string().nullable().describe("gmail-thread: and the thread id"),
+  actors: z.array(EventActor).max(20).describe("From, To, Cc and Bcc, as mailto: ids"),
+  title: z.string().max(300).describe(`The subject. ${Untrusted}`),
+  text: z.string().max(4096).describe(`The message's own text, without quoted replies or signature. ${Untrusted}`),
+  url: z.string().nullable().describe("The thread in Gmail"),
+  labels: z.array(z.string()).max(20).describe("Gmail system labels such as inbox, sent, important"),
+  hash: z.string().describe("sha256: of the other fields"),
+})
+
+export const EventsListOutput = z.object({
+  source: z.literal("gmail").describe("The source listed, also on an empty page"),
+  account: z.string().describe("The account alias listed, also on an empty page"),
+  owner: z.object({ id: z.string(), label: z.string() }).describe("The signed-in Gmail address"),
+  events: z.array(SourceEvent).describe("Oldest first"),
+  cursor: z.string().describe("Pass it to the next call"),
+  more: z.boolean().describe("True when another call now would list more"),
+  trust: z.literal("untrusted"),
+})
+
 export type RequestInput = z.infer<typeof RequestInput>
 export type CommitInput = z.infer<typeof CommitInput>
 export type SchemaInput = z.infer<typeof SchemaInput>
@@ -282,3 +333,5 @@ export type Preview = z.infer<typeof Preview>
 export type ReadOutput = z.infer<typeof ReadOutput>
 export type PlanOutput = z.infer<typeof PlanOutput>
 export type CommitOutput = z.infer<typeof CommitOutput>
+export type EventsListInput = z.infer<typeof EventsListInput>
+export type EventsListOutput = z.infer<typeof EventsListOutput>

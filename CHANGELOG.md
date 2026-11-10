@@ -14,15 +14,25 @@ All notable changes to this project are documented here. The format follows [Kee
   still needs its plan and `planId`. `gws_status`, the status RPC and the dialog show the value.
 - The tools RPC follows the same default: a script runs every method unless `access` or a rule says otherwise.
 
-- tools RPC v2: every known tool is scriptable, and a call runs when the session's rules allow it. The six commit tools are methods too, in
-  the shared tools RPC module (`src/host/tools-rpc.ts`), so a script can plan and commit in one run; a commit still
-  takes only a `planId`, and is refused unless the session's agent allows that commit's action. Every method carries a
-  class; `describe` reports it, and with a session each method's resolved `permission`. A call now resolves the rule
-  before dispatch: an `ask` is refused, and a `deny` is refused, with no gws call and no prompt.
+- The tools RPC, `google-workspace.gws.tools`, follows the family's shared v2.1 module (`src/host/tools-rpc.ts`). Its methods are the read tools, `status`, `catalog`, `schema`, `read`, `plan` and `events_list`, each with its input and output schema. The six commit tools are not methods: a script can plan a change, and a commit runs only from the model's approved tool. A call resolves the rule before dispatch: an `ask` is refused, and a `deny` is refused, with no gws call and no prompt. With a session, `describe` reports each method's resolved `permission`.
+- `events_list` is a read, so it is allowed at every `access` value, as the other reads are.
 - A saved "Always allow" no longer authorises an ad-hoc script. A script's grant is a rule in config, or a Jobs run
   session; `docs/scripting.md` says so, and names the Jobs one-off as the way to get an approval-bound grant.
 - The permissions a script's calls assert now carry the same tool source id as a model call, so an inner `ask`, such
   as a plan's read of an event's guests, is refused and named instead of waiting for a prompt.
+
+## [0.0.10] - 2026-11-08
+
+### Added
+
+- `gws_events_list`, and the tools RPC method `events_list`: every result names its `source` (`gmail`) and `account` (the account alias), an empty one included, and the input takes `source`, which is `gmail` until Calendar and Drive are added. It lists the Gmail messages that arrived since a cursor, as Memory's normalised events, oldest first. The first listing searches `messages.list` from `since` (24 hours back by default), then follows `history.list` from the mailbox's history id; a history id Gmail no longer keeps falls back to the search. Each event has the sender and recipients as `mailto:` ids, the subject, the thread and its Gmail link, the system labels, and the message's own text without quoted replies or signature, at most 4,096 characters. Spam, trash, drafts, Promotions and Social are left out. The owner is the account's address from `getProfile`. It only reads and never asks: it asserts `gws.events_list`, then `gws.read` on each Gmail read.
+- `src/host/events-list.ts`, the shared `events_list` source contract: the event type, the input parser, the cursor helpers, the checks, and the conformance check every source runs in its tests. `scripts/check-copies.mjs` pins it like the other shared copies.
+- The error `CURSOR_INVALID`, for an events_list cursor from another account, mailbox or source.
+- The fake gws answers Gmail reads from a synthetic mailbox file (`FAKE_GWS_MAILBOX`), for the events_list tests.
+
+### Changed
+
+- A Google API error keeps its HTTP status on the plugin's error, so events_list can tell a message deleted since it was listed (404) from a failure.
 
 ## [0.0.9] - 2026-11-06
 

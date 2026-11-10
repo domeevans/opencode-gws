@@ -7,8 +7,8 @@ import { ACCOUNT } from "./harness.js"
 import { call, codeMode, commits, COMMITS, driver, plan, turn, type Commit, type Driver } from "./tools-driver.js"
 
 /**
- * All eleven tools in the real host, driven by the scripted model against
- * the fake gws. status, catalog, schema, and plan run in Code Mode; read
+ * All twelve tools in the real host, driven by the scripted model against
+ * the fake gws. status, catalog, schema, plan and events_list run in Code Mode; read
  * and the six commit tools are direct tools the model calls by name. Each
  * commit runs only after its permission prompts are approved, and each
  * category has a path where nothing commits. admin is refused without a
@@ -33,7 +33,7 @@ beforeAll(() => {
 })
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-describe("the eleven tools", () => {
+describe("the twelve tools", () => {
   let d: Driver
   beforeAll(async () => {
     d = await driver()
@@ -42,10 +42,10 @@ describe("the eleven tools", () => {
     await d?.host.close()
   })
 
-  it("offers status, catalog, schema, and plan in Code Mode, and read and the commits as direct tools", async () => {
+  it("offers status, catalog, schema, plan and events_list in Code Mode, and read and the commits as direct tools", async () => {
     const found = await codeMode(d, `return search({ namespace: "gws", limit: 50 })`)
     const paths = (found["items"] as Array<{ path: string }>).map((item) => item.path).sort()
-    expect(paths).toEqual(["tools.gws.catalog", "tools.gws.plan", "tools.gws.schema", "tools.gws.status"])
+    expect(paths).toEqual(["tools.gws.catalog", "tools.gws.events_list", "tools.gws.plan", "tools.gws.schema", "tools.gws.status"])
     const offered = d.host.model.requests.at(-1)!
     expect(offered.tools).toEqual(expect.arrayContaining(["gws_read", ...COMMITS.map((category) => `gws_${category}`)]))
     expect(offered.tools).not.toEqual(expect.arrayContaining(["gws_plan", "gws_catalog"]))

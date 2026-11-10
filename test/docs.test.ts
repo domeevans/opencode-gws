@@ -73,11 +73,12 @@ describe("the README's generated blocks", () => {
       for (const match of read(file).matchAll(/"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*): /g)) raised.add(match[1]!)
       for (const match of read(file).matchAll(/`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*): /g)) raised.add(match[1]!)
     }
-    // Not plugin codes: Google's own reason and status strings, the audit's marker for a non-plugin error, an
+    // Not plugin codes: Gmail's system label ids, which events_list filters on, Google's own reason and status strings, the audit's marker for a non-plugin error, an
     // httpMethod marker for helpers, HTTP methods, Node's errno codes, and the shared tools RPC's codes for
     // MCP-backed plugins (gws has no MCP server, so a gws refusal is one of the four above).
     const upstream = new Set([
       "ACCESS_TOKEN_SCOPE_INSUFFICIENT", "UNAUTHENTICATED", "SERVICE_DISABLED", "UNKNOWN_ERROR", "HELPER",
+      "SPAM", "TRASH", "DRAFT", "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
       "OK", "ERROR", "SKIPPED", "DENIED", "UNKNOWN", "S256", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD",
       "SERVER_CONFLICT", "CONNECTING", "CONNECTION_FAILED", "DISABLED", "NOT_REGISTERED", "TOOL_UNAVAILABLE", "UPSTREAM_ERROR",
       "GOOGLE_WORKSPACE_CLI_TOKEN", "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE", "GOOGLE_WORKSPACE_CLI_CLIENT_ID",

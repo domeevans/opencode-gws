@@ -8,8 +8,8 @@ import { planSummary, registerCommands } from "./host/commands.js"
 import { integrationAuthReporter, integrationConnection, integrationIds, integrationTokenProvider, registerIntegrations } from "./host/integrations.js"
 import { registerRpc, statusSource } from "./host/rpc.js"
 import { registerSkills, skillLister } from "./host/skills.js"
-import { registerTools } from "./host/tools.js"
-import { registerToolsRpc, scriptMethods } from "./host/tools-rpc.js"
+import { registerTools, scriptMethods } from "./host/tools.js"
+import { registerToolsRpc } from "./host/tools-rpc.js"
 import { Runtime } from "./runtime/index.js"
 
 /**
@@ -67,7 +67,7 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
     await registerSkills(ctx, config)
     stopRpc = await registerRpc(ctx, runtime, status)
     stopToolsRpc = await registerToolsRpc(ctx, {
-      methods: scriptMethods({ runtime, assert: (request) => ctx.permission.assert(request as never), status }),
+      owned: scriptMethods({ runtime, assert: (request) => ctx.permission.assert(request as never), status }),
     })
     stopCommands = await registerCommands(ctx, { status, plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary), doctor: runtime }, runtime.signal)
     runtime.audit.emit({ event: "plugin.loaded", outcome: "success" })

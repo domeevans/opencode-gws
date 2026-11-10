@@ -95,7 +95,7 @@ A Calendar event write (`insert`, `patch`, `update`, `move`, `quickAdd`) becomes
 
 **Every tool is allowed by default.** The plugin inserts its default rules through `ctx.agent.transform`, immediately after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets none, so its default deny stays a deny. The block is the `gws.*` namespace, then the five reads, then the six commits; the `access` option decides the effect, and the README prints the block for each value:
 
-| `access` | The namespace and the six commits | The five reads |
+| `access` | The namespace and the six commits | The six reads, events_list included |
 | --- | --- | --- |
 | `"all"` (the default) | `allow` | `allow` |
 | `"ask-changes"` | `ask` | `allow` |
@@ -181,6 +181,36 @@ Two skills load automatically: `opencode-gws` (how the tools work: accounts, pla
 
 `binary.path` is an optional absolute path to a `gws` 0.22.5 executable outside the project directory. Without it, the plugin uses the platform package. See [backend.md](backend.md).
 
+## Events list
+
+`gws_events_list` (tools RPC method `events_list`) is Gmail's side of Memory's sources funnel: the shared `events_list` contract in `src/host/events-list.ts`, which every source plugin carries. Memory's collector calls it on a schedule, with no model and no one there.
+
+| Input | Default | Rule |
+| --- | --- | --- |
+| `since` | 24 hours ago | Where to start when there is no cursor: an ISO date (a UTC day) or an ISO date-time with `Z` or an offset. |
+| `cursor` | unset | The `cursor` of the previous result. It wins over `since`. A cursor from another account, another source, or the account before it signed in as another address is `CURSOR_INVALID`. |
+| `limit` | `100` | Events, 1–500. |
+| `account` | the only account | The account alias, as for every tool. |
+| `source` | `gmail` | The source to list. Only `gmail` exists until Calendar and Drive are added; any other is `GWS_VALIDATION_ERROR`. |
+
+The result is `{ source, account, owner, events, cursor, more, trust: "untrusted" }`. `source` is `gmail` and `account` the account alias on every result, an empty one included, so Memory can bind the source before it has anything to list. `owner` is `{ "id": "mailto:<address>", "label": "<address>" }`, the account's address from `gmail.users.getProfile`. Each event is one Gmail message:
+
+| Field | Value |
+| --- | --- |
+| `source`, `kind` | `gmail`, `message`. |
+| `account` | The account alias. |
+| `external_id` | The message id. |
+| `occurred_at` | When Gmail received it (`internalDate`), in UTC. |
+| `thread`, `url` | `gmail-thread:<thread id>`, and `https://mail.google.com/mail/u/0/#all/<thread id>`. |
+| `actors` | Everyone in From, To, Cc and Bcc, with the header as the role, as `mailto:` ids, with display names when there are any; at most 20. |
+| `title` | The subject, at most 300 characters. |
+| `text` | The plain part, else the HTML part as text, else the snippet: without quoted lines, a quoted reply and its header ("On … wrote:", Outlook's "From: … Sent: …", "Original Message"), or the signature after `-- ` or "Sent from my …"; at most 4,096 characters. |
+| `labels` | Gmail's system labels it has: `inbox`, `sent`, `important`, `starred`, `unread`, `personal`, `updates`, `forums`. |
+
+Spam, trash, drafts, Promotions and Social are never events. The first listing (no cursor) notes the mailbox's history id, then searches `messages.list` for the messages after `since`, at most 10,000, and lists them oldest first. After that it follows `history.list` from the noted id, so a message that arrives meanwhile is listed too, at worst twice; Memory drops the repeat. When Gmail no longer keeps a cursor's history id, it searches again from the last event it listed. A message deleted after it was listed is skipped. The cursor holds where the listing stands, so calling again with an older cursor lists the same events again. A result stops early, with `more`, before its JSON passes 900,000 bytes.
+
+It only reads and never asks: it asserts `gws.events_list` on `<account>:gmail.users.history.list`, then `gws.read` on `<account>:<operation>` for `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.messages.list` and `gmail.users.messages.get`, before any read runs. Each read passes the plugin's read policy and audit like a `gws_read`. A deny rule on `gws.events_list` turns it off without touching `gws_read`.
+
 ## Errors
 
 <!-- generated:errors -->
@@ -196,6 +226,7 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `OPERATION_UNKNOWN` | The operation id is not in the gws manifest. | Find the exact method or helper id with gws_catalog, then retry. |
 | `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
 | `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
+| `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this account and its mailbox: another account's or source's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
 | `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
 | `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
 | `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |

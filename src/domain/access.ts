@@ -19,7 +19,7 @@ export const ACCESS_EFFECT: Readonly<Record<Access, "allow" | "ask" | "deny">> =
 export const NAMESPACE_ACTION = "gws.*"
 
 /** The tool actions that change nothing: status, catalog, schema, read and plan. */
-export const READ_ACTIONS = ["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan"] as const
+export const READ_ACTIONS = ["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan", "gws.events_list"] as const
 
 /** The six commit actions: a change, a send, a share, a delete, an export or an admin operation. */
 export const CHANGING_ACTIONS = ["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"] as const
