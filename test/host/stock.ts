@@ -4,7 +4,8 @@ import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomBytes, randomUUID } from "node:crypto"
-import { network } from "./setup.js"
+import { stockGate } from "../support/stock-gate.js"
+import { inherited, network } from "./setup.js"
 import { REPO } from "./package.js"
 
 /**
@@ -19,16 +20,20 @@ import { REPO } from "./package.js"
 
 /** The versions the family tests, TESTED_HOSTS in src/domain/host.ts. */
 export const TESTED_HOSTS = ["2.2.3", "2.2.4", "2.2.5", "2.2.6"] as const
-/** The stock binary for a version, from OPENCODE_BIN_<version> ("" when unset). The host suite never guesses a path. */
+/** The stock binary for a version, from OPENCODE_BIN_<version> as the environment had it ("" when unset). Never guessed. */
 export function binary(version: string): string {
-  return process.env[`OPENCODE_BIN_${version.replaceAll(".", "_")}`] ?? ""
+  return inherited.stockBinaries[`OPENCODE_BIN_${version.replaceAll(".", "_")}`] ?? ""
 }
 
 export const available = (version: string) => binary(version) !== "" && existsSync(binary(version))
 
+/** The gate for one stock release: it runs, skips on a laptop with a notice, and fails in CI when the binary is missing. */
+export const gateOf = (version: string) => stockGate(version, binary(version), available(version), { CI: inherited.CI })
+
 export const ACCOUNT = "personal"
 
 const AGENTS = {
+  scripted: { description: "a plain agent: the plugin's default rules and nothing else", mode: "primary", permissions: [] },
   locked: { description: "deny every gws tool", mode: "primary", permissions: [{ action: "gws.*", resource: "*", effect: "deny" }] },
   careful: { description: "ask for every gws read", mode: "primary", permissions: [{ action: "gws.read", resource: "*", effect: "ask" }] },
 }
@@ -219,7 +224,9 @@ export async function startStock(version: string): Promise<StockHost> {
 
 /** A session in the project, with optional session rules. */
 export async function session(host: StockHost, agent: string, permissions?: readonly { action: string; resource: string; effect: string }[]): Promise<string> {
-  const created = await host.api("POST", "/api/session", { title: `rpc-${agent}-${randomUUID().slice(0, 6)}`, agent, ...(permissions ? { permissions } : {}) }, host.project)
+  // The session must live in the project, where the plugin and its agents are. A location query or the directory header
+  // leaves a stock session at the server root, whose agent list is empty: the body's `location` is the one that holds.
+  const created = await host.api("POST", "/api/session", { title: `rpc-${agent}-${randomUUID().slice(0, 6)}`, agent, permissions: permissions ?? [], location: { directory: host.project } })
   const data = ((created.data as { data?: unknown })?.data ?? created.data) as { id?: string }
   if (!data.id) throw new Error(`no session id: ${JSON.stringify(created.data)}`)
   return data.id
@@ -227,5 +234,5 @@ export async function session(host: StockHost, agent: string, permissions?: read
 
 /** A call to a tools RPC method in the project. */
 export function rpc(host: StockHost, method: string, sessionID: string, input: unknown = {}, location = host.project) {
-  return host.api("POST", `/api/rpc/google-workspace.gws.tools/${method}`, { input: { sessionID, ...(input === undefined ? {} : { input }) } }, location)
+  return host.api("POST", `/api/rpc/google-workspace.gws.tools/${method}`, { input: { sessionID, ...(input === undefined ? {} : { input }) } }, location, { "x-opencode-directory": location })
 }

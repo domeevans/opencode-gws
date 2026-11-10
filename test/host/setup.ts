@@ -6,6 +6,12 @@ import { installNetworkGuard } from "./network.js"
 // Runs before tests import plugin contracts or the SDK. Remove provider keys,
 // proxy settings and credential paths, not just OPENCODE-prefixed variables.
 const sdkOverride = process.env.HOST_SDK_DIR
+// The stock OpenCode binaries and the CI flag are read by the stock gate, so they are kept before the clear below.
+// Without this, every stock test skipped silently, even on a laptop with the binaries set.
+export const inherited = {
+  stockBinaries: Object.fromEntries(Object.entries(process.env).filter(([key]) => /^OPENCODE_BIN_\d+_\d+_\d+$/.test(key))) as Record<string, string>,
+  CI: process.env.CI,
+}
 // Never under $HOME or an inherited TMPDIR: OpenCode finds .opencode/ folders by searching upward.
 const root = realpathSync(mkdtempSync(join(existsSync("/private/tmp") ? "/private/tmp" : "/tmp", "plugin-host-worker-")))
 for (const key of Object.keys(process.env)) delete process.env[key]
