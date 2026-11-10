@@ -16,7 +16,7 @@ const Tools = Rpc.define({
   methods: {
     describe: { input: open, output: open },
     ...Object.fromEntries(
-      ["status", "catalog", "schema", "read", "plan", "events_list", "write", "send", "share", "delete", "export", "admin"].map((name) => [
+      ["status", "catalog", "schema", "read", "plan", "events_list"].map((name) => [
         name,
         { input: open, output: open, errors: { failed: open } },
       ]),
@@ -135,7 +135,7 @@ describe("tools RPC on a real host", () => {
     expect(extra.value).toBeUndefined()
     expect(extra.message).toContain('"extra" is not allowed')
     expect((await raw("read", { input: list })).message).toContain('"sessionID" must be a non-empty string')
-    expect((await raw("describe", 1)).message).toContain("describe takes nothing")
+    expect((await raw("describe", 1)).message).toContain("describe takes no input")
   })
 
   it("plans a change as a script, and offers no commit as a method: the model commits the plan through its approved tool", async () => {

@@ -27,16 +27,14 @@ describe("access: ask-changes", () => {
     await expectBlock(host, block)
   })
 
-  it("reads, and refuses a commit at once with no gws call and no prompt", async () => {
+  it("reads and plans; the commit is not a method, so a script cannot run it, and no prompt is left waiting", async () => {
     expect((await run(host, sessionID, "read", list)).value).toMatchObject({ ok: true, category: "read" })
     const planned = await run(host, sessionID, "plan", create)
     expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
     const commits = writes(host).length
     const prompts = asked(host).length
     const started = Date.now()
-    const refused = await run(host, sessionID, "write", { planId: planned.value.planId })
-    expect(refused).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-    expect(refused.message).toMatch(/would ask/)
+    expect((await run(host, sessionID, "write", { planId: planned.value.planId })).value).toBeUndefined()
     expect(Date.now() - started).toBeLessThan(5000)
     expect(writes(host).length).toBe(commits)
     expect(asked(host).length).toBe(prompts)

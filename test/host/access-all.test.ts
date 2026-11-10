@@ -27,15 +27,15 @@ describe("access: all", () => {
     await expectBlock(host, defaultRules("all"))
   })
 
-  it("reads, and commits a plan with no permission prompt", async () => {
+  it("reads and plans; the commit is not a method, so a script cannot run it and no gws call is made for it", async () => {
     const before = gwsCalls(host).length
     expect((await run(host, sessionID, "read", list)).value).toMatchObject({ ok: true, category: "read" })
     const planned = await run(host, sessionID, "plan", create)
     expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
     const prompts = asked(host).length
     const commits = writes(host).length
-    expect((await run(host, sessionID, "write", { planId: planned.value.planId })).value).toMatchObject({ ok: true })
-    expect(writes(host).length).toBe(commits + 1)
+    expect((await run(host, sessionID, "write", { planId: planned.value.planId })).value).toBeUndefined()
+    expect(writes(host).length).toBe(commits)
     expect(asked(host).length).toBe(prompts)
     expect(gwsCalls(host).length).toBeGreaterThan(before)
   })

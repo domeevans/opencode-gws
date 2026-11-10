@@ -27,14 +27,12 @@ describe("access: read-only", () => {
     await expectBlock(host, block)
   })
 
-  it("reads, and denies a commit with no gws call", async () => {
+  it("reads and plans; the commit is not a method, so a script cannot run it, and no gws call is made for it", async () => {
     expect((await run(host, sessionID, "read", list)).value).toMatchObject({ ok: true, category: "read" })
     const planned = await run(host, sessionID, "plan", create)
     expect(planned.value, planned.message).toMatchObject({ ok: true, category: "write", planId: expect.any(String) })
     const commits = writes(host).length
-    const refused = await run(host, sessionID, "write", { planId: planned.value.planId })
-    expect(refused).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-    expect(refused.message).toMatch(/hidden/)
+    expect((await run(host, sessionID, "write", { planId: planned.value.planId })).value).toBeUndefined()
     expect(writes(host).length).toBe(commits)
   })
 })
