@@ -85,7 +85,7 @@ const OFFLINE = { OPENCODE_DISABLE_MODELS_FETCH: "1", OPENCODE_DISABLE_AUTOUPDAT
 // asking. A stock load fails if the installed plugin inserts anything else after the base allow.
 const ASK_RULES = [
   { action: "gws.*", resource: "*", effect: "ask" },
-  ...["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan"].map((action) => ({ action, resource: "*", effect: "allow" })),
+  ...["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan", "gws.events_list"].map((action) => ({ action, resource: "*", effect: "allow" })),
   ...["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"].map((action) => ({ action, resource: "*", effect: "ask" })),
 ]
 const BLANK_PROVIDERS = { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } }
