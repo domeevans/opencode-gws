@@ -64,13 +64,15 @@ for (const version of TESTED_HOSTS) {
       expect(host.invocations().length).toBe(before)
     })
 
-    it("describe lists the read methods with their schemas, and takes no input", async () => {
-      const described = await host.api("POST", "/api/rpc/google-workspace.gws.tools/describe", { input: {} }, host.project)
-      const methods = unwrap(described.data).methods as { name: string; input?: unknown; output?: unknown }[]
+    it("describe lists the read methods with their class and schemas, and with a session each one's permission", async () => {
+      const withSession = await host.api("POST", "/api/rpc/google-workspace.gws.tools/describe", { input: { sessionID: build } }, host.project)
+      const methods = unwrap(withSession.data).methods as { name: string; class: string; input?: unknown; output?: unknown; permission?: string }[]
       expect(methods.map((method) => method.name).sort()).toEqual(["catalog", "events_list", "plan", "read", "schema", "status"])
-      for (const method of methods) expect(method).toMatchObject({ input: { type: "object" }, output: { type: "object" } })
-      expect((await host.api("POST", "/api/rpc/google-workspace.gws.tools/describe", { input: { sessionID: build } }, host.project)).status).toBe(400)
-      expect(unwrap(described.data).location).toBe(host.project)
+      for (const method of methods) expect(method).toMatchObject({ class: "read", input: { type: "object" }, output: { type: "object" }, permission: "allow" })
+      const plain = unwrap((await host.api("POST", "/api/rpc/google-workspace.gws.tools/describe", { input: {} }, host.project)).data)
+      expect(plain.methods.every((method: object) => !Object.hasOwn(method, "permission"))).toBe(true)
+      expect(plain.location).toBe(host.project)
+      expect(plain.locationHint).toContain("x-opencode-directory")
     })
 
     it("a call with no location reaches the default location and fails rpc.unavailable; the query and the header work", async () => {

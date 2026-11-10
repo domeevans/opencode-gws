@@ -1,16 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { CHANGING_ACTIONS, NAMESPACE_ACTION, READ_ACTIONS, type Access } from "../src/domain/access.js"
 import { defaultRules, hasDefaultRules, insertDefaultRules, permissionsBlock, unguardedAgents, type Rule } from "../src/host/agents.js"
-
-/** The effect the last matching rule gives an action; no match asks, as OpenCode's rules do. */
-function evaluate(rules: readonly Rule[], action: string): "allow" | "deny" | "ask" {
-  let effect: "allow" | "deny" | "ask" = "ask"
-  for (const rule of rules) {
-    const pattern = new RegExp(`^${rule.action.split("*").map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`)
-    if (pattern.test(action)) effect = rule.effect
-  }
-  return effect
-}
+import { evaluate } from "../src/host/tools-rpc.js"
 
 /**
  * The default rules: the block every agent gets after its base allow. At the

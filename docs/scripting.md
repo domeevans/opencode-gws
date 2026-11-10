@@ -17,7 +17,7 @@ can plan a change, but only the model's approved commit tool runs the plan, so a
 | `read` | `gws_read` |
 | `plan` | `gws_plan` |
 | `events_list` | Code Mode only: the Gmail messages since a cursor, as Memory's events ([configuration.md](configuration.md#events-list)) |
-| `describe` | none: lists the methods, their permission actions, and their input and output as JSON Schema |
+| `describe` | none: lists the methods with their class and their input and output as JSON Schema; with `sessionID`, each method also reports its resolved `permission` |
 
 ## A script runs as a session
 
@@ -57,14 +57,14 @@ The reads and `plan` are always allowed by the plugin's block, whatever `access`
 `access` for the model's commits: allowed by default, asking at `ask-changes`, denied at `read-only`. The session above
 denies the namespace and opts the reads and `plan` back in, so the script can look and plan, and nothing else.
 
-Ask `describe` for the methods, with their input and output schemas:
+Ask `describe` for the methods, with their classes and schemas, and with the session each method's permission:
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/describe \
-  -H "x-opencode-directory:$PWD" -d '{"input":{}}'
+  -H "x-opencode-directory:$PWD" -d '{"input":{"sessionID":"ses_…"}}'
 ```
 
-`describe` takes no input. Each call is resolved against its session's agent when it runs, so a refusal names the rule.
+`describe` takes nothing, or `{"sessionID": "…"}`. Each call is resolved against its session's agent when it runs, so a refusal names the rule.
 
 ## The location
 

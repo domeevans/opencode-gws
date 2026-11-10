@@ -1,5 +1,5 @@
 import { Error as ToolError } from "@opencode/plugin/promise/tool"
-import * as z from "zod"
+import type { z } from "zod"
 import {
   CatalogInput,
   CatalogOutput,
@@ -24,7 +24,6 @@ import type { Runtime } from "../runtime/index.js"
 import type { PluginContext, ToolContext, ToolEditor, ToolInfo } from "./context.js"
 import { EVENT_READS, eventsRequest, gmailEvents } from "./gmail-events.js"
 import type { StatusSource } from "./rpc.js"
-import type { JsonSchema, OwnedMethod, ToolCall } from "./tools-rpc.js"
 import { commitRequests, externalDirectoryRequest, localRequest, operationRequest } from "./permissions.js"
 import type { Caller, PermissionRequest } from "./permissions.js"
 
@@ -89,14 +88,31 @@ interface Outcome<O> {
   metadata?: { operation?: string; category?: string; account?: string; truncated?: boolean }
 }
 
+export type ToolClass = "read" | "write" | "send" | "export" | "destructive"
+
 interface ToolSpec<I extends z.ZodType, O extends z.ZodType> {
   name: string
   action: string
+  class: ToolClass
   description: string
   exposure: Exposure
   input: I
   output: O
   run: (input: z.output<I>, call: Call) => Promise<Outcome<z.output<O>>>
+}
+
+/**
+ * The six commit tools' class. write and export are what they say; a send and a share reach
+ * people, so both are sends; a delete and an admin change can remove data or access, so both
+ * are destructive. The category is still in the method's name and its action.
+ */
+const COMMIT_CLASSES: Readonly<Record<CommitCategory, ToolClass>> = {
+  write: "write",
+  send: "send",
+  share: "send",
+  delete: "destructive",
+  export: "export",
+  admin: "destructive",
 }
 
 const COMMIT_CATEGORIES: readonly { category: CommitCategory; description: string }[] = [
@@ -132,6 +148,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "status",
       action: "gws.status",
+      class: "read",
       description:
         "Shows the plugin and gws versions, each configured account with its sign-in state, access level, and granted scopes, " +
         "the services the model can use, and the next step. Reads the stored sign-ins and never calls a Google Workspace API. " +
@@ -147,6 +164,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "catalog",
       action: "gws.catalog",
+      class: "read",
       description:
         'Searches the gws command manifest for services, methods, and helpers. Words from operation ids work best, such as "gmail messages list" or "drive files update". ' +
         "When no entry matches every word, the best partial matches come back with relaxed: true; unavailable names a service this setup leaves out, and why. " +
@@ -163,6 +181,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "schema",
       action: "gws.schema",
+      class: "read",
       description:
         "Shows one operation's parameters, scopes, and request body for a method, or its input flags for a helper, " +
         "so read and plan requests are right the first time. Pass the operation id from catalog.",
@@ -180,6 +199,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "read",
       action: "gws.read",
+      class: "read",
       description:
         "Run a read-only operation; data is parsed JSON or a text helper's string. Use catalog and schema first. " +
         "List/search needs fields; pagination is optional. If truncated, narrow fields or set response.mode to full. " +
@@ -202,6 +222,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "plan",
       action: "gws.plan",
+      class: "read",
       description:
         "Prepares a change without making it: a gws dry run that returns a single-use planId, a redacted preview of the exact command, and its category. " +
         "Show the preview to the user, then commit with the direct tool of that category (gws_write, gws_send, gws_share, gws_delete, gws_export, or gws_admin), " +
@@ -222,6 +243,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     spec({
       name: "events_list",
       action: "gws.events_list",
+      class: "read",
       description:
         "For Memory's collector and scripts, not for answering questions: lists the Gmail messages that arrived since a cursor as normalised events, oldest first, " +
         "each with its sender and recipients as mailto: ids, subject, thread link, system labels and its own text without quoted replies or signature, cut to 4096 characters. " +
@@ -248,6 +270,7 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
       spec({
         name: category,
         action: `gws.${category}`,
+        class: COMMIT_CLASSES[category],
         description:
           `${description} Show the preview first; pass only {planId}. ` +
           'Default access allows without a prompt; "ask-changes" asks and "read-only" denies. Returns Google\'s response.',
@@ -280,48 +303,6 @@ export function toolSpecs(runtime: Runtime, assert: Assert, status: StatusSource
     ),
   ]
   return specs as ToolSpec<z.ZodType, z.ZodType>[]
-}
-
-/** The tools that are the tools RPC's methods: the reads, events_list included. The commit tools never are. */
-const SCRIPT_METHODS: readonly string[] = ["status", "catalog", "schema", "read", "plan", "events_list"]
-
-export interface ScriptSources {
-  readonly runtime: Runtime
-  /** The host's permission check: the tool's own asserts run inside its spec, exactly as on the model path. */
-  readonly assert: Assert
-  readonly status: StatusSource
-}
-
-/**
- * The tools RPC's methods, one per script-visible read tool. Each runs the tool's own spec, so its input check, policy,
- * asserts and error mapping are the model path's; a script call carries a tool source id, so the RPC's evaluate hook can
- * refuse an inner ask instead of leaving a prompt no one answers.
- */
-export function scriptMethods(sources: ScriptSources): OwnedMethod[] {
-  return toolSpecs(sources.runtime, sources.assert, sources.status)
-    .filter((tool) => SCRIPT_METHODS.includes(tool.name))
-    .map((tool) => ({
-      name: tool.name,
-      action: tool.action,
-      description: tool.description,
-      input: schemaOf(tool.input, "input"),
-      output: schemaOf(tool.output, "output"),
-      async run(input: unknown, call: ToolCall) {
-        const host = { sessionID: call.sessionID, agent: call.agent, messageID: call.messageID, id: call.id }
-        const runtime = { sessionId: call.sessionID, agentId: call.agent, signal: call.signal, caller: "rpc" as const }
-        const outcome = await tool.run(parse(tool.input, input), { host, runtime })
-        return outcome.output
-      },
-    }))
-}
-
-/** A tool's Zod schema as the plain JSON Schema describe reports. A schema the converter cannot represent reports as an object. */
-function schemaOf(schema: z.ZodType, io: "input" | "output"): JsonSchema {
-  try {
-    return z.toJSONSchema(schema, { io, unrepresentable: "any" }) as JsonSchema
-  } catch {
-    return { type: "object" }
-  }
 }
 
 export async function registerTools(ctx: PluginContext, runtime: Runtime, status: StatusSource): Promise<void> {

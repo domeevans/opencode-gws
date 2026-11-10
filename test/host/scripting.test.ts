@@ -135,7 +135,7 @@ describe("tools RPC on a real host", () => {
     expect(extra.value).toBeUndefined()
     expect(extra.message).toContain('"extra" is not allowed')
     expect((await raw("read", { input: list })).message).toContain('"sessionID" must be a non-empty string')
-    expect((await raw("describe", 1)).message).toContain("describe takes no input")
+    expect((await raw("describe", 1)).message).toContain("describe takes nothing")
   })
 
   it("plans a change as a script, and offers no commit as a method: the model commits the plan through its approved tool", async () => {
