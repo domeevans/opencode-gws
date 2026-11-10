@@ -310,6 +310,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 - **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit there needs an allow rule for it, or `access: "all"`.
 - **Output and time limits.** A result that is too large stops with `OUTPUT_LIMIT`, and a slow call with `TIMEOUT`. Narrow the request with `fields`, a smaller page size, `maxPages` or `maxItems`.
 - **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release loads, and `/gws-status` marks it untested.
+- **Audit lines can drop.** The audit log is written off the call path, with a 100 ms budget per line. A write that stalls past it is abandoned: its line and any queued behind it are lost. The call's result is not affected. The sink then stops writing until the plugin reloads, and `/gws-status` shows that some audit records could not be saved.
 
 ## Links
 
