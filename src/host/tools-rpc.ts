@@ -111,7 +111,7 @@ export function shapeResult(_method: string, result: McpResult, _call: ShapeCall
 /** The next step for each code. Each is one sentence that ends with a full stop. */
 export const NEXT_STEPS: NextSteps = {
   SESSION_UNKNOWN: `Create a session in the location you mean, such as POST /api/session with {"agent":"build"} sent with the header "x-opencode-directory: <dir>" or the location[directory] query, and pass its id.`,
-  SESSION_AGENT_REQUIRED: `Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id.`,
+  SESSION_AGENT_REQUIRED: `Create a session that names an agent this project has, with its project as the location, such as POST /api/session with {"agent":"build","location":{"directory":"/path/to/project"}}, and pass its id.`,
   PERMISSION_DENIED: "Add an allow rule for the action to the session's agent or to the session, or use a session whose agent allows it.",
   CANCELLED: "Call the method again if you still need the result.",
 }
@@ -549,7 +549,10 @@ export async function registerToolsRpc(ctx: ToolsRpcContext, options: ToolsRpcOp
       // with "Agent not found" on 2.2.3/2.2.4, so the location is left to the context, which is per location.
       agent = await ctx.agent.get({ agentID: info.agent })
     } catch (error) {
-      if (notFound(error, ["Agent.NotFoundError", "AgentNotFoundError"])) throw fail("SESSION_AGENT_REQUIRED", `session '${sessionID}' names the agent '${info.agent}', which does not exist`)
+      // A host may report a missing agent as a plain Error whose message names it (stock 2.2.3 to 2.2.6), not as a tagged
+      // NotFoundError. Both are the same refusal: the session names an agent this location does not have.
+      const missing = notFound(error, ["Agent.NotFoundError", "AgentNotFoundError"]) || (error instanceof Error && error.message.startsWith("Agent not found"))
+      if (missing) throw fail("SESSION_AGENT_REQUIRED", `session '${sessionID}' names the agent '${info.agent}', which does not exist in this location`)
       throw error
     }
     const rules: Rule[] = [...agent.data.permissions, ...(info.permissions ?? [])]
