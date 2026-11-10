@@ -46,7 +46,7 @@ function release(overrides: { gz?: Buffer; executableSha?: string; withManifest?
   const root2 = temporary()
   const pkg = join(root2, "dist")
   mkdirSync(pkg, { recursive: true })
-  writeFileSync(join(root2, "package.json"), JSON.stringify({ name: "@joe-broadhead/opencode-gws", version: "0.0.0" }))
+  writeFileSync(join(root2, "package.json"), JSON.stringify({ name: "github:joe-broadhead/opencode-gws#v0.0.0", version: "0.0.0" }))
   const gz = overrides.gz ?? gzip()
   const exe = pinnedBinary()
   if (overrides.withManifest !== false) {
