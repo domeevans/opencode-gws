@@ -28,10 +28,13 @@ describe("audit sink", () => {
   })
 
   it("records caller rpc and drops any other caller value", async () => {
+    // The same freeze as the rotation test: the sink's 100 ms write budget must not cut a line short under suite load.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
     const { sink, path } = audit()
     sink.emit({ event: "operation.read", outcome: "success", caller: "rpc" })
     sink.emit({ event: "operation.read", outcome: "success", caller: "PRIVATE_CALLER" } as never)
-    await vi.waitFor(() => expect(readFileSync(path, "utf8").trim().split("\n")).toHaveLength(2), { timeout: 5000 })
+    const { setTimeout: pause } = await import("node:timers/promises")
+    for (let i = 0; i < 2000 && !(existsSync(path) && readFileSync(path, "utf8").trim().split("\n").length >= 2); i++) await pause(5)
     const [rpc, other] = readFileSync(path, "utf8").trim().split("\n").map((line) => JSON.parse(line))
     expect(rpc.caller).toBe("rpc")
     expect(other).not.toHaveProperty("caller")
