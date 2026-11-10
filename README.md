@@ -18,6 +18,8 @@ opencode plugin add github:joe-broadhead/opencode-gws#v0.0.0
 
 Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
 
+A Git install is removed and updated by its installed spec: `opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.0`. `opencode plugin update` and `opencode plugin check` take the same spec.
+
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 A new release is a new tag: install it with its own `#v<version>` spec.
 
@@ -286,7 +288,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 2. Remove the plugin:
 
    ```sh
-   opencode plugin remove @joe-broadhead/opencode-gws
+   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.0
    ```
 
 3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.

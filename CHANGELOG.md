@@ -3,6 +3,7 @@
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.0.0] - 2026-11-10
+<!-- kit-release: the GitHub release v0.0.0 -->
 
 ### Changed
 
@@ -29,6 +30,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `/gws-status` says what `access` decides for a pending commit: it runs without a prompt at `"all"`, asks at `"ask-changes"`, and is denied at `"read-only"`. The line used to say approval happens only in the permission prompt, which is false at `"all"`.
 
 ## Earlier releases on npm
+
 These versions were published to npm before the plugin moved to GitHub releases. Their Git tags have been removed.
 
 ### npm 0.0.10 - 2026-11-08
