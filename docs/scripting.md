@@ -37,16 +37,16 @@ A saved **Always allow** does not authorise an ad-hoc script. It is not part of 
 the resolve never sees it. That is deliberate: a script's permission must be reviewable in config. The supported way to
 get an approval-bound grant is a Jobs one-off script (`jobs_run_script`), whose approval names the exact methods.
 
-Create the session once, with the agent the script should run as, and keep its id:
+Create the session once, with the agent the script should run as, and keep its id. Give the project as the session's `location`: a session made without one belongs to the service's default location, where the project's agents may not exist, and each call then fails `Agent not found`:
 
 ```sh
-opencode api post /api/session -d '{"title":"mail digest","agent":"build"}'
+opencode api post /api/session -d '{"title":"mail digest","agent":"build","location":{"directory":"/path/to/project"}}'
 ```
 
 Session rules come after the agent's, so a session can narrow what its script may do, or opt one method in:
 
 ```sh
-opencode api post /api/session -d '{"title":"label sorter","agent":"build","permissions":[
+opencode api post /api/session -d '{"title":"label sorter","agent":"build","location":{"directory":"/path/to/project"},"permissions":[
   {"action":"gws.*","resource":"*","effect":"deny"},
   {"action":"gws.read","resource":"*","effect":"allow"},
   {"action":"gws.plan","resource":"*","effect":"allow"}
