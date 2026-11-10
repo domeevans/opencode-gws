@@ -1,8 +1,9 @@
 name: native
 
-# Builds the gws executables for a release: the gzip of each platform's executable, and the candidate manifest the
-# release commit pins (NATIVE-DESIGN.md, section 4). Runs on master only. It attests and uploads the files, and
-# publishes nothing; the release job downloads this run's files and checks them against the pinned hashes.
+# Builds the gws release files for a release (NATIVE-DESIGN.md, section 4). Runs on master only, so the candidate manifest
+# pins master's commit. It writes one gzip per platform and the candidate manifest/native.json the release commit copies,
+# attests the gzips and uploads them as artifacts. It publishes nothing: the release job downloads this run's files,
+# checks them against the pinned hashes and attaches them (scripts/attach-native.mjs).
 
 on:
   workflow_dispatch:
@@ -47,10 +48,55 @@ jobs:
         with:
           subject-path: ${{ runner.temp }}/native/*.gz
 
-      - name: Upload the release files
+      # The artifacts the release job reads: the candidate manifest as native.json, and the gzips of each platform.
+      - name: Stage the artifacts
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/staged"
+          mkdir -p "$staged/native-manifest"
+          mv "$RUNNER_TEMP/native/native-manifest.json" "$staged/native-manifest/native.json"
+          for target in darwin-arm64 darwin-x64 linux-arm64-gnu linux-x64-gnu; do
+            mkdir -p "$staged/native-$target"
+            mv "$RUNNER_TEMP/native/gws-$target.gz" "$staged/native-$target/"
+          done
+          ls -R "$staged"
+
+      - name: Upload the candidate manifest
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: native
-          path: ${{ runner.temp }}/native
+          name: native-manifest
+          path: ${{ runner.temp }}/staged/native-manifest
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload the darwin-arm64 files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-darwin-arm64
+          path: ${{ runner.temp }}/staged/native-darwin-arm64
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload the darwin-x64 files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-darwin-x64
+          path: ${{ runner.temp }}/staged/native-darwin-x64
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload the linux-arm64-gnu files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-linux-arm64-gnu
+          path: ${{ runner.temp }}/staged/native-linux-arm64-gnu
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload the linux-x64-gnu files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-linux-x64-gnu
+          path: ${{ runner.temp }}/staged/native-linux-x64-gnu
           retention-days: 30
           if-no-files-found: error

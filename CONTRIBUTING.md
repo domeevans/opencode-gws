@@ -57,14 +57,24 @@ Add a focused test under `test/`. Keep it independent of a live Google account.
 
 A public tool or config change needs a test and a docs update.
 
-## Releasing
+## Release
 
-1. Set the version in `package.json`, and date its `CHANGELOG.md` section.
-2. Push a `vX.Y.Z` tag on `master`.
-3. A reviewer approves the `release` environment.
-4. CI (`.github/workflows/release.yml`) refuses a private package or a tag that differs from the version, then runs `npm ci`, `npm run fetch:gws` and `npm run check`. It packs the main package and runs the pack test on that exact tarball.
-5. It publishes the main package with `npm publish <tarball> --provenance --access public` through npm trusted publishing. A version already on npm is skipped, so a rerun is safe.
+### Releasing
 
+Every plugin releases as `v0.0.0`, and it installs from that GitHub tag. The release is one commit on top of a `master`
+head that CI passed, and the tag points at it.
+
+1. Set `version` to `0.0.0` in `package.json`, date the `## [0.0.0]` entry in `CHANGELOG.md`, then run `npm run check`.
+2. Push that commit to `master`, and wait for CI to pass on it.
+3. In a clean checkout of `master` at that commit, run `node scripts/release-commit.mjs --ci-sha <its full sha>`. It builds
+   `dist/`, removes the lifecycle scripts, and creates the signed commit and the signed annotated tag `v0.0.0`. It never
+   pushes; `--dry-run` shows the change first.
+4. Push the tag only: `git push origin v0.0.0`.
+5. Approve the run in the `release` environment. The release workflow checks the tag and its commit, installs the tag on
+   each stock OpenCode host (2.2.3 to 2.2.6), packs it, and creates the GitHub Release with the notes, the tarball and
+   `SHA256SUMS`.
+
+A tag that already exists stops step 3. Delete the old tag and its Release first, then start again.
 ## Live checks
 
 These need the owner's authorization for that run, on a disposable test account. Do not run them against a personal or production Workspace.

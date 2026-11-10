@@ -13,14 +13,13 @@ Unofficial; not affiliated with Google.
 ## Install
 
 ```sh
-opencode plugin add @joe-broadhead/opencode-gws
+opencode plugin add github:joe-broadhead/opencode-gws#v0.0.0
 ```
 
-Run `opencode reload`, or restart OpenCode. Then run `/gws-status`.
+Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
 
-On first use the plugin downloads the unmodified `gws` binary at the version it pins from this repository's GitHub Release, checks it against the pinned SHA-256 values, and caches it. `/gws-install` does the download on demand ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
-
-With no options, the plugin creates one account, `default`, with every Workspace service a Google sign-in can use at Read and write, so one consent grants every scope it can use. Keep is left out: Google grants its scopes only through domain-wide delegation, which a Workspace admin sets up ([Keep](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#keep-needs-domain-wide-delegation)). Admin reports, which need a Workspace admin, and Model Armor, which cannot run, are left out too. Every change still needs a plan and an explicit commit; at the default `access` the commit runs without a prompt, and `"ask-changes"` asks first. To narrow it, set `accounts` ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#accounts)).
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
+A new release is a new tag: install it with its own `#v<version>` spec.
 
 ## Sign in
 
@@ -32,7 +31,7 @@ opencode auth login gws-default
 
 No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 42 scopes (35 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
 
-To update, run `opencode plugin update @joe-broadhead/opencode-gws`, then `opencode reload`. An entry pinned to a version (`@joe-broadhead/opencode-gws@<version>`) does not update: remove the `@version` from `plugins` first. Your options and sign-ins are kept.
+To update, install the new release tag as in [Install](#install), then run `opencode reload`. Your options and sign-ins are kept.
 
 Details and the scope table: [docs/auth.md](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md).
 
@@ -78,7 +77,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
-   { "plugins": [{ "package": "@joe-broadhead/opencode-gws", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.0", "options": { "access": "read-only" } }] }
    ```
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
@@ -193,7 +192,7 @@ Create a Desktop app OAuth client in your organisation's Google Cloud project (u
 {
   "plugins": [
     {
-      "package": "@joe-broadhead/opencode-gws",
+      "package": "github:joe-broadhead/opencode-gws#v0.0.0",
       "options": {
         "oauthClient": {
           "clientId": "<your client ID>.apps.googleusercontent.com",
