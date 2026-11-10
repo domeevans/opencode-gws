@@ -37,6 +37,7 @@ import * as z from "zod"
 import { GwsError } from "../domain/errors.js"
 import { RPC_ID } from "../rpc.js"
 import type { Runtime } from "../runtime/index.js"
+import { nativeGate } from "./permissions.js"
 import type { StatusSource } from "./rpc.js"
 import { parse, toolSpecs, type Assert, type ToolClass } from "./tools.js"
 
@@ -78,7 +79,7 @@ export function scriptMethods(sources: MethodSources): readonly MethodSpec[] {
         // calls the same spec. A script call still carries a tool source id, so this RPC's evaluate hook can refuse
         // an inner ask instead of leaving a prompt no one answers.
         const host = { sessionID: call.sessionID, agent: call.agent, messageID: call.messageID, id: call.id }
-        const runtime = { sessionId: call.sessionID, agentId: call.agent, signal: call.signal, caller: "rpc" as const }
+        const runtime = { sessionId: call.sessionID, agentId: call.agent, signal: call.signal, caller: "rpc" as const, mayDownload: nativeGate(host, sources.assert) }
         const outcome = await spec.run(parse(spec.input, input), { host, runtime })
         return outcome.output
       },

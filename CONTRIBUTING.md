@@ -38,7 +38,7 @@ npm run drift
 
 `npm run manifest` regenerates `manifest/generated.json` from the pinned `gws`. `npm run docs:coverage` regenerates `docs/coverage.md`, the Errors section of `docs/configuration.md`, and the scope table in `docs/auth.md`. `npm run generated:check` fails if those drifted. `npm run drift` compares the manifest with the pinned `gws` and warns; it does not stop a call.
 
-`node scripts/build-bin-packages.mjs --record` writes binary digests into `native/provenance.json` after the archive digest has been verified. Use it only when the pinned upstream archive changes.
+A new upstream release: record its archive URL and SHA-256 (checked against the release's own `.sha256` file), and the executable's size and SHA-256, in `native/provenance.json`; mirror the executable's SHA-256 in `src/domain/backend.ts`. Then `npm run fetch:gws` refuses any archive or executable that does not match the pins.
 
 An example config is in [examples/opencode.jsonc](examples/opencode.jsonc). The source layout is in [docs/architecture.md](docs/architecture.md#source-layout).
 
@@ -59,11 +59,11 @@ A public tool or config change needs a test and a docs update.
 
 ## Releasing
 
-1. Set the version in `package.json`, its four `optionalDependencies` and the lockfile, and date its `CHANGELOG.md` section.
+1. Set the version in `package.json`, and date its `CHANGELOG.md` section.
 2. Push a `vX.Y.Z` tag on `master`.
 3. A reviewer approves the `release` environment.
-4. CI (`.github/workflows/release.yml`) refuses a private package or a tag that differs from the version, then runs `npm ci` and `npm run check`. It packs the main package and the four `@joe-broadhead/opencode-gws-bin-<target>` packages, each built from the pinned upstream archive and checked against `native/provenance.json`, and runs the pack test on those exact tarballs.
-5. It publishes the four platform packages first, then the main package, each with `npm publish <tarball> --provenance --access public` through npm trusted publishing. A version already on npm is skipped, so a rerun is safe.
+4. CI (`.github/workflows/release.yml`) refuses a private package or a tag that differs from the version, then runs `npm ci`, `npm run fetch:gws` and `npm run check`. It packs the main package and runs the pack test on that exact tarball.
+5. It publishes the main package with `npm publish <tarball> --provenance --access public` through npm trusted publishing. A version already on npm is skipped, so a rerun is safe.
 
 ## Live checks
 

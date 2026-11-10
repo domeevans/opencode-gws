@@ -143,7 +143,7 @@ describe("runtime close", () => {
     const f = await fixture(), entered = deferred<void>(), status = deferred<any>()
     const commands = new Map<string, any>(), synthetic = vi.fn()
     const stop = await registerCommands({ command: { transform: async (edit: any) => edit({ add: (command: any) => commands.set(command.name, command) }) }, session: { synthetic } } as never,
-      { status: async () => { entered.resolve(); return status.promise }, plans: () => [], doctor: f.runtime }, f.runtime.signal)
+      { status: async () => { entered.resolve(); return status.promise }, plans: () => [], doctor: f.runtime, install: async () => ({ path: "", version: "unknown" }) }, f.runtime.signal)
     const pending = commands.get("gws-status").execute({ sessionID: "session", delivery: "queue" })
     const verdict = expect(pending).rejects.toThrow(/^CANCELLED:/)
     await entered.promise

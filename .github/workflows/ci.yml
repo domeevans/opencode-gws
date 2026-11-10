@@ -76,7 +76,7 @@ jobs:
       - name: Install
         run: npm ci --ignore-scripts
 
-      - name: Install the gws package for ${{ matrix.target }}
+      - name: Fetch the pinned gws executable for ${{ matrix.target }}
         run: npm run fetch:gws
 
       # The stock OpenCode binaries the host and pack stages spawn, one per tested release (TESTED_HOSTS in

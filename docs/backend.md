@@ -1,49 +1,51 @@
 # gws binary
 
-Unofficial plugin. Not affiliated with Google. `gws` 0.22.5 is Google's open-source Workspace CLI (Apache-2.0). The plugin does not modify the binary.
+Unofficial plugin. Not affiliated with Google. `gws` 0.22.5 is Google's open-source Workspace CLI (Apache-2.0). The plugin does not modify the binary. Its licence and notice ship with the plugin in [licenses/gws](../licenses/gws).
 
-## Platform packages
+## The release binary
 
-The unmodified binary ships in an optional npm package, one per platform, at the same version as this package:
+The plugin's GitHub Release carries one gzip per platform: the unmodified `gws` executable, compressed. The plugin never runs a binary it has not verified:
 
-| Package | Platform |
+- The release commit's `manifest/native.json` pins, for each platform, the release file's size and SHA-256 and the executable's size and SHA-256. The executable's SHA-256 is the upstream pin in [native/provenance.json](../native/provenance.json).
+- The first use downloads the file over HTTPS from `github.com`, checks its size and SHA-256 as it arrives, decompresses it, checks the executable, and only then installs it into the plugin's cache (`$XDG_CACHE_HOME/opencode-gws`, or `~/Library/Caches/opencode-gws` on macOS). A file that fails a check is discarded and never reaches the cache.
+- A cached executable is used without a download. It is refused if it is not a regular file with owner read and execute and no permission bits outside `0755`.
+
+| Platform | Target |
 | --- | --- |
-| `@joe-broadhead/opencode-gws-bin-darwin-arm64` | macOS arm64 |
-| `@joe-broadhead/opencode-gws-bin-darwin-x64` | macOS x64 |
-| `@joe-broadhead/opencode-gws-bin-linux-arm64-gnu` | Linux arm64, glibc |
-| `@joe-broadhead/opencode-gws-bin-linux-x64-gnu` | Linux x64, glibc |
+| macOS arm64 | `darwin-arm64` |
+| macOS x64 | `darwin-x64` |
+| Linux arm64, glibc | `linux-arm64-gnu` |
+| Linux x64, glibc | `linux-x64-gnu` |
 
-Each package contains `bin/gws`, `LICENSE`, `NOTICE`, and `provenance.json`. It has no scripts. npm installs the package that matches the machine. There is no `PATH` lookup and no download at runtime.
+Windows, musl and any other platform have no release binary. Setup does not fail: the tools refuse with `GWS_UNAVAILABLE` and name `binary.path` as the way out.
 
-The plugin resolves that package from its own install location, checks that `bin/gws` is a regular file with owner read and execute and no permission bits outside `0755`, and checks the SHA-256 recorded in [native/provenance.json](../native/provenance.json). The same file records the upstream archive URL and archive digest for each target. A mismatch fails setup with `BINARY_TRUST_FAILED`.
+## When a download happens
 
-The version probe then requires the binary to report exactly `gws 0.22.5`.
+The download is a change, because it writes a program the plugin then runs. The access rules decide it, through the namespace rule `gws.*`:
 
-## Checkout
+| `access` | A tool call that needs the binary | `/gws-install` |
+| --- | --- | --- |
+| `all` (the default) | Downloads on first use. | Downloads. |
+| `ask-changes` | Asks first. | Downloads. |
+| `read-only` | Refused: `GWS_UNAVAILABLE`, with `/gws-install` as the next step. | Downloads. |
 
-`npm run fetch:gws` builds the host platform's package into `node_modules` so a checkout uses the same resolution path as an install. It downloads the pinned archive once, verifies the archive digest, and extracts `gws`. A later run does nothing when that binary already matches. An unsupported platform fails with a message that names the supported targets and `binary.path`.
+`/gws-install` is the person's own command, so it runs under every access value. It reports the result. Setup makes no network call, and status never downloads: `gws_status` reports the cached binary, or an empty path when none is cached.
 
-## Override
+## Explicit `binary.path`
 
 `binary.path` is an absolute path to some other `gws` 0.22.5 executable. It is admitted only when all of these hold:
 
-- it is a regular file, not a symlink to something else after `realpath`;
-- it is executable, and not group- or world-writable;
-- it is outside the project directory;
-- no ancestor is world-writable, and no ancestor is writable by a group this user is not in.
+- it is absolute, and exists;
+- its real path is a regular file with owner execute and no group or world write;
+- it is not inside the project directory;
+- no ancestor directory is world-writable, and none is writable by a group the user is not in.
 
-There is no hash option on the override. The version probe still requires `gws 0.22.5`. A relative path, a missing file, or a failed trust check does not fall through to `PATH`.
+There is no hash option on the override. The version probe still requires `gws 0.22.5`. A relative path, a missing file, or a failed trust check does not fall through to a binary elsewhere, and nothing is looked up on `PATH`.
 
-## Unsupported platform
+## Development and the pack test
 
-Windows, musl, and any other platform have no package. Setup fails with `GWS_UNAVAILABLE` and names the four packages. Next step: reinstall on a supported platform, or set `binary.path` to a `gws` 0.22.5 executable for this machine.
+A checkout has no release manifest, so its tests and the pack check name the verified executable directly. `npm run fetch:gws` downloads the pinned upstream archive once into `.cache/gws-archives/`, checks its SHA-256 and the executable's against [native/provenance.json](../native/provenance.json), and puts the executable at `.cache/gws/<target>/gws`. Run it after `npm ci`. The pack check installs a release copy into each stock host's cache to prove the installed plugin finds it.
 
-A missing platform package on a supported platform is the same code. In a checkout, run `npm run fetch:gws`. In an install, reinstall so npm fetches the optional package.
+## Releasing the binary
 
-## Air-gapped install
-
-Runtime never downloads `gws`. An install needs the main package and the matching platform package already present: a local npm cache, a tarball, or `binary.path` pointing at a binary you placed on the machine. `npm run fetch:gws` is the checkout path; it needs the pinned archive in its cache or a network path to the GitHub release. It does not run when OpenCode loads the plugin.
-
-## Provenance
-
-[native/provenance.json](../native/provenance.json) is the record: upstream repository, tag, archive URL, archive SHA-256, and binary SHA-256 for each target. The platform packages carry the same binary and the upstream Apache-2.0 `LICENSE`. A maintainer refreshes the recorded binary digest with `node scripts/build-bin-packages.mjs --record` after verifying the archive digest. Do not point that command at an unpinned release.
+`node scripts/build-native.mjs --release <dir> --tag v0.0.0 --repository joe-broadhead/opencode-gws --commit <sha> --run <id>` writes `gws-<target>.gz` for every platform and the candidate `native-manifest.json`. The `native` workflow ([.github/workflows/native.yml](../.github/workflows/native.yml)) runs it on `master`, attests the files and uploads them. The release commit pins the candidate's hashes, and the release checks them again before it attaches the files. [native/provenance.json](../native/provenance.json) records the upstream archive URL, its SHA-256, and the executable's SHA-256 for each target.

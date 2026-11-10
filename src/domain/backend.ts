@@ -1,7 +1,7 @@
 /**
- * The pinned upstream gws release and the per-platform npm packages that
- * carry its unmodified binary. Mirrors native/provenance.json, which
- * test/backend.test.ts keeps identical.
+ * The pinned upstream gws release: each target's unmodified binary, by
+ * SHA-256. Mirrors native/provenance.json, which test/backend.test.ts keeps
+ * identical. The release manifest must pin these same bytes.
  */
 
 export const GWS_VERSION = "gws 0.22.5"
@@ -28,15 +28,10 @@ export interface Platform {
   glibc: boolean
 }
 
-/** The target whose package serves `platform`, or undefined. */
+/** The target whose pinned binary serves `platform`, or undefined. */
 export function gwsTarget(platform: Platform): string | undefined {
   return Object.keys(GWS_TARGETS).find((target) => {
     const entry = GWS_TARGETS[target]!
     return entry.os === platform.os && entry.cpu === platform.cpu && (entry.libc === undefined || platform.glibc)
   })
-}
-
-/** The npm package that carries gws for `target`. */
-export function gwsPackage(target: string): string {
-  return `@joe-broadhead/opencode-gws-bin-${target}`
 }

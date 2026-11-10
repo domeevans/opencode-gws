@@ -1,24 +1,30 @@
 #!/usr/bin/env node
 /**
  * `npm run test:pack`: pack and install the plugin the way OpenCode does,
- * then load the installed copy. Run it after `npm run build`.
+ * then load the installed copy. Run it after `npm run build` and
+ * `npm run fetch:gws` (the verified upstream gws executable for this platform).
  *
- * 1. Pack the main package and this platform's gws package (built from the
- *    verified upstream archive). Check both tarballs: the file whitelist, at
- *    most 1 MiB for the main package, and the gws package's five files.
- * 2. Bare install: both tarballs, scripts disabled, into an empty project.
+ * 1. Pack the main package. Check the tarball: the file whitelist, at most
+ *    1 MiB, and no gws binary in it. The plugin downloads its binary on
+ *    first use from its GitHub Release (manifest/native.json), so the
+ *    package carries none.
+ * 2. Bare install: the tarball, scripts disabled, into an empty project.
  *    Nothing else is installed or resolvable from it: no @opencode/plugin,
- *    effect, OpenTUI, Solid or zod. Neither package declares an install
- *    lifecycle script, and the binary matches the pinned release.
- * 3. SDK install: the same tarballs plus @opencode/plugin 2.2.3, as a Node
+ *    effect, OpenTUI, Solid or zod. The package declares no install
+ *    lifecycle script and no optional dependency.
+ * 3. SDK install: the same tarball plus @opencode/plugin 2.2.3, as a Node
  *    program that embeds OpenCode has it. Plain Node imports "." and
  *    nothing else. dist/ holds only index.js and tui.js, neither has a
  *    relative import, and dist/tui.js imports only host-provided modules.
- * 4. Load, with no binary override, and require the plugin active and its
- *    status RPC to report gws 0.22.5 from the installed platform package:
+ * 4. Load, with no binary override. Status reads the cache and never
+ *    downloads, so the plugin reports no gws binary until one is cached.
+ *    Then each stock host gets a release copy (the package's manifest, and
+ *    the verified executable in the host's cache, where a release install
+ *    would have it), and its status RPC must report gws 0.22.5 from that
+ *    cache. The checks:
  *    - the SDK install in the embedded @opencode/sdk from devDependencies
  *      (2.2.3), and in the one under HOST_SDK_DIR when set (for example a
- *      2.2.4 SDK installed outside the lockfile);
+ *      2.2.4 SDK installed outside the lockfile), with no binary yet;
  *    - the bare install in each stock OpenCode of TESTED_HOSTS
  *      (src/domain/host.ts: 2.2.3, 2.2.4, 2.2.5 and 2.2.6), through
  *      `opencode serve`. Only a stock CLI supplies @opencode/plugin to a
@@ -26,16 +32,7 @@
  *      does not.
  *
  * PACK_TARBALL names a main-package tarball to check instead of packing the
- * checkout, and PACK_BIN_TARBALL this platform's gws-package tarball instead
- * of building one; the release workflow sets both to the tarballs it
- * publishes.
- *
- * Stock binaries come from OPENCODE_BIN_2_2_3, OPENCODE_BIN_2_2_4 and
- * OPENCODE_BIN_2_2_5. When one is unset, @opencode/cli and the current
- * platform package are installed into the temp folder with scripts disabled,
- * once per version. The version a binary reports is the one checked; it
- * must be inside opencode.host. OPENCODE_BIN is ignored: a
- * stock binary must not be started without the isolation below.
+ * checkout; the release workflow sets it to the tarball it made.
  *
  * Every host runs in its own child process. HOME, the four XDG variables,
  * OPENCODE_TEST_HOME and TMPDIR sit inside that host's temp root, and the
@@ -48,18 +45,25 @@
  */
 import { spawn, spawnSync } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createServer } from "node:net"
+import { gzipSync } from "node:zlib"
 import { dirname, join, sep } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { buildPackage, hostTarget, packageName, readProvenance, ROOT } from "./build-bin-packages.mjs"
+import { hostTarget } from "./build-native.mjs"
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
+const REPO = "joe-broadhead/opencode-gws"
+const TAG = "v0.0.0"
+const NOT_INSTALLED = { path: "", version: "unknown" }
+const readProvenance = () => JSON.parse(readFileSync(join(ROOT, "native", "provenance.json"), "utf8"))
 
 const MAIN = "@joe-broadhead/opencode-gws"
 const PLUGIN_ID = "google-workspace.gws"
 const MAX_PACKED_BYTES = 1024 * 1024
 const TUI_MAX_BYTES = 30 * 1024
-const MAIN_FILES = /^(package\.json|README\.md|LICENSE|NOTICE|CHANGELOG\.md|assets\/icon(-128|-256)?\.(svg|png)|manifest\/generated\.json|views\/(gmail-thread\.html|jelly-view\.js)|skills\/[^/]+\/SKILL\.md)$/
+const MAIN_FILES = /^(package\.json|README\.md|LICENSE|NOTICE|CHANGELOG\.md|assets\/icon(-128|-256)?\.(svg|png)|manifest\/generated\.json|manifest\/native\.json|licenses\/gws\/(LICENSE|NOTICE)|views\/(gmail-thread\.html|jelly-view\.js)|skills\/[^/]+\/SKILL\.md)$/
 // The two entries the host loads, each one self-contained file; nothing else ships in dist/.
 const DIST_FILES = ["dist/index.js", "dist/tui.js"]
 const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare"]
@@ -134,7 +138,7 @@ function pack(dir, destination) {
   return { ...result, tarball: join(destination, result.filename) }
 }
 
-/** A tarball packed earlier (PACK_TARBALL, PACK_BIN_TARBALL), described like `npm pack --json` does: paths and modes. */
+/** A tarball packed earlier (PACK_TARBALL), described like `npm pack --json` does: paths and modes. */
 function packed(tarball) {
   const mode = (bits) => [...bits.slice(1, 10)].reduce((value, bit) => value * 2 + (bit === "-" ? 0 : 1), 0)
   const files = run("tar", ["-tvzf", tarball])
@@ -155,7 +159,7 @@ function checkMainTarball(main) {
   const paths = main.files.map((file) => file.path).sort()
   equal(paths.filter((path) => path.startsWith("dist/")), DIST_FILES, "main tarball dist/ files")
   equal(paths.filter((path) => !path.startsWith("dist/") && !MAIN_FILES.test(path)), [], "main tarball files outside the whitelist")
-  for (const required of ["package.json", ...DIST_FILES, "assets/icon.svg", "assets/icon-128.png", "assets/icon-256.png", "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]) {
+  for (const required of ["package.json", ...DIST_FILES, "assets/icon.svg", "assets/icon-128.png", "assets/icon-256.png", "manifest/generated.json", "licenses/gws/LICENSE", "licenses/gws/NOTICE", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"]) {
     check(paths.includes(required), `main tarball lacks ${required}`)
   }
   check(!paths.some((path) => /(^|\/)gws$/.test(path)), "main tarball contains a gws binary")
@@ -165,16 +169,10 @@ function checkMainTarball(main) {
   console.log(`ok main tarball: ${main.entryCount} files, ${main.size} bytes packed`)
 }
 
-function checkBinTarball(bin, target, provenance) {
-  equal(bin.files.map((file) => file.path).sort(), ["LICENSE", "NOTICE", "bin/gws", "package.json", "provenance.json"], "gws package files")
-  check((bin.files.find((file) => file.path === "bin/gws").mode & 0o777) === 0o755, "gws package bin/gws is not 0755")
-  console.log(`ok ${packageName(target)} tarball: ${bin.size} bytes packed for ${provenance.targets[target].triple}`)
-}
-
-function checkBareInstall(project, target, version, provenance) {
+function checkBareInstall(project, version) {
   const modules = join(project, "node_modules")
   equal(readdirSync(modules).filter((name) => !name.startsWith(".")), ["@joe-broadhead"], "installed top-level packages")
-  equal(readdirSync(join(modules, "@joe-broadhead")).sort(), ["opencode-gws", `opencode-gws-bin-${target}`], "installed @joe-broadhead packages")
+  equal(readdirSync(join(modules, "@joe-broadhead")).sort(), ["opencode-gws"], "installed @joe-broadhead packages")
   // Not installed, and not reachable from any ancestor node_modules either.
   const require = createRequire(join(project, "package.json"))
   const resolvable = HOST_MODULES.filter((name) => {
@@ -189,24 +187,11 @@ function checkBareInstall(project, target, version, provenance) {
 
   const main = packageJson(join(modules, MAIN))
   equal(main.version, version, "installed main version")
-  for (const field of ["dependencies", "peerDependencies", "peerDependenciesMeta", "bundleDependencies", "bundledDependencies"]) {
+  for (const field of ["dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "bundleDependencies", "bundledDependencies"]) {
     check(main[field] === undefined, `the main package declares ${field}`)
   }
-  equal(
-    main.optionalDependencies,
-    Object.fromEntries(Object.keys(provenance.targets).sort().map((name) => [packageName(name), version])),
-    "main optionalDependencies",
-  )
-
-  const bin = packageJson(join(modules, packageName(target)))
-  const entry = provenance.targets[target]
-  equal([bin.name, bin.version, bin.os, bin.cpu, bin.libc], [packageName(target), version, [entry.os], [entry.cpu], entry.libc ? [entry.libc] : undefined], "gws package manifest")
-  for (const manifest of [main, bin]) {
-    equal(INSTALL_SCRIPTS.filter((name) => manifest.scripts?.[name] !== undefined), [], `${manifest.name} install lifecycle scripts`)
-  }
-  equal(createHash("sha256").update(readFileSync(join(modules, packageName(target), "bin", "gws"))).digest("hex"), entry.binary.sha256, "installed gws sha256")
-  equal(JSON.parse(readFileSync(join(modules, packageName(target), "provenance.json"), "utf8")).archive, entry.archive, "gws package provenance")
-  console.log("ok bare install with scripts disabled: the plugin and its platform package only; no host module resolvable; no lifecycle scripts")
+  equal(INSTALL_SCRIPTS.filter((name) => main.scripts?.[name] !== undefined), [], "main install lifecycle scripts")
+  console.log("ok bare install with scripts disabled: the plugin only; no gws binary, no host module resolvable, no lifecycle scripts")
 }
 
 /** Add the exact 2.2.3 SDK from devDependencies, without another registry download. */
@@ -215,6 +200,46 @@ function addPluginSdk(project) {
   equal(packageJson(sdk).version, "2.2.3", "@opencode/plugin dev dependency")
   mkdirSync(join(project, "node_modules", "@opencode"), { recursive: true })
   symlinkSync(sdk, join(project, "node_modules", "@opencode", "plugin"), "dir")
+}
+
+/**
+ * Makes an installed copy look like a release install, without the network: its manifest/native.json pins the upstream
+ * gzip under the release URL, and the verified executable (from npm run fetch:gws) sits in the host's cache where the
+ * plugin looks for it. Returns that cached executable's path.
+ */
+function installReleaseCopy(pluginDir, cacheDir) {
+  const provenance = readProvenance()
+  const target = hostTarget(provenance)
+  const entry = provenance.targets[target]
+  const executable = readFileSync(join(ROOT, ".cache", "gws", target, "gws"))
+  equal(createHash("sha256").update(executable).digest("hex"), entry.binary.sha256, "the fetched gws sha256")
+  const gzip = gzipSync(executable, { level: 9 })
+  const name = `gws-${target}.gz`
+  const manifest = {
+    schema: 1,
+    plugin: "opencode-gws",
+    repository: REPO,
+    tag: TAG,
+    built: { commit: "0".repeat(40), run: 1, workflow: "native" },
+    modules: {
+      gws: {
+        [target]: {
+          name,
+          url: `https://github.com/${REPO}/releases/download/${TAG}/${name}`,
+          bytes: gzip.length,
+          sha256: createHash("sha256").update(gzip).digest("hex"),
+          executable: { name: "gws", bytes: executable.length, sha256: entry.binary.sha256 },
+        },
+      },
+    },
+  }
+  mkdirSync(join(pluginDir, "manifest"), { recursive: true })
+  writeFileSync(join(pluginDir, "manifest", "native.json"), `${JSON.stringify(manifest, null, 2)}\n`)
+  const path = join(cacheDir, "native", TAG, "gws", target, "gws")
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, executable, { mode: 0o755 })
+  chmodSync(path, 0o755)
+  return path
 }
 
 function checkImports(project, root) {
@@ -295,11 +320,11 @@ function checkLoaded(host, entry, status, expected, diagnostics) {
   try {
     equal(entry?.state, { status: "active" }, `${host}: plugin state`)
     check(entry.features?.server && entry.features?.tui && entry.features?.rpc === undefined, `${host}: plugin parts ${JSON.stringify(entry.features)}`)
-    equal([status.version, status.host?.version, status.host?.range, status.gws], [expected.version, expected.hostVersion, HOST_RANGE, { path: expected.binary, version: "gws 0.22.5" }], `${host}: status`)
+    equal([status.version, status.host?.version, status.host?.range, status.gws], [expected.version, expected.hostVersion, HOST_RANGE, expected.gws], `${host}: status`)
   } catch (error) {
     throw new Error(`${error.message}\n${diagnostics()}`)
   }
-  console.log(`ok ${host}: ${PLUGIN_ID} active, gws 0.22.5 from ${expected.binary}`)
+  console.log(`ok ${host}: ${PLUGIN_ID} active, gws binary ${expected.gws.path || "not cached yet"}`)
 }
 
 /** Child process: load the plugin in an embedded @opencode/sdk host and print its plugin entry, status and warnings. */
@@ -471,7 +496,7 @@ function inRange(version, range) {
  * Loads the installed plugin into the stock OpenCode `slot` names, from a project config, as a user does.
  * The version checked is the one the binary reports, which must be inside opencode.host.
  * The plugin must be active, its server part registered, its ask rules after each agent's base allow,
- * and its status RPC answering with gws 0.22.5 from the installed platform package.
+ * and its status RPC answering with no binary until a release copy is cached, then gws 0.22.5 from that cache.
  */
 async function checkStockHost(slot, binary, pluginDir, expected, root) {
   const base = realpathSync(mkdtempSync(join(root, `stock-${slot}-`)))
@@ -560,12 +585,17 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
       const { output } = await api("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })
       equal(
         [output?.version, output?.host, output?.gws],
-        [expected.version, { version, range: HOST_RANGE, tested: STOCK_HOSTS.includes(version) }, { path: expected.binary, version: "gws 0.22.5" }],
+        [expected.version, { version, range: HOST_RANGE, tested: STOCK_HOSTS.includes(version) }, NOT_INSTALLED],
         `opencode ${version}: status`,
       )
+      // The release copy, as a release install would have it: the status RPC finds the cached executable without a
+      // download, and reports it.
+      const cached = installReleaseCopy(pluginDir, join(base, "home", ".cache", "opencode-gws"))
+      const resolved = (await api("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })).output
+      equal(resolved?.gws, { path: cached, version: "gws 0.22.5" }, `opencode ${version}: status after the cached install`)
       check(proxy.attempts.length === 0, `opencode ${version} tried to reach the network: ${proxy.attempts.join(", ")}`)
       passed = true
-      console.log(`ok stock opencode ${version}: ${PLUGIN_ID} active, server registered, the access block after the base allow, /connect entries and forms, skills and manifest from the package, gws 0.22.5 from ${expected.binary}`)
+      console.log(`ok stock opencode ${version}: ${PLUGIN_ID} active, server registered, the access block after the base allow, /connect entries and forms, skills and manifest from the package, gws 0.22.5 from the host cache`)
     } catch (error) {
       const extra = proxy.attempts.length > 0 ? `\nproxy attempts: ${proxy.attempts.join(", ")}` : ""
       throw new Error(`${error.message}\nserver log tail:\n${log}${extra}`)
@@ -584,36 +614,30 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
 async function main() {
   check(Number(process.versions.node.split(".")[0]) >= 24, `the embedded host needs Node >= 24 (running ${process.version})`)
   const sdkDirs = [ROOT, ...(process.env.HOST_SDK_DIR ? [realpathSync(process.env.HOST_SDK_DIR)] : [])]
-  const provenance = readProvenance()
-  const target = hostTarget(provenance)
-  check(target, `no gws package for ${process.platform} ${process.arch}`)
+  const target = hostTarget(readProvenance())
+  check(target, `no pinned gws for ${process.platform} ${process.arch}`)
+  check(existsSync(join(ROOT, ".cache", "gws", target, "gws")), `.cache/gws/${target}/gws is missing; run npm run fetch:gws first`)
   const version = packageJson(ROOT).version
   for (const file of ["index.js", "tui.js"]) check(readdirSync(join(ROOT, "dist")).includes(file), `dist/${file} is missing; run npm run build first`)
 
   // Never under $HOME or an inherited TMPDIR: OpenCode finds .opencode/ folders by searching upward.
   const root = realpathSync(mkdtempSync(join(existsSync("/private/tmp") ? "/private/tmp" : "/tmp", "opencode-gws-pack-")))
   try {
-    for (const dir of ["tarballs", "bin"]) mkdirSync(join(root, dir))
+    mkdirSync(join(root, "tarballs"))
     const main = process.env.PACK_TARBALL ? packed(realpathSync(process.env.PACK_TARBALL)) : pack(ROOT, join(root, "tarballs"))
     checkMainTarball(main)
-    const bin = process.env.PACK_BIN_TARBALL ? packed(realpathSync(process.env.PACK_BIN_TARBALL)) : pack(buildPackage(target, join(root, "bin"), { provenance }), join(root, "tarballs"))
-    checkBinTarball(bin, target, provenance)
 
-    const bare = install(join(root, "bare"), [main.tarball, bin.tarball])
-    checkBareInstall(join(root, "bare"), target, version, provenance)
+    const bare = install(join(root, "bare"), [main.tarball])
+    checkBareInstall(join(root, "bare"), version)
 
-    const withSdk = install(join(root, "sdk"), [main.tarball, bin.tarball])
+    const withSdk = install(join(root, "sdk"), [main.tarball])
     addPluginSdk(join(root, "sdk"))
     checkImports(join(root, "sdk"), root)
     await checkEntryImports(withSdk)
 
-    for (const sdkDir of sdkDirs) {
-      const binary = realpathSync(join(root, "sdk", "node_modules", packageName(target), "bin", "gws"))
-      checkEmbeddedHost(sdkDir, withSdk, { version, binary }, root)
-    }
-    const gwsBinary = realpathSync(join(root, "bare", "node_modules", packageName(target), "bin", "gws"))
+    for (const sdkDir of sdkDirs) checkEmbeddedHost(sdkDir, withSdk, { version, gws: NOT_INSTALLED }, root)
     for (const hostVersion of STOCK_HOSTS) {
-      await checkStockHost(hostVersion, stockBinary(hostVersion, root), bare, { version, binary: gwsBinary }, root)
+      await checkStockHost(hostVersion, stockBinary(hostVersion, root), bare, { version, gws: NOT_INSTALLED }, root)
     }
   } finally {
     rmSync(root, { recursive: true, force: true })

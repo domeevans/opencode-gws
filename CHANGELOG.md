@@ -192,5 +192,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - Sign-in from `/connect` with a Desktop app OAuth client, read-only by default, with the scopes shown before consent. Organisation config can set the client through `oauthClient`.
 - Default ask rules for every commit category; reads do not prompt.
 - `/gws-status`, `/gws-doctor`, and the TUI dialog **Google Workspace: Status** (`/gws`).
-- The `gws` binary in per-platform packages for macOS (arm64, x64) and Linux (arm64, x64, glibc).
+- The `gws` binary for macOS (arm64, x64) and Linux (arm64, x64, glibc), downloaded on first use from this release and verified against the release manifest and the upstream SHA-256. `/gws-install` downloads it on request.
+- The licence and notice of the `gws` executable ship in `licenses/gws`.
 - Three skills: `opencode-gws`, `opencode-gws-recipes` and `opencode-gws-admin`.

@@ -18,7 +18,7 @@ opencode plugin add @joe-broadhead/opencode-gws
 
 Run `opencode reload`, or restart OpenCode. Then run `/gws-status`.
 
-npm also installs the matching `@joe-broadhead/opencode-gws-bin-<target>` package, which holds the unmodified `gws` binary at the version the plugin pins ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
+On first use the plugin downloads the unmodified `gws` binary at the version it pins from this repository's GitHub Release, checks it against the pinned SHA-256 values, and caches it. `/gws-install` does the download on demand ([details](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/backend.md)). Nothing downloads at runtime and there is no install script.
 
 With no options, the plugin creates one account, `default`, with every Workspace service a Google sign-in can use at Read and write, so one consent grants every scope it can use. Keep is left out: Google grants its scopes only through domain-wide delegation, which a Workspace admin sets up ([Keep](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#keep-needs-domain-wide-delegation)). Admin reports, which need a Workspace admin, and Model Armor, which cannot run, are left out too. Every change still needs a plan and an explicit commit; at the default `access` the commit runs without a prompt, and `"ask-changes"` asks first. To narrow it, set `accounts` ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#accounts)).
 
@@ -263,9 +263,9 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
 | `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
 | `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
-| `GWS_UNAVAILABLE` | No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist. | Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable. |
+| `GWS_UNAVAILABLE` | No gws binary is available: this platform has no release binary, the binary is not installed yet, or binary.path does not exist. | Run /gws-install, which downloads and verifies it, or set binary.path to a gws 0.22.5 executable. |
 | `GWS_VERSION_MISMATCH` | The gws version check failed, or gws is not the version the manifest was generated from. | Reinstall the plugin, or point binary.path at gws 0.22.5. |
-| `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Reinstall the plugin, or move the binary.path executable to a location only you can write. |
+| `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Follow the step the message names: remove the named cached copy and call the tool again, move the binary.path executable to a location only you can write, or reinstall the plugin from a valid release. |
 
 <!-- /generated:codes -->
 
@@ -302,7 +302,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 
 ## Known limits
 
-- **Platforms.** macOS (arm64, x64) and Linux (glibc, arm64, x64) only. Windows and musl have no `gws` package, so setup fails with `GWS_UNAVAILABLE` unless `binary.path` names a `gws` 0.22.5 executable.
+- **Platforms.** macOS (arm64, x64) and Linux (glibc, arm64, x64) only. Windows and musl have no release binary, so the tools refuse with `GWS_UNAVAILABLE` unless `binary.path` names a `gws` 0.22.5 executable.
 - **Operations.** The tools are the operations in the manifest generated from the pinned `gws` 0.22.5. A method that a later `gws` adds arrives with a plugin release, and `gws_catalog` lists only the manifest.
 - **Services the default sign-in leaves out.** Keep needs domain-wide delegation that a Workspace admin sets up, admin reports need a Workspace admin account, and Model Armor cannot run. A method that only a Chat app or a Classroom add-on can run (`appOnly`) fails with `AUTH_SCOPE_MISSING` under a Google sign-in.
 - **Unverified OAuth apps.** An External client left in Testing shows unverified-app warnings, and its refresh tokens expire after 7 days, so each account signs in again weekly.

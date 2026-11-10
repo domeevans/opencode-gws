@@ -104,7 +104,12 @@ async function setup(
   )
   const stop = await registerCommands(
     ctx as never,
-    { status: statusSource(runtime, async () => []), plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary), doctor: runtime },
+    {
+      status: statusSource(runtime, async () => []),
+      plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary),
+      doctor: runtime,
+      install: async (settled) => ({ path: await runtime.binaryFor({ signal: settled, mayDownload: async () => undefined }), version: runtime.version }),
+    },
     runtime.signal,
   )
   harness = { runtime, commands, synthetic, asserts, stop }
@@ -117,9 +122,9 @@ const run = (h: Harness, name: string, delivery = "steer") => h.commands.get(nam
 const TESTED = { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }
 
 describe("commands", () => {
-  it("registers only /gws-status and /gws-doctor", async () => {
+  it("registers only /gws-status, /gws-doctor and /gws-install", async () => {
     const h = await setup()
-    expect([...h.commands.keys()]).toEqual(["gws-status", "gws-doctor"])
+    expect([...h.commands.keys()]).toEqual(["gws-status", "gws-doctor", "gws-install"])
     for (const command of h.commands.values()) expect(command.description).toMatch(/^Google Workspace: /)
   })
 

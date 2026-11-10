@@ -34,10 +34,10 @@ describe("plugin parts", () => {
     expect(entry?.features).not.toHaveProperty("rpc")
   })
 
-  it("registers only /gws-status and /gws-doctor", async () => {
+  it("registers only /gws-status, /gws-doctor and /gws-install", async () => {
     const { data } = await host.opencode.command.list({ location: host.location })
     const names = data.map((command) => command.name).filter((name) => name.startsWith("gws-"))
-    expect(names.sort()).toEqual(["gws-doctor", "gws-status"])
+    expect(names.sort()).toEqual(["gws-doctor", "gws-install", "gws-status"])
   })
 })
 

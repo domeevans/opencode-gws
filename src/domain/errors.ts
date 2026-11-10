@@ -226,8 +226,8 @@ export const ErrorCode = {
     next: "Reinstall the plugin.",
   },
   GWS_UNAVAILABLE: {
-    meaning: "No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist.",
-    next: "Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable.",
+    meaning: "No gws binary is available: this platform has no release binary, the binary is not installed yet, or binary.path does not exist.",
+    next: "Run /gws-install, which downloads and verifies it, or set binary.path to a gws 0.22.5 executable.",
   },
   GWS_VERSION_MISMATCH: {
     meaning: "The gws version check failed, or gws is not the version the manifest was generated from.",
@@ -236,7 +236,7 @@ export const ErrorCode = {
   BINARY_TRUST_FAILED: {
     meaning:
       "The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch.",
-    next: "Reinstall the plugin, or move the binary.path executable to a location only you can write.",
+    next: "Follow the step the message names: remove the named cached copy and call the tool again, move the binary.path executable to a location only you can write, or reinstall the plugin from a valid release.",
   },
 } as const satisfies Record<string, ErrorEntry>
 

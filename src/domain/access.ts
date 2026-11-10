@@ -23,3 +23,8 @@ export const READ_ACTIONS = ["gws.status", "gws.catalog", "gws.schema", "gws.rea
 
 /** The six commit actions: a change, a send, a share, a delete, an export or an admin operation. */
 export const CHANGING_ACTIONS = ["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"] as const
+/**
+ * The first-use download of the gws binary: it writes an executable the plugin then runs. It is not in the generated
+ * block; the namespace rule (`gws.*`) carries its access effect, so `ask-changes` asks and `read-only` denies it.
+ */
+export const NATIVE_ACTION = "gws.native_install"

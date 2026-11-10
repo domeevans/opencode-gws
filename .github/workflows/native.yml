@@ -1,0 +1,56 @@
+name: native
+
+# Builds the gws executables for a release: the gzip of each platform's executable, and the candidate manifest the
+# release commit pins (NATIVE-DESIGN.md, section 4). Runs on master only. It attests and uploads the files, and
+# publishes nothing; the release job downloads this run's files and checks them against the pinned hashes.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: native (gws)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Refuse anything but master
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/master" ]; then
+            echo "::error::native builds run on master only, so the candidate pins master's commit."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          package-manager-cache: false # no caches in release builds
+
+      # Each executable is the pinned upstream release, checked against native/provenance.json before it is gzipped.
+      - name: Build the release files for every platform
+        run: node scripts/build-native.mjs --release "$RUNNER_TEMP/native" --tag v0.0.0 --repository "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
+
+      - name: Attest the executables
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/native/*.gz
+
+      - name: Upload the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native
+          path: ${{ runner.temp }}/native
+          retention-days: 30
+          if-no-files-found: error

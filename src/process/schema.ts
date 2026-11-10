@@ -10,7 +10,7 @@ export class SchemaClient {
   private readonly cache = new Map<string, ResolvedSchema>()
 
   constructor(
-    private readonly binary: string,
+    private readonly binary: () => string,
     private readonly cwd: string,
     private readonly env: Record<string, string>,
     private readonly timeoutMs = 15_000,
@@ -22,7 +22,7 @@ export class SchemaClient {
     if (hit) return hit
 
     const result = await runProcess({
-      binary: this.binary,
+      binary: this.binary(),
       argv: ["schema", id],
       cwd: this.cwd,
       env: this.env,

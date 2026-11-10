@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-gws",
-  "version": "0.0.10",
+  "version": "0.0.0",
   "description": "Unofficial OpenCode plugin for Google Workspace (gws CLI)",
   "type": "module",
   "license": "MIT",
@@ -62,6 +62,8 @@
     "assets/icon-256.png",
     "skills",
     "manifest/generated.json",
+    "manifest/native.json",
+    "licenses/gws",
     "views/gmail-thread.html",
     "views/jelly-view.js",
     "README.md",
@@ -77,19 +79,13 @@
     "test:host": "vitest run -c vitest.host.config.ts",
     "test:pack": "node scripts/pack-smoke.mjs",
     "test:tui": "bun --conditions=browser test/tui-renderer.mjs",
-    "fetch:gws": "node scripts/fetch-gws.mjs",
+    "fetch:gws": "node scripts/build-native.mjs",
     "check": "npm run lint && npm run typecheck && npm run build && npm test && npm run test:host && npm run test:pack && npm run generated:check && npm run test:tui",
     "generated:check": "node scripts/generate-docs.mjs --check",
     "manifest": "node scripts/generate-manifest.mjs",
     "drift": "node scripts/drift.mjs",
     "docs:coverage": "node scripts/generate-docs.mjs",
     "manifest:check": "node scripts/generate-manifest.mjs --check"
-  },
-  "optionalDependencies": {
-    "@joe-broadhead/opencode-gws-bin-darwin-arm64": "0.0.10",
-    "@joe-broadhead/opencode-gws-bin-darwin-x64": "0.0.10",
-    "@joe-broadhead/opencode-gws-bin-linux-arm64-gnu": "0.0.10",
-    "@joe-broadhead/opencode-gws-bin-linux-x64-gnu": "0.0.10"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",

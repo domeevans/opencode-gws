@@ -1,13 +1,11 @@
 name: Release
 
-# Publishes a v* tag to npm with trusted publishing (OIDC) and provenance,
-# after a reviewer approves the release environment.
-# Order: guard, npm ci, npm run check, pack the main package and the four
-# gws packages, run the pack test on those exact tarballs, then publish the
-# gws packages and finally the main package.
-# The guard refuses a private package or a tag that differs from the
-# version. A package whose exact version is already on npm is skipped, so
-# a rerun is safe.
+# Publishes the main package to npm with trusted publishing (OIDC) and provenance, after a reviewer approves the
+# release environment. Order: guard, npm ci, fetch the pinned gws executable (the pack test runs it), npm run check,
+# pack the main package, run the pack test on that exact tarball, then publish it.
+# The gws executable is not in the package: the plugin downloads it from its GitHub Release (NATIVE-DESIGN.md).
+# The guard refuses a private package or a tag that differs from the version. A package whose exact version is
+# already on npm is skipped, so a rerun is safe.
 
 on:
   push:
@@ -38,7 +36,7 @@ jobs:
           node -e '
             const pkg = require("./package.json")
             if (pkg.private !== undefined && pkg.private !== false) {
-              console.error("::error::package.json has \"private\": true, so nothing was published. The gws packages take the same flag.")
+              console.error("::error::package.json has \"private\": true, so nothing was published.")
               process.exit(1)
             }
             if (process.env.GITHUB_REF_NAME !== "v" + pkg.version) {
@@ -80,53 +78,37 @@ jobs:
       - name: Install
         run: npm ci --ignore-scripts
 
-      - name: Install the gws package for this runner
+      - name: Fetch the pinned gws executable for this runner
         run: npm run fetch:gws
 
       - name: Check
         run: npm run check
 
-      # Each gws package is built from the pinned upstream archive; the build
-      # fails unless the archive and the binary match native/provenance.json.
-      - name: Pack the main package and the four gws packages
+      - name: Pack the main package
         run: |
           mkdir -p "$RUNNER_TEMP/tarballs"
           npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/tarballs"
-          node scripts/build-bin-packages.mjs --all --out "$RUNNER_TEMP/gws-bin"
-          for dir in "$RUNNER_TEMP"/gws-bin/opencode-gws-bin-*; do
-            npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/tarballs" "$dir"
-          done
           ls -l "$RUNNER_TEMP/tarballs"
 
-      - name: Run the pack test on those tarballs
+      - name: Run the pack test on that tarball
         run: |
-          PACK_TARBALL="$(ls "$RUNNER_TEMP"/tarballs/joe-broadhead-opencode-gws-[0-9]*.tgz)" \
-          PACK_BIN_TARBALL="$(ls "$RUNNER_TEMP"/tarballs/joe-broadhead-opencode-gws-bin-linux-x64-gnu-*.tgz)" \
-          npm run test:pack
+          PACK_TARBALL="$(ls "$RUNNER_TEMP"/tarballs/joe-broadhead-opencode-gws-[0-9]*.tgz)" npm run test:pack
 
-      - name: Publish the gws packages, then the main package
+      - name: Publish the main package
         run: |
           tag=latest
           case "$GITHUB_REF_NAME" in *-*) tag=next ;; esac
           version="$(node -p 'require("./package.json").version')"
-          # Publish one tested tarball, unless that exact version is already on npm.
+          # Publish the tested tarball, unless that exact version is already on npm.
           # A 404 means it is not published yet; any other failure stops the release.
-          publish() {
-            name="$1"
-            tarball="$2"
-            if published="$(npm view "$name@$version" version 2>"$RUNNER_TEMP/npm-view.log")"; then
-              if [ "$published" = "$version" ]; then
-                echo "::notice::$name@$version is already on npm; skipping it."
-                return 0
-              fi
-            elif ! grep -q E404 "$RUNNER_TEMP/npm-view.log"; then
-              cat "$RUNNER_TEMP/npm-view.log"
-              echo "::error::Could not check whether $name@$version is already on npm."
-              exit 1
+          if published="$(npm view "@joe-broadhead/opencode-gws@$version" version 2>"$RUNNER_TEMP/npm-view.log")"; then
+            if [ "$published" = "$version" ]; then
+              echo "::notice::@joe-broadhead/opencode-gws@$version is already on npm; skipping it."
+              exit 0
             fi
-            npm publish "$tarball" --provenance --access public --tag "$tag"
-          }
-          for target in darwin-arm64 darwin-x64 linux-arm64-gnu linux-x64-gnu; do
-            publish "@joe-broadhead/opencode-gws-bin-$target" "$RUNNER_TEMP/tarballs/joe-broadhead-opencode-gws-bin-$target-$version.tgz"
-          done
-          publish "@joe-broadhead/opencode-gws" "$RUNNER_TEMP/tarballs/joe-broadhead-opencode-gws-$version.tgz"
+          elif ! grep -q E404 "$RUNNER_TEMP/npm-view.log"; then
+            cat "$RUNNER_TEMP/npm-view.log"
+            echo "::error::Could not check whether @joe-broadhead/opencode-gws@$version is already on npm."
+            exit 1
+          fi
+          npm publish "$RUNNER_TEMP/tarballs/joe-broadhead-opencode-gws-$version.tgz" --provenance --access public --tag "$tag"

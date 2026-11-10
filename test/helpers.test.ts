@@ -5,9 +5,9 @@ import { join } from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { helperAdapter } from "../src/domain/helpers.js"
 import { loadManifest, resolveHelper } from "../src/domain/manifest.js"
-import { resolvePackagedBinary } from "../src/process/binary.js"
 import type { Runtime } from "../src/runtime/index.js"
 import { testRuntime } from "./support/config.js"
+import { pinnedGwsPath } from "./support/pinned.js"
 import { request as requestFor } from "./support/requests.js"
 
 const request = requestFor("gmail.send", { input: {} })
@@ -274,7 +274,7 @@ describe("helper adapters match gws's own flags", () => {
     const home = mkdtempSync(join(tmpdir(), "gws-help-"))
     try {
       const env = { HOME: home, PATH: "", GOOGLE_WORKSPACE_CLI_CONFIG_DIR: offlineConfig(home), ...NO_NETWORK }
-      const help = execFileSync(resolvePackagedBinary(), [service, `+${name}`, "--help"], { env, encoding: "utf8" })
+      const help = execFileSync(pinnedGwsPath(), [service, `+${name}`, "--help"], { env, encoding: "utf8" })
       // Option lines only: the flag, its value name, then its description after two or more spaces.
       const flags = [...new Set([...help.matchAll(/^\s+(?:-\w, )?--([a-z-]+)(?: <[^>]+>)? {2,}\S/gm)].map((match) => match[1]!))]
       const expected = flags

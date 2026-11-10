@@ -69,7 +69,12 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
     stopToolsRpc = await registerToolsRpc(ctx, {
       methods: [...METHODS, ...scriptMethods({ runtime, assert: (request) => ctx.permission.assert(request as never), status })],
     })
-    stopCommands = await registerCommands(ctx, { status, plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary), doctor: runtime }, runtime.signal)
+    stopCommands = await registerCommands(ctx, {
+      status,
+      plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary),
+      doctor: runtime,
+      install: async (settled) => ({ path: await runtime.binaryFor({ signal: settled, mayDownload: async () => undefined }), version: runtime.version }),
+    }, runtime.signal)
     runtime.audit.emit({ event: "plugin.loaded", outcome: "success" })
   } catch (error) {
     await close()

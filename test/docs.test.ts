@@ -90,7 +90,9 @@ describe("the README's generated blocks", () => {
       // "CODE" is the placeholder a doc comment writes the message shape with, not a code.
       "CODE",
     ])
-    expect([...raised].filter((code) => !table.has(code) && !upstream.has(code))).toEqual([])
+    // "NATIVE_*" are the shared release-binary installer's own codes (src/process/install.ts, the kit's module). Its
+    // one caller, src/process/binary.ts, maps each to a GWS_ code before any tool reports it.
+    expect([...raised].filter((code) => !table.has(code) && !upstream.has(code) && !code.startsWith("NATIVE_"))).toEqual([])
     // Every code in the table is in the README table, which the previous test pins to the same table.
     expect([...table].filter((code) => !block("README.md", "codes").includes(`\`${code}\``))).toEqual([])
   })

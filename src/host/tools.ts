@@ -24,7 +24,7 @@ import type { Runtime } from "../runtime/index.js"
 import type { PluginContext, ToolContext, ToolEditor, ToolInfo } from "./context.js"
 import { EVENT_READS, eventsRequest, gmailEvents } from "./gmail-events.js"
 import type { StatusSource } from "./rpc.js"
-import { commitRequests, externalDirectoryRequest, localRequest, operationRequest } from "./permissions.js"
+import { commitRequests, externalDirectoryRequest, localRequest, nativeGate, operationRequest } from "./permissions.js"
 import type { Caller, PermissionRequest } from "./permissions.js"
 
 /**
@@ -310,7 +310,7 @@ export async function registerTools(ctx: PluginContext, runtime: Runtime, status
   const specs = toolSpecs(runtime, assert, status)
   await ctx.tool.transform((editor: ToolEditor) => {
     editor.namespace(NAMESPACE)
-    for (const tool of specs) editor.add(buildTool(tool, runtime))
+    for (const tool of specs) editor.add(buildTool(tool, runtime, assert))
   })
 }
 
@@ -318,7 +318,7 @@ function spec<I extends z.ZodType, O extends z.ZodType>(tool: ToolSpec<I, O>): T
   return tool
 }
 
-function buildTool<I extends z.ZodType, O extends z.ZodType>(tool: ToolSpec<I, O>, runtime: Runtime): ToolInfo {
+function buildTool<I extends z.ZodType, O extends z.ZodType>(tool: ToolSpec<I, O>, runtime: Runtime, assert: Assert): ToolInfo {
   return {
     name: tool.name,
     description: tool.description,
@@ -332,7 +332,7 @@ function buildTool<I extends z.ZodType, O extends z.ZodType>(tool: ToolSpec<I, O
         // The host validates against the same schema; this re-check keeps the
         // adapter safe when called without host validation (tests, fakes).
         const input = parse(tool.input, raw)
-        const outcome = await tool.run(input, call(context))
+        const outcome = await tool.run(input, call(context, assert))
         const rendered = render(outcome.output, outcome.inlineBytes ?? runtime.config.execution.maxInlineBytes)
         return {
           output: outcome.output,
@@ -371,13 +371,15 @@ export function parse<I extends z.ZodType>(schema: I, input: unknown): z.output<
   return result.data
 }
 
-function call(context: ToolContext): Call {
+function call(context: ToolContext, assert: Assert): Call {
+  const host = { sessionID: context.sessionID, agent: context.agent, messageID: context.messageID, id: context.id }
   return {
-    host: { sessionID: context.sessionID, agent: context.agent, messageID: context.messageID, id: context.id },
+    host,
     runtime: {
       sessionId: context.sessionID,
       agentId: context.agent,
       signal: context.signal,
+      mayDownload: nativeGate(host, assert),
       progress: (update) => {
         context.progress?.({ ...update }).catch(() => undefined)
       },

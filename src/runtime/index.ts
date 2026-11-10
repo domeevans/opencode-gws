@@ -33,9 +33,11 @@ export class Runtime {
   readonly plans = new PlanStore()
   readonly workDir: string
   readonly paths: PluginPaths
-  readonly binary: string
   readonly audit: Audit
   readonly schema: SchemaClient
+  /** The verified binary and its version, once a call has resolved them. Until then, none is installed for this process. */
+  private resolved?: { readonly binary: string; readonly version: string }
+  private resolving?: Promise<string>
   private visible?: ReadonlySet<string>
   private readonly lifetime = new Lifecycle()
   private readonly accounts: Accounts
@@ -50,35 +52,37 @@ export class Runtime {
     return this.lifetime.wait(start, signal)
   }
 
-  private invocation<T>(ctx: Pick<CallContext, "signal" | "progress">, start: (control: Pick<CallContext, "signal" | "progress">) => Promise<T>): Promise<T> {
-    const signal = this.lifetime.compose(ctx.signal)
-    return this.lifetime.track(() => {
-      this.assertActive(signal)
-      return start({ ...ctx, signal, progress: update => { if (!signal.aborted) ctx.progress?.(update) } })
+  /** The path of the verified binary; the call must have resolved it (every operation does, through `invocation`). */
+  requireBinary(): string {
+    if (this.resolved === undefined) throw new Error("GWS_UNAVAILABLE: gws has not been resolved for this call. Next step: Call the tool again.")
+    return this.resolved.binary
+  }
+
+  /** The verified binary's path, or "" while none is installed for this process. */
+  get binary(): string { return this.resolved?.binary ?? "" }
+
+  /** The probed version, or "unknown" while no binary is resolved. */
+  get version(): string { return this.resolved?.version ?? "unknown" }
+
+  /**
+   * The binary for a call, resolved once. A download happens only when the call's `mayDownload` allows it (the access
+   * rules decide). A failure is not kept, so a later call tries again.
+   */
+  binaryFor(ctx: Pick<CallContext, "signal" | "mayDownload">): Promise<string> {
+    if (this.resolved !== undefined) return Promise.resolve(this.resolved.binary)
+    this.resolving ??= this.loadBinary(ctx).finally(() => { this.resolving = undefined })
+    return this.resolving
+  }
+
+  private async loadBinary(ctx: Pick<CallContext, "signal" | "mayDownload">): Promise<string> {
+    const binary = await resolveBinary(this.config, this.options.projectDirectory, {
+      cacheRoot: this.paths.cacheDir,
+      mayDownload: ctx.mayDownload,
+      signal: ctx.signal,
     })
-  }
-
-  private constructor(
-    readonly config: PluginConfig,
-    readonly options: RuntimeOptions,
-    binary: string,
-    readonly version: string,
-  ) {
-    this.binary = binary
-    this.paths = options.paths ?? pluginPaths()
-    this.workDir = createWorkDir()
-    this.audit = new Audit({ ...config.audit, path: config.audit.path ?? join(this.paths.stateDir, "audit.jsonl") }, options.pluginVersion)
-    this.schema = new SchemaClient(binary, this.workDir, localEnv(this.workDir, ownedDir(join(this.paths.cacheDir, "discovery"))), SCHEMA_TIMEOUT_MS)
-    this.accounts = new Accounts(this)
-    this.operations = new Operations(this, this.accounts)
-  }
-
-  static async create(config: PluginConfig, options: RuntimeOptions): Promise<Runtime> {
-    const binary = resolveBinary(config, options.projectDirectory)
     // Work folders of servers that stopped without closing.
     removeStaleWorkDirs()
     const probeDir = mkdtempSync(join(tmpdir(), "opencode-gws-probe-"))
-    let version = "unknown"
     try {
       const probe = await runProcess({
         binary,
@@ -89,14 +93,45 @@ export class Runtime {
         maxStdoutBytes: 64 * 1024,
         maxStderrBytes: 64 * 1024,
       })
-      version = probe.stdout.toString("utf8").split("\n")[0]?.trim() ?? "unknown"
+      const version = probe.stdout.toString("utf8").split("\n")[0]?.trim() ?? "unknown"
       if (probe.exitCode !== 0 || probe.timedOut || probe.outputCapped || version !== GWS_VERSION || version !== loadManifest().gwsVersion) {
         throw new Error(`GWS_VERSION_MISMATCH: Requires ${GWS_VERSION} and the matching manifest`)
       }
+      this.resolved = { binary, version }
+      return binary
     } finally {
       rmSync(probeDir, { recursive: true, force: true })
     }
-    return new Runtime(config, options, binary, version)
+  }
+
+  private invocation<T>(ctx: Pick<CallContext, "signal" | "progress" | "mayDownload">, start: (control: Pick<CallContext, "signal" | "progress">) => Promise<T>): Promise<T> {
+    const signal = this.lifetime.compose(ctx.signal)
+    return this.lifetime.track(async () => {
+      this.assertActive(signal)
+      await this.binaryFor({ signal, mayDownload: ctx.mayDownload })
+      this.assertActive(signal)
+      return start({ ...ctx, signal, progress: update => { if (!signal.aborted) ctx.progress?.(update) } })
+    })
+  }
+
+  private constructor(
+    readonly config: PluginConfig,
+    readonly options: RuntimeOptions,
+  ) {
+    this.paths = options.paths ?? pluginPaths()
+    this.workDir = createWorkDir()
+    this.audit = new Audit({ ...config.audit, path: config.audit.path ?? join(this.paths.stateDir, "audit.jsonl") }, options.pluginVersion)
+    this.schema = new SchemaClient(() => this.requireBinary(), this.workDir, localEnv(this.workDir, ownedDir(join(this.paths.cacheDir, "discovery"))), SCHEMA_TIMEOUT_MS)
+    this.accounts = new Accounts(this)
+    this.operations = new Operations(this, this.accounts)
+  }
+
+  /**
+   * Builds the runtime. Setup makes no network call and runs no binary: the gws binary is resolved, and probed, by the
+   * first call that needs it (see `binaryFor`), so a download is always a call's, under its access rules.
+   */
+  static async create(config: PluginConfig, options: RuntimeOptions): Promise<Runtime> {
+    return new Runtime(config, options)
   }
 
   /** Model-facing service allowlist: explicit config.services or the account union. */

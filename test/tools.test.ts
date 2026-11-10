@@ -547,7 +547,8 @@ describe("commit permission assertions", () => {
       ["gws.plan", ["personal:gmail.reply"]],
       ["gws.read", ["personal:gmail.users.messages.get"]],
     ])
-    expect(readFileSync(log, "utf8").trim().split("\n")).toEqual(["--version"])
+    // A refused read spawns nothing: the binary is resolved only once a call may run.
+    expect(readFileSync(log, "utf8").trim()).toBe("")
   })
 
   it("refuses the wrong commit tool before asking", async () => {

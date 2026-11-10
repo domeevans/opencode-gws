@@ -1,18 +1,17 @@
 import { globSync, readFileSync } from "node:fs"
 import { matchesGlob } from "node:path"
 import { describe, expect, it } from "vitest"
-import { GWS_TARGETS, gwsPackage } from "../src/domain/backend.js"
+import { GWS_TARGETS } from "../src/domain/backend.js"
 
 /**
- * The published shape: a small JavaScript-only main package with no
- * runtime or host dependencies, and the gws binary in per-platform optional
- * packages at the same version.
+ * The published shape: a small JavaScript-only plugin with no runtime or host dependencies. The gws binary is not a
+ * package: the plugin downloads its own pinned copy from its GitHub Release on first use (native/provenance.json and
+ * manifest/native.json).
  */
 
 const read = (path: string) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"))
 const pkg = read("package.json")
 const lock = read("package-lock.json")
-const template = read("packages/gws-bin/package.template.json")
 const LIFECYCLE = ["preinstall", "install", "postinstall", "prepublish", "preprepare", "prepare", "postprepare", "prepack", "postpack"]
 
 describe("main package", () => {
@@ -20,14 +19,19 @@ describe("main package", () => {
     expect(pkg.publishConfig).toBeUndefined()
   })
 
+  it("is the first GitHub release, v0.0.0, under the tag's version (D19)", () => {
+    expect(pkg.version).toBe("0.0.0")
+  })
+
   it("declares no runtime, bundled or host peer dependencies and no engines or overrides", () => {
-    for (const field of ["dependencies", "peerDependencies", "peerDependenciesMeta", "bundleDependencies", "bundledDependencies", "engines", "overrides"]) {
+    for (const field of ["dependencies", "optionalDependencies", "peerDependencies", "peerDependenciesMeta", "bundleDependencies", "bundledDependencies", "engines", "overrides"]) {
       expect(pkg[field], field).toBeUndefined()
     }
   })
 
-  it("lists the four gws packages as optional dependencies at exactly its own version", () => {
-    expect(pkg.optionalDependencies).toEqual(Object.fromEntries(Object.keys(GWS_TARGETS).sort().map((target) => [gwsPackage(target), pkg.version])))
+  it("names no per-platform gws package: the binary is the plugin's own pinned release asset", () => {
+    expect(Object.keys(GWS_TARGETS)).toHaveLength(4)
+    expect(JSON.stringify(pkg)).not.toMatch(/opencode-gws-bin/)
   })
 
   it("states the tested host line and has no lifecycle scripts", () => {
@@ -53,8 +57,23 @@ describe("main package", () => {
     })
   })
 
-  it("whitelists the published files", () => {
-    expect(pkg.files).toEqual(["dist", "assets/icon.svg", "assets/icon-128.png", "assets/icon-256.png", "skills", "manifest/generated.json", "views/gmail-thread.html", "views/jelly-view.js", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md"])
+  it("whitelists the published files, including the release manifest and the upstream licence", () => {
+    expect(pkg.files).toEqual([
+      "dist",
+      "assets/icon.svg",
+      "assets/icon-128.png",
+      "assets/icon-256.png",
+      "skills",
+      "manifest/generated.json",
+      "manifest/native.json",
+      "licenses/gws",
+      "views/gmail-thread.html",
+      "views/jelly-view.js",
+      "README.md",
+      "LICENSE",
+      "NOTICE",
+      "CHANGELOG.md",
+    ])
   })
 
   it("pins every dev dependency exactly, with the OpenCode SDKs at 2.2.3", () => {
@@ -68,39 +87,27 @@ describe("lockfile", () => {
     const root = lock.packages[""]
     expect(lock.lockfileVersion).toBe(3)
     expect([root.name, root.version]).toEqual([pkg.name, pkg.version])
-    expect(root.optionalDependencies).toEqual(pkg.optionalDependencies)
+    expect(root.optionalDependencies).toBeUndefined()
     expect(root.devDependencies).toEqual(pkg.devDependencies)
     expect(root.dependencies).toBeUndefined()
   })
 
-  it("records each gws package with its platform, so npm ci installs only the matching one", () => {
-    for (const [target, entry] of Object.entries(GWS_TARGETS)) {
-      expect(lock.packages[`node_modules/${gwsPackage(target)}`], target).toEqual({
-        version: pkg.version,
-        os: [entry.os],
-        cpu: [entry.cpu],
-        ...(entry.libc ? { libc: [entry.libc] } : {}),
-        optional: true,
-      })
-    }
+  it("records no gws package: nothing optional is installed for the binary", () => {
+    expect(Object.keys(lock.packages).filter((name) => name.includes("opencode-gws-bin"))).toEqual([])
   })
 })
 
-describe("gws package template", () => {
-  it("carries only the binary, its license, notice and provenance, with no scripts, bin links or dependencies", () => {
-    expect(template).toMatchObject({
-      license: "Apache-2.0",
-      homepage: "https://github.com/joe-broadhead/opencode-gws#readme",
-      bugs: { url: "https://github.com/joe-broadhead/opencode-gws/issues" },
-      files: ["bin/gws", "LICENSE", "NOTICE", "provenance.json"],
-    })
-    expect(template.publishConfig).toBeUndefined()
-    for (const field of ["name", "version", "private", "scripts", "bin", "main", "dependencies", "optionalDependencies", "os", "cpu", "libc"]) {
-      expect(template[field], field).toBeUndefined()
-    }
-    expect(readFileSync(new URL("../packages/gws-bin/LICENSE", import.meta.url), "utf8")).toMatch(/^\s*Apache License\s+Version 2\.0, January 2004/)
+describe("upstream licence", () => {
+  it("ships the Apache-2.0 licence and the notice for the gws executable it downloads", () => {
+    expect(readFileSync(new URL("../licenses/gws/LICENSE", import.meta.url), "utf8")).toMatch(/^\s*Apache License\s+Version 2\.0, January 2004/)
+    const notice = readFileSync(new URL("../licenses/gws/NOTICE", import.meta.url), "utf8")
+    expect(notice).toContain("GitHub Release")
+    expect(notice).toContain("https://github.com/googleworkspace/cli/releases/tag/v0.22.5")
+    expect(notice).toContain("Apache License, Version 2.0")
   })
+})
 
+describe("declarations", () => {
   it("ships no type declarations: files names no directory that holds a .d.ts (S6)", () => {
     const declarations = globSync("**/*.d.{ts,mts,cts}", { cwd: new URL("../", import.meta.url), exclude: (name) => name === "node_modules" || name.startsWith(".") })
     for (const declaration of declarations) {

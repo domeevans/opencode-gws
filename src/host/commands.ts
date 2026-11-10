@@ -19,6 +19,7 @@ import type { CommitCategory, Plan } from "../domain/types.js"
 export const COMMANDS = {
   status: { name: "gws-status", description: "Google Workspace: sign-in, access, pending plans, setup steps, and unguarded agents" },
   doctor: { name: "gws-doctor", description: "Google Workspace: check every account's services with one small read each" },
+  install: { name: "gws-install", description: "Google Workspace: download and verify the gws binary for this platform" },
 } as const
 
 /** The redacted plan view /gws-status posts: never argv, params, url, a body, or a token. */
@@ -45,6 +46,8 @@ interface CommandSources {
   status: (signal?: AbortSignal) => Promise<GwsStatus>
   plans: (sessionID: string) => PlanSummary[]
   doctor: DoctorSource
+  /** Downloads and verifies the binary, as the person asked: the command is typed, so the access rules do not ask. */
+  install: (signal: AbortSignal) => Promise<{ readonly path: string; readonly version: string }>
 }
 
 export function planSummary(plan: Plan): PlanSummary {
@@ -279,6 +282,21 @@ export async function registerCommands(ctx: PluginContext, sources: CommandSourc
         lifetime.assert(signal)
         const outcomes = await doctor(sessionID)
         await post(sessionID, delivery, formatDoctor(outcomes), summarizeDoctor(outcomes), COMMANDS.doctor.name)
+      },
+    })
+    editor.add({
+      ...COMMANDS.install,
+      execute: async ({ sessionID, delivery }) => {
+        const result = await lifetime.wait(async (settled) => {
+          try {
+            return { ok: true as const, installed: await sources.install(settled) }
+          } catch (error) {
+            if (settled.aborted) throw error
+            return { ok: false as const, message: (error as Error).message }
+          }
+        }, signal)
+        const text = result.ok ? `gws ${result.installed.version} is installed and verified.` : `gws is not installed: ${result.message}`
+        await post(sessionID, delivery, text, result.ok ? "gws installed" : "gws not installed", COMMANDS.install.name)
       },
     })
   })

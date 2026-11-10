@@ -8,9 +8,9 @@
  * sentence of its Discovery description, and the plugin risk category.
  * `npm run drift` warns when gws and the manifest diverge.
  *
- * gws is the one the plugin runs: this platform's gws package, found and
- * checked by the plugin's own resolver (in a checkout, `npm run fetch:gws`
- * installs it), or an explicit `--gws` path. Never a `gws` on PATH.
+ * gws is the one the plugin runs: this platform's pinned executable that
+ * `npm run fetch:gws` puts in .cache/gws, checked against native/provenance.json,
+ * or an explicit `--gws` path. Never a `gws` on PATH.
  * `gws schema` reads public Discovery documents, so a first run needs the
  * network.
  *
@@ -22,6 +22,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, isAbsolute, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { hostTarget } from "./build-native.mjs"
 import { manifestText } from "./manifest-format.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
@@ -33,9 +34,8 @@ export function fail(message) {
 }
 
 /**
- * The gws binary the plugin runs: `--gws <absolute path>`, or this
- * platform's gws package as the plugin resolves and checks it
- * (`resolvePackagedBinary` in src/process/binary.ts, bundled in memory).
+ * The gws binary the plugin runs: `--gws <absolute path>`, or this platform's pinned executable that `npm run fetch:gws`
+ * put in .cache/gws, checked against native/provenance.json before it is used.
  */
 export async function resolveGws(args) {
   const index = args.indexOf("--gws")
@@ -44,22 +44,10 @@ export async function resolveGws(args) {
     if (!path || !isAbsolute(path)) fail("--gws needs the absolute path of a gws executable")
     return path
   }
-  try {
-    const { build } = await import("esbuild")
-    const bundled = await build({
-      entryPoints: [join(ROOT, "src", "process", "binary.ts")],
-      bundle: true,
-      write: false,
-      format: "esm",
-      platform: "node",
-      logLevel: "silent",
-    })
-    const source = Buffer.from(bundled.outputFiles[0].text).toString("base64")
-    const { currentPlatform, resolvePackagedBinary } = await import(`data:text/javascript;base64,${source}`)
-    return resolvePackagedBinary(currentPlatform(), pathToFileURL(join(ROOT, "package.json")).href)
-  } catch (error) {
-    fail(`${String(error?.message ?? error).split("\n")[0].replace(/\.?$/, ".")} Or pass --gws <absolute path>.`)
-  }
+  const target = hostTarget(JSON.parse(readFileSync(join(ROOT, "native", "provenance.json"), "utf8")))
+  const path = join(ROOT, ".cache", "gws", target ?? "none", "gws")
+  if (target === undefined || !existsSync(path)) fail(`no gws binary for ${process.platform}-${process.arch}: run npm run fetch:gws, or pass --gws <absolute path>.`)
+  return path
 }
 
 /** A runner for one gws binary: argv in, stdout out. */

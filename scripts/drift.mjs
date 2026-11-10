@@ -6,9 +6,9 @@
  *
  *   node scripts/drift.mjs [--gws <absolute path>] [--strict]
  *
- * gws is the one the plugin runs: this platform's gws package, found and
- * checked by the plugin's own resolver (in a checkout, `npm run fetch:gws`
- * installs it), or an explicit `--gws` path. Never a `gws` on PATH. It
+ * gws is the one the plugin runs: this platform's pinned executable that
+ * `npm run fetch:gws` puts in .cache/gws, checked against native/provenance.json,
+ * or an explicit `--gws` path. Never a `gws` on PATH. It
  * reads only gws's own help, so it needs no network and no sign-in.
  *
  * Exit codes: 0 no drift, or drift without --strict; 1 drift with

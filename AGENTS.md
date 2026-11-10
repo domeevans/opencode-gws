@@ -74,6 +74,8 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   draft, an event's guests) asserts `gws.read` on each read, and its commit
   reads them again.
 
+- The first-use download of the gws binary asserts `gws.native_install`, which the `gws.*` namespace rule governs: it asks under `ask-changes` and is denied under `read-only`. `/gws-install` is the person's own command and always downloads. Status reads the cache and never downloads.
+
 ## Security
 
 - With no `accounts` option, the `default` account enables every manifest
@@ -125,9 +127,7 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   only. No chunks, no relative
   imports, no runtime dependencies, no peers, no `.d.ts`. The version comes
   from `package.json` at build time.
-- `files` is a whitelist. The `gws` binary ships in the four
-  `@joe-broadhead/opencode-gws-bin-<target>` optional packages, at the same
-  version; the only other backend is an explicit `binary.path`.
+- `files` is a whitelist. The package carries no gws binary: the plugin downloads the pinned executable on first use from its GitHub Release (`manifest/native.json`, checked against `native/provenance.json`). The only other backend is an explicit `binary.path`.
 - Releases come only from `.github/workflows/release.yml` on a `vX.Y.Z` tag,
   after the `release` environment is approved. Never publish by hand.
 - No personal email in anything we publish. Every commit, tag and package is authored and committed as

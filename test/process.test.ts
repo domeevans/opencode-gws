@@ -139,7 +139,7 @@ describe("fake gws fixture", () => {
 
 describe("SchemaClient", () => {
   it("threads the abort signal into gws schema", async () => {
-    const client = new SchemaClient(sleeper, dir, { PATH: process.env["PATH"] ?? "" })
+    const client = new SchemaClient(() => sleeper, dir, { PATH: process.env["PATH"] ?? "" })
     const controller = new AbortController()
     const pending = client.resolve("gmail", ["users", "getProfile"], controller.signal)
     setTimeout(() => controller.abort(), 50)

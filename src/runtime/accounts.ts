@@ -39,6 +39,11 @@ export interface CallContext {
   progress?: (update: Progress) => void
   /** Set when a script made the call through the tools RPC rather than a tool call; the audit records it. */
   caller?: "rpc"
+  /**
+   * Called only when this call must download the gws binary first. It throws to refuse, so the access rules decide
+   * whether a download happens on a model's call; without it the download is refused.
+   */
+  mayDownload?: () => Promise<void>
 }
 
 /** An interactive account's current sign-in, from OpenCode's credential store. */
@@ -88,6 +93,8 @@ interface AccountsContext {
   readonly options: RuntimeOptions
   readonly binary: string
   readonly version: string
+  requireBinary(): string
+  binaryFor(ctx: Pick<CallContext, "signal" | "mayDownload">): Promise<string>
   readonly workDir: string
   readonly paths: PluginPaths
   readonly audit: Audit
@@ -104,6 +111,15 @@ export class Accounts {
   constructor(private readonly runtime: AccountsContext) {
     this.integrations = integrationIds(runtime.config.accounts)
     this.names = integrationNames(runtime.config.accounts)
+  }
+
+  /**
+   * The binary as status reports it: the verified copy the cache or an override holds, resolved without a download
+   * (status never asks for or makes a change). Not installed yet is reported as an empty path, not an error.
+   */
+  private async binaryStatus(signal?: AbortSignal): Promise<{ path: string; version: string }> {
+    await this.runtime.binaryFor({ signal }).catch(() => undefined)
+    return { path: this.runtime.binary, version: this.runtime.version }
   }
 
   async status(signal?: AbortSignal): Promise<RuntimeStatus> {
@@ -128,7 +144,7 @@ export class Accounts {
       auditDegraded: this.runtime.audit.degraded,
       version: options.pluginVersion,
       host: options.host ?? { version: null, range: HOST_RANGE, tested: false },
-      binary: { path: this.runtime.binary, version: this.runtime.version },
+      binary: await this.binaryStatus(signal),
       services: [...this.runtime.visibleServices()].sort(),
       accounts,
     }
@@ -307,7 +323,7 @@ export class Accounts {
     const { execution } = this.runtime.config
     let page = 0
     return runProcess({
-      binary: this.runtime.binary,
+      binary: this.runtime.requireBinary(),
       argv,
       cwd,
       env,

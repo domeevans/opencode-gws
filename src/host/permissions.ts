@@ -1,4 +1,5 @@
 import { dirname } from "node:path"
+import { NATIVE_ACTION } from "../domain/access.js"
 import { underRoot } from "../domain/files.js"
 import { redactedPreview } from "../domain/plans.js"
 import type { Plan } from "../domain/types.js"
@@ -21,6 +22,20 @@ interface ToolCall {
 }
 
 export type Caller = ToolCall
+
+/**
+ * The permission for a call's first-use download of the gws binary. The namespace rule decides it: `all` allows it,
+ * `ask-changes` asks, and `read-only` denies it. A refusal names the command that downloads it instead.
+ */
+export function nativeGate(host: Caller, assert: (request: PermissionRequest) => Promise<void>): () => Promise<void> {
+  return async () => {
+    try {
+      await assert(localRequest(host, NATIVE_ACTION))
+    } catch {
+      throw new Error("GWS_UNAVAILABLE: gws is not installed, and this call may not download it under this session's access. Next step: Run /gws-install, which downloads and verifies it.")
+    }
+  }
+}
 
 export interface PermissionRequest {
   sessionID: string

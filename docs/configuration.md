@@ -38,7 +38,7 @@ An account whose config sets `access` to read, with no write service, does not o
 | `oauthClient` | none | `{ clientId, clientSecret }` of a Desktop app client, or Google's downloaded client JSON, usually set by organisation config. When set, the sign-in form hides its client fields and uses this client; a Web client's secret is never put in the form. An account `oauthClient` overrides it. See [auth.md](auth.md). |
 | `redirectUri` | none: a loopback redirect | The absolute URL Google redirects to after consent, when the browser is not on the machine OpenCode runs on, such as `https://host.example/oauth/return`. `https`, unless it is loopback. Needs `callbackPort` and a Web application client that lists it exactly. See [auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine). |
 | `callbackPort` | none: a random port | The port on `127.0.0.1` where the sign-in listens and the redirect is forwarded. Alone, a loopback redirect on that port. |
-| `binary.path` | the platform package | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
+| `binary.path` | the release binary | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
 | `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0`, such as 2.2.2, 2.3.0, 3.0.0, a prerelease or a dev build, and show it as host untested in status. A release inside the range loads without it; only 2.2.3, 2.2.4, 2.2.5 and 2.2.6 are tested. |
 | `access` | `"all"` | What the default permission rules allow: `"all"` allows every tool, the six commit tools included; `"ask-changes"` allows the reads and asks for each commit; `"read-only"` allows the reads and denies the commits. It is not the account's sign-in level, which is `accounts.<alias>.access`. See [Approvals](#approvals). |
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
@@ -179,7 +179,7 @@ Two skills load automatically: `opencode-gws` (how the tools work: accounts, pla
 
 ## Binary
 
-`binary.path` is an optional absolute path to a `gws` 0.22.5 executable outside the project directory. Without it, the plugin uses the platform package. See [backend.md](backend.md).
+`binary.path` is an optional absolute path to a `gws` 0.22.5 executable outside the project directory. Without it, the plugin uses the release binary it downloads on first use and verifies. See [backend.md](backend.md).
 
 ## Events list
 
@@ -267,8 +267,8 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
 | `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
 | `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
-| `GWS_UNAVAILABLE` | No gws binary is available: this platform has no gws package, the package is not installed, or binary.path does not exist. | Reinstall the plugin so npm installs the gws package for this platform, or set binary.path to a gws 0.22.5 executable. |
+| `GWS_UNAVAILABLE` | No gws binary is available: this platform has no release binary, the binary is not installed yet, or binary.path does not exist. | Run /gws-install, which downloads and verifies it, or set binary.path to a gws 0.22.5 executable. |
 | `GWS_VERSION_MISMATCH` | The gws version check failed, or gws is not the version the manifest was generated from. | Reinstall the plugin, or point binary.path at gws 0.22.5. |
-| `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Reinstall the plugin, or move the binary.path executable to a location only you can write. |
+| `BINARY_TRUST_FAILED` | The gws binary failed a trust check: a relative path, not a regular file, group- or world-writable, inside the project, a writable ancestor, or a checksum mismatch. | Follow the step the message names: remove the named cached copy and call the tool again, move the binary.path executable to a location only you can write, or reinstall the plugin from a valid release. |
 
 <!-- /generated:errors -->

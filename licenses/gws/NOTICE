@@ -1,0 +1,8 @@
+The gws executable that the plugin downloads from its GitHub Release, one per platform, is the unmodified Google
+Workspace CLI (gws) 0.22.5 release binary for that platform, from
+https://github.com/googleworkspace/cli/releases/tag/v0.22.5. It is licensed under the Apache License, Version 2.0;
+LICENSE in this folder is the license file shipped in the same release archive. native/provenance.json records each
+release archive's URL and the SHA-256 digests of the archive and the binary.
+
+The gws CLI is not an officially supported Google product. This plugin is unofficial and is not affiliated with or
+endorsed by Google.

@@ -23,7 +23,7 @@
  * (`__PLUGIN_VERSION__`), so no source file repeats it.
  *
  * Modules that locate package files from `import.meta.url` (the manifest,
- * the skills, the gws package) count directories from their source
+ * the skills, the release manifest) count directories from their source
  * location. Each bundled module therefore sees the URL its file would have
  * at dist/<path>.js, so `../..` still reaches the package root.
  */
