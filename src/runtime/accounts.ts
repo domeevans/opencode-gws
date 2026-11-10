@@ -117,9 +117,16 @@ export class Accounts {
    * The binary as status reports it: the verified copy the cache or an override holds, resolved without a download
    * (status never asks for or makes a change). Not installed yet is reported as an empty path, not an error.
    */
-  private async binaryStatus(signal?: AbortSignal): Promise<{ path: string; version: string }> {
-    await this.runtime.binaryFor({ signal }).catch(() => undefined)
-    return { path: this.runtime.binary, version: this.runtime.version }
+  /**
+   * The binary's state for status. Status never downloads (no mayDownload), so a missing binary is refused here with its
+   * coded message and next step, and that refusal is reported as `problem`, not swallowed.
+   */
+  private async binaryStatus(signal?: AbortSignal): Promise<{ path: string; version: string; problem?: string }> {
+    const problem = await this.runtime.binaryFor({ signal }).then(
+      () => undefined,
+      (error: unknown) => (error instanceof Error ? error.message.split("\n", 1)[0] : String(error)),
+    )
+    return { path: this.runtime.binary, version: this.runtime.version, ...(problem === undefined ? {} : { problem }) }
   }
 
   async status(signal?: AbortSignal): Promise<RuntimeStatus> {

@@ -57,7 +57,7 @@ export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills
       version: base.version,
       host: base.host,
       state: stateOf(base.accounts),
-      gws: { path: base.binary.path, version: base.binary.version },
+      gws: { path: base.binary.path, version: base.binary.version, ...(base.binary.problem === undefined ? {} : { problem: base.binary.problem }) },
       services: base.services,
       accounts: base.accounts,
       auditDegraded: base.auditDegraded,

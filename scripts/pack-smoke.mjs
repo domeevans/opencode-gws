@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * `npm run test:pack`: pack and install the plugin the way OpenCode does,
- * then load the installed copy. Run it after `npm run build` and
- * `npm run fetch:gws` (the verified upstream gws executable for this platform).
+ * `npm run test:pack`: pack and install the plugin the way OpenCode does, then load the installed copy. It needs only
+ * `npm run build` (dist/). It needs no gws binary, here or in the package: the plugin downloads its binary on first use from
+ * its GitHub Release (manifest/native.json), and that binary is covered by the native workflow, the release job's hash and
+ * attestation check, and release-verify's download and hash.
  *
- * 1. Pack the main package. Check the tarball: the file whitelist, at most
- *    1 MiB, and no gws binary in it. The plugin downloads its binary on
- *    first use from its GitHub Release (manifest/native.json), so the
- *    package carries none.
+ * 1. Pack the main package. Check the tarball: the file whitelist, at most 1 MiB, and no gws binary in it.
  * 2. Bare install: the tarball, scripts disabled, into an empty project.
  *    Nothing else is installed or resolvable from it: no @opencode/plugin,
  *    effect, OpenTUI, Solid or zod. The package declares no install
@@ -16,15 +14,13 @@
  *    program that embeds OpenCode has it. Plain Node imports "." and
  *    nothing else. dist/ holds only index.js and tui.js, neither has a
  *    relative import, and dist/tui.js imports only host-provided modules.
- * 4. Load, with no binary override. Status reads the cache and never
- *    downloads, so the plugin reports no gws binary until one is cached.
- *    Then each stock host gets a release copy (the package's manifest, and
- *    the verified executable in the host's cache, where a release install
- *    would have it), and its status RPC must report gws 0.22.5 from that
- *    cache. The checks:
+ * 4. Load with no binary cached. Status never downloads: it reports the
+ *    binary with no path and the coded refusal in `gws.problem`, which must be
+ *    the not-installed error or the manifest error, each with its next step.
+ *    The checks:
  *    - the SDK install in the embedded @opencode/sdk from devDependencies
  *      (2.2.3), and in the one under HOST_SDK_DIR when set (for example a
- *      2.2.4 SDK installed outside the lockfile), with no binary yet;
+ *      2.2.4 SDK installed outside the lockfile);
  *    - the bare install in each stock OpenCode of TESTED_HOSTS
  *      (src/domain/host.ts: 2.2.3, 2.2.4, 2.2.5 and 2.2.6), through
  *      `opencode serve`. Only a stock CLI supplies @opencode/plugin to a
@@ -44,20 +40,15 @@
  * with a random password.
  */
 import { spawn, spawnSync } from "node:child_process"
-import { createHash, randomBytes } from "node:crypto"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { randomBytes } from "node:crypto"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
 import { createRequire } from "node:module"
 import { createServer } from "node:net"
-import { gzipSync } from "node:zlib"
 import { dirname, join, sep } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { hostTarget } from "./build-native.mjs"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
-const REPO = "joe-broadhead/opencode-gws"
-const TAG = "v0.0.0"
 const NOT_INSTALLED = { path: "", version: "unknown" }
-const readProvenance = () => JSON.parse(readFileSync(join(ROOT, "native", "provenance.json"), "utf8"))
 
 const MAIN = "@joe-broadhead/opencode-gws"
 const PLUGIN_ID = "google-workspace.gws"
@@ -202,46 +193,6 @@ function addPluginSdk(project) {
   symlinkSync(sdk, join(project, "node_modules", "@opencode", "plugin"), "dir")
 }
 
-/**
- * Makes an installed copy look like a release install, without the network: its manifest/native.json pins the upstream
- * gzip under the release URL, and the verified executable (from npm run fetch:gws) sits in the host's cache where the
- * plugin looks for it. Returns that cached executable's path.
- */
-function installReleaseCopy(pluginDir, cacheDir) {
-  const provenance = readProvenance()
-  const target = hostTarget(provenance)
-  const entry = provenance.targets[target]
-  const executable = readFileSync(join(ROOT, ".cache", "gws", target, "gws"))
-  equal(createHash("sha256").update(executable).digest("hex"), entry.binary.sha256, "the fetched gws sha256")
-  const gzip = gzipSync(executable, { level: 9 })
-  const name = `gws-${target}.gz`
-  const manifest = {
-    schema: 1,
-    plugin: "opencode-gws",
-    repository: REPO,
-    tag: TAG,
-    built: { commit: "0".repeat(40), run: 1, workflow: "native" },
-    modules: {
-      gws: {
-        [target]: {
-          name,
-          url: `https://github.com/${REPO}/releases/download/${TAG}/${name}`,
-          bytes: gzip.length,
-          sha256: createHash("sha256").update(gzip).digest("hex"),
-          executable: { name: "gws", bytes: executable.length, sha256: entry.binary.sha256 },
-        },
-      },
-    },
-  }
-  mkdirSync(join(pluginDir, "manifest"), { recursive: true })
-  writeFileSync(join(pluginDir, "manifest", "native.json"), `${JSON.stringify(manifest, null, 2)}\n`)
-  const path = join(cacheDir, "native", TAG, "gws", target, "gws")
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, executable, { mode: 0o755 })
-  chmodSync(path, 0o755)
-  return path
-}
-
 function checkImports(project, root) {
   writeFileSync(
     join(project, "imports.mjs"),
@@ -316,11 +267,24 @@ async function loaded(list, pluginDir, what) {
   return find(await poll(list, (plugins) => find(plugins) !== undefined && find(plugins).state?.status !== "loading", what))
 }
 
+/** The two refusals a binary-less install may report: not installed yet, or no release manifest (a development copy). */
+const NOT_INSTALLED_PROBLEM = /^GWS_UNAVAILABLE: (gws is not installed yet|This copy of the plugin has no release manifest)\b.*Next step: \S/
+
+/** Status reports why no binary runs: the coded refusal with its next step. Status downloads nothing to say it. */
+function notInstalled(what, problem) {
+  check(typeof problem === "string" && NOT_INSTALLED_PROBLEM.test(problem), `${what}: status does not report the coded not-installed or manifest error with its next step (${problem ?? "nothing"})`)
+}
+
 function checkLoaded(host, entry, status, expected, diagnostics) {
   try {
     equal(entry?.state, { status: "active" }, `${host}: plugin state`)
     check(entry.features?.server && entry.features?.tui && entry.features?.rpc === undefined, `${host}: plugin parts ${JSON.stringify(entry.features)}`)
-    equal([status.version, status.host?.version, status.host?.range, status.gws], [expected.version, expected.hostVersion, HOST_RANGE, expected.gws], `${host}: status`)
+    equal(
+      [status.version, status.host?.version, status.host?.range, status.gws?.path, status.gws?.version],
+      [expected.version, expected.hostVersion, HOST_RANGE, expected.gws.path, expected.gws.version],
+      `${host}: status`,
+    )
+    notInstalled(host, status.gws?.problem)
   } catch (error) {
     throw new Error(`${error.message}\n${diagnostics()}`)
   }
@@ -584,18 +548,14 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
 
       const { output } = await api("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })
       equal(
-        [output?.version, output?.host, output?.gws],
-        [expected.version, { version, range: HOST_RANGE, tested: STOCK_HOSTS.includes(version) }, NOT_INSTALLED],
+        [output?.version, output?.host, output?.gws?.path, output?.gws?.version],
+        [expected.version, { version, range: HOST_RANGE, tested: STOCK_HOSTS.includes(version) }, NOT_INSTALLED.path, NOT_INSTALLED.version],
         `opencode ${version}: status`,
       )
-      // The release copy, as a release install would have it: the status RPC finds the cached executable without a
-      // download, and reports it.
-      const cached = installReleaseCopy(pluginDir, join(base, "home", ".cache", "opencode-gws"))
-      const resolved = (await api("POST", `/api/rpc/${PLUGIN_ID}/status`, { input: {} })).output
-      equal(resolved?.gws, { path: cached, version: "gws 0.22.5" }, `opencode ${version}: status after the cached install`)
+      notInstalled(`opencode ${version}`, output?.gws?.problem)
       check(proxy.attempts.length === 0, `opencode ${version} tried to reach the network: ${proxy.attempts.join(", ")}`)
       passed = true
-      console.log(`ok stock opencode ${version}: ${PLUGIN_ID} active, server registered, the access block after the base allow, /connect entries and forms, skills and manifest from the package, gws 0.22.5 from the host cache`)
+      console.log(`ok stock opencode ${version}: ${PLUGIN_ID} active, server registered, the access block after the base allow, /connect entries and forms, skills and manifest from the package, the status problem named with its next step`)
     } catch (error) {
       const extra = proxy.attempts.length > 0 ? `\nproxy attempts: ${proxy.attempts.join(", ")}` : ""
       throw new Error(`${error.message}\nserver log tail:\n${log}${extra}`)
@@ -614,9 +574,6 @@ async function checkStockHost(slot, binary, pluginDir, expected, root) {
 async function main() {
   check(Number(process.versions.node.split(".")[0]) >= 24, `the embedded host needs Node >= 24 (running ${process.version})`)
   const sdkDirs = [ROOT, ...(process.env.HOST_SDK_DIR ? [realpathSync(process.env.HOST_SDK_DIR)] : [])]
-  const target = hostTarget(readProvenance())
-  check(target, `no pinned gws for ${process.platform} ${process.arch}`)
-  check(existsSync(join(ROOT, ".cache", "gws", target, "gws")), `.cache/gws/${target}/gws is missing; run npm run fetch:gws first`)
   const version = packageJson(ROOT).version
   for (const file of ["index.js", "tui.js"]) check(readdirSync(join(ROOT, "dist")).includes(file), `dist/${file} is missing; run npm run build first`)
 

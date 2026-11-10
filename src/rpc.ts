@@ -50,7 +50,7 @@ export interface GwsStatus {
   state: GwsState
   /** What the generated default rules allow: `all`, `ask-changes` or `read-only`. */
   access: "all" | "ask-changes" | "read-only"
-  gws: { path: string; version: string }
+  gws: { path: string; version: string; problem?: string }
   services: string[]
   accounts: GwsAccount[]
   /** Audit persistence has failed; omitted means false. */
@@ -101,7 +101,7 @@ const status = object(
     host: object({ version: { type: ["string", "null"] }, range: text, tested: { type: "boolean" } }, ["version", "range", "tested"]),
     state: { enum: STATES },
     access: { enum: POLICY_ACCESS },
-    gws: object({ path: text, version: text }, ["path", "version"]),
+    gws: object({ path: text, version: text, problem: text }, ["path", "version"]),
     services: texts,
     accounts: { type: "array", items: account },
     auditDegraded: { type: "boolean" },

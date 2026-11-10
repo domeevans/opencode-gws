@@ -56,6 +56,8 @@ interface SetupOptions {
   skills?: Array<{ id: string; path: string; content?: string }>
   /** The plugin option that decides what the default rules allow. */
   access?: "all" | "ask-changes" | "read-only"
+  /** No binary.path: the binary is the release's, and nothing is cached. */
+  noBinary?: boolean
 }
 
 async function setup(options: SetupOptions = {}): Promise<Harness> {
@@ -95,7 +97,8 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
   }
   const runtime = await testRuntime(
     {
-      binary: { path: binary },
+      // `binary` named, even as undefined, keeps testRuntime from adding the fake binary.
+      ...(options.noBinary ? { binary: undefined } : { binary: { path: binary } }),
       accounts: options.accounts ?? { personal: account(), work: account({ services: ["gmail", "drive"] }) },
     },
     { host: options.host ?? { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, connection: integrationConnection(ctx as never, ids) },
@@ -153,6 +156,13 @@ describe("rpc contract", () => {
 })
 
 describe("status", () => {
+  it("reports a binary that is not installed with its coded problem and next step, and downloads nothing", async () => {
+    const h = await setup({ noBinary: true })
+    const output = await status(h)
+    expect(output.gws).toMatchObject({ path: "", version: "unknown" })
+    expect(String((output.gws as { problem?: string }).problem)).toMatch(/^GWS_UNAVAILABLE: .+ Next step: \S/)
+  })
+
   it("shows each account's access, client source, granted and missing scopes, and next step, never a token or secret", async () => {
     const work = requestedScopes(["gmail", "drive"], "write").filter((scope) => scope !== url("drive"))
     const h = await setup({

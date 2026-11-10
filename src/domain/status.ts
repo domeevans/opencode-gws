@@ -58,7 +58,7 @@ export interface RuntimeStatus {
   auditDegraded: boolean
   version: string
   host: z.infer<typeof Host>
-  binary: { path: string; version: string }
+  binary: { path: string; version: string; problem?: string }
   services: string[]
   accounts: AccountStatus[]
 }
