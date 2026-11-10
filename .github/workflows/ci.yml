@@ -68,8 +68,17 @@ jobs:
       - name: Install the gws package for ${{ matrix.target }}
         run: npm run fetch:gws
 
-      # The pack test installs each tested stock OpenCode (2.2.3, 2.2.4,
-      # 2.2.5 and 2.2.6, TESTED_HOSTS in src/domain/host.ts) into its temp
-      # folder, since OPENCODE_BIN_2_2_3 to _2_2_6 are unset here.
+      # The stock OpenCode binaries the host and pack stages spawn, one per tested release (TESTED_HOSTS in
+      # src/domain/host.ts), so every tested release really runs here: a missing one fails the run (PUBLIC-PATTERN R34).
+      - name: Stock OpenCode binaries
+        run: |
+          platform="$(node -p 'process.platform')-$(node -p 'process.arch')"
+          for version in 2.2.3 2.2.4 2.2.5 2.2.6; do
+            dir="$RUNNER_TEMP/stock-$version"
+            mkdir -p "$dir"
+            (cd "$dir" && npm init -y >/dev/null && npm install "@opencode/cli@$version" "@opencode/cli-$platform@$version" --omit=optional --ignore-scripts --no-audit --no-fund)
+            echo "OPENCODE_BIN_${version//./_}=$dir/node_modules/@opencode/cli-$platform/bin/opencode" >> "$GITHUB_ENV"
+          done
+
       - name: Check
         run: npm run check
