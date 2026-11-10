@@ -7,19 +7,21 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Changed
 
 - The Code Mode catalogue no longer pins `catalog` or `plan`. The Workspace skills describe call shapes, and Code Mode search finds full signatures. Both skills explain how to connect an account.
-
 - **Every tool is allowed by default.** The plugin inserts an allow for each of its actions, the six commit tools and
   the `gws.*` namespace included, so a tool a later release adds runs at once. The new `access` option restricts it:
   `"ask-changes"` asks before each commit, and `"read-only"` denies the commits while every read still runs. A commit
   still needs its plan and `planId`. `gws_status`, the status RPC and the dialog show the value.
-- The tools RPC follows the same default: a script runs every method unless `access` or a rule says otherwise.
-
+- The tools RPC follows the same default: a script runs every method unless a rule says otherwise.
 - The tools RPC, `google-workspace.gws.tools`, follows the family's shared v2.1 module (`src/host/tools-rpc.ts`). Its methods are the read tools, `status`, `catalog`, `schema`, `read`, `plan` and `events_list`, each with its input and output schema. The six commit tools are not methods: a script can plan a change, and a commit runs only from the model's approved tool. A call resolves the rule before dispatch: an `ask` is refused, and a `deny` is refused, with no gws call and no prompt.
 - `events_list` is a read, so it is allowed at every `access` value, as the other reads are.
 - A saved "Always allow" no longer authorises an ad-hoc script. A script's grant is a rule in config, or a Jobs run
   session; `docs/scripting.md` says so, and names the Jobs one-off as the way to get an approval-bound grant.
 - The permissions a script's calls assert now carry the same tool source id as a model call, so an inner `ask`, such
   as a plan's read of an event's guests, is refused and named instead of waiting for a prompt.
+
+### Fixed
+
+- `/gws-status` says what `access` decides for a pending commit: it runs without a prompt at `"all"`, asks at `"ask-changes"`, and is denied at `"read-only"`. The line used to say approval happens only in the permission prompt, which is false at `"all"`.
 
 ## [0.0.10] - 2026-11-08
 
