@@ -45,6 +45,7 @@
         "services": ["gmail", "drive", "calendar", "docs", "sheets", "admin-reports"],
         "access": "ask-changes",
         "allowUntestedHost": false,
+        "rpcCommits": false,
         "policy": {
           "planTtlSeconds": 300,
           "rules": [

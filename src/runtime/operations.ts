@@ -437,6 +437,7 @@ export class Operations {
         category,
         operation: plan.operation,
         durationMs: Date.now() - started,
+        caller: ctx.caller,
       })
       const answer = plan.files?.output ? parsed.data : withoutSavedBody(parsed.data)
       receipt = { ok: true, planId: plan.id, category, operation: plan.operation, result: answer ?? parsed.raw, file, ...(delivered?.cleanupDegraded ? { cleanupDegraded: true } : {}) }
@@ -451,6 +452,7 @@ export class Operations {
         operation: plan.operation,
         durationMs: Date.now() - started,
         errorCode: auditErrorCode(error),
+        caller: ctx.caller,
       })
       if (ctx.signal?.aborted) {
         throw new GwsError(

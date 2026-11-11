@@ -21,7 +21,7 @@ OpenCode
                      Google Workspace APIs
 ```
 
-A change is a dry-run plan, then one commit tool. The RPC, the TUI, and the commands cannot approve or commit.
+A change is a dry-run plan, then one commit tool. The RPC, the TUI, and the commands cannot approve or commit; the one exception is the tools RPC's commit methods, which exist only when the `rpcCommits` option is on ([scripting.md](scripting.md#committing-from-a-script-rpccommits)).
 
 ## Source layout
 

@@ -21,7 +21,7 @@ interface AuditEvent {
   operation?: string
   durationMs?: number
   errorCode?: string
-  /** `rpc` for a read or plan a script made through the tools RPC; absent for a tool call. */
+  /** `rpc` for a read, plan or commit a script made through the tools RPC; absent for a tool call. */
   caller?: "rpc"
 }
 

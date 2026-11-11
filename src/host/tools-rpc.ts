@@ -45,16 +45,21 @@ import { parse, toolSpecs, type Assert, type ToolClass } from "./tools.js"
 export const PLUGIN_ID = RPC_ID
 
 /**
- * gws has no MCP server, so the block declares no method. Its read methods are built in setup, from the tool table, by
+ * gws has no MCP server, so the block declares no method. Its methods are built in setup, from the tool table, by
  * `scriptMethods`, and appended to this list.
  */
 export const METHODS: readonly MethodSpec[] = []
 
 /**
- * gws has no MCP server, so its methods are plugin-owned read tools: the read tools in `toolSpecs` (status, catalog,
- * schema, read, plan and events_list), each with its name, action, schemas, permission asserts, run function and class.
- * `scriptMethods` turns those specs into the module's methods. The six commit tools are never methods: only known reads
- * become methods, so a commit runs only from the model's approved tool.
+ * gws has no MCP server, so its methods are plugin-owned tools from `toolSpecs`, each with its name, action, schemas,
+ * permission asserts, run function and class. `scriptMethods` turns those specs into the module's methods.
+ *
+ * By default only the read tools are methods (status, catalog, schema, read, plan and events_list), so a script can
+ * plan a change but a commit runs only from the model's approved tool. With the `rpcCommits` option, which a host turns
+ * on only when it confirms each change on its own screen before it calls the RPC, the six commit tools (write, send,
+ * share, delete, export and admin) are methods too. A commit method runs the commit tool's own spec: the plan stays
+ * single-use and bound to the account, session and agent that made it, the commit asserts its own action, and an
+ * `ask` on that action is refused like any other.
  */
 export interface MethodSources {
   readonly runtime: Runtime
@@ -64,7 +69,8 @@ export interface MethodSources {
 }
 
 export function scriptMethods(sources: MethodSources): readonly MethodSpec[] {
-  return toolSpecs(sources.runtime, sources.assert, sources.status).filter((spec) => spec.class === "read").map(
+  const commits = sources.runtime.config.rpcCommits
+  return toolSpecs(sources.runtime, sources.assert, sources.status).filter((spec) => commits || spec.class === "read").map(
     (spec): PluginMethod => ({
       kind: "plugin",
       name: spec.name,

@@ -58,7 +58,7 @@ Ask the agent for what you need. It works in four steps:
 
 ### Scripts
 
-A script or a cron job can call the read tools with no model, through `opencode api`: `status`, `catalog`, `schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits it. A rule that `ask`s is refused, because no one can answer it:
+A script or a cron job can call the read tools with no model, through `opencode api`: `status`, `catalog`, `schema`, `read`, `plan` and `events_list`. It runs as a session and its agent, under that agent's permission rules, which default to allowing every method. The commit tools are not methods, so a script plans a change but never commits it, unless the host turns on `rpcCommits` because it confirms changes itself. A rule that `ask`s is refused, because no one can answer it:
 
 ```sh
 opencode api post /api/rpc/google-workspace.gws.tools/read \

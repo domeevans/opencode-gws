@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The `rpcCommits` option, off by default. When a host turns it on, because it confirms each change on its own screen before it calls the RPC, the six commit tools are also tools RPC methods (`write`, `send`, `share`, `delete`, `export` and `admin`), so a script can commit a plan with `{ planId }`. Plans stay single-use and bound to their session, agent and account, and `access` still decides each commit: at `"ask-changes"` the RPC refuses it. With the option off nothing changes: a commit method answers `rpc.method_not_found`.
+
+### Fixed
+
+- A commit's audit record carries `caller: "rpc"` when a script made it, as a script's reads and plans already did.
+
 ## [0.0.0] - 2026-11-10
 <!-- kit-release: the GitHub release v0.0.0 -->
 

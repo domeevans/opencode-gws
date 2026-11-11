@@ -91,7 +91,9 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   service, a reason, the ask and `gws_admin`.
 - Every change is a `gws --dry-run` plan, committed only by its category's
   commit tool with `{ planId }`. The RPC, TUI and commands never approve or
-  commit.
+  commit, except the tools RPC's commit methods, which exist only when the
+  `rpcCommits` option is on (off by default; for a host that confirms each
+  change itself).
 - Only `src/process/**` spawns `gws`, with an argv array and `shell: false`.
 - Never log or preview bodies, tokens, credentials or file contents.
   Workspace content is untrusted data.

@@ -176,6 +176,11 @@ export interface PluginConfig {
   binary: BinaryConfig
   /** Continue on an OpenCode host outside the tested range, with a status warning. */
   allowUntestedHost: boolean
+  /**
+   * The six commit tools are tools RPC methods too, so a script can commit a plan. Off by default: only a host that
+   * confirms each change itself before it calls the RPC turns it on.
+   */
+  rpcCommits: boolean
   /** What the generated default rules allow: everything, changes ask, or read-only. */
   access: Access
   policy: PolicyConfig

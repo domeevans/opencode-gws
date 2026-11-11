@@ -158,6 +158,7 @@ const configSchema = z.strictObject({
     })
     .optional(),
   allowUntestedHost: z.boolean().optional(),
+  rpcCommits: z.boolean().optional(),
   access: z.enum(ACCESS_VALUES).optional(),
   admin: z
     .strictObject({
@@ -262,6 +263,7 @@ export function loadConfig(raw: unknown): PluginConfig {
       path: parsed.binary?.path,
     },
     allowUntestedHost: parsed.allowUntestedHost ?? false,
+    rpcCommits: parsed.rpcCommits ?? false,
     access: parsed.access ?? "all",
     policy: {
       planTtlSeconds: parsed.policy?.planTtlSeconds ?? 300,

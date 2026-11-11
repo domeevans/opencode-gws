@@ -144,4 +144,21 @@ describe("tools RPC on a real host", () => {
     const described = (await tools().describe!({}, at())) as { methods: Array<{ name: string }> }
     expect(described.methods.map((method) => method.name)).not.toContain("write")
   })
+
+  it("without rpcCommits, a commit method does not exist: send answers rpc.method_not_found and gws never runs", async () => {
+    const planned = await run("plan", sessions.build!, request("gmail.reply", { input: { messageId: "m-1", body: "hi" } }))
+    expect(planned.value, planned.message).toMatchObject({ ok: true, category: "send", planId: expect.any(String) })
+    const commits = () => host.invocations().filter((argv) => !argv.includes("--dry-run")).length
+    const before = commits()
+    const Send = Rpc.define({ id: "google-workspace.gws.tools", methods: { send: { input: open, output: open, errors: { failed: open } } }, events: {} })
+    const refused = await host.opencode
+      .rpc(Send)
+      .send({ sessionID: sessions.build!, input: { planId: planned.value.planId } }, at())
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      )
+    expect(`${JSON.stringify(refused)} ${String(refused)}`).toContain("method_not_found")
+    expect(commits()).toBe(before)
+  })
 })

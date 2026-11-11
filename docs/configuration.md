@@ -40,6 +40,7 @@ An account whose config sets `access` to read, with no write service, does not o
 | `callbackPort` | none: a random port | The port on `127.0.0.1` where the sign-in listens and the redirect is forwarded. Alone, a loopback redirect on that port. |
 | `binary.path` | the release binary | Absolute path to a `gws` 0.22.5 executable. See [backend.md](backend.md). |
 | `allowUntestedHost` | `false` | Load a host outside `>=2.2.3 <2.3.0`, such as 2.2.2, 2.3.0, 3.0.0, a prerelease or a dev build, and show it as host untested in status. A release inside the range loads without it; only 2.2.3, 2.2.4, 2.2.5 and 2.2.6 are tested. |
+| `rpcCommits` | `false` | Make the six commit tools methods of the tools RPC, so a script can commit a plan with `{ planId }`. Turn it on only in a host that confirms each change on its own screen before it calls the RPC: the plugin asks no one first. Plans stay single-use and bound to their session, and `access` still decides each commit. See [scripting.md](scripting.md#committing-from-a-script-rpccommits). |
 | `access` | `"all"` | What the default permission rules allow: `"all"` allows every tool, the six commit tools included; `"ask-changes"` allows the reads and asks for each commit; `"read-only"` allows the reads and denies the commits. It is not the account's sign-in level, which is `accounts.<alias>.access`. See [Approvals](#approvals). |
 | `policy` | see below | Deny-only content constraints, plus the plan lifetime. |
 | `execution` | see below | Timeouts, page caps, and file roots. |

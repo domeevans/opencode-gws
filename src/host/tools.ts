@@ -46,8 +46,10 @@ import type { Caller, PermissionRequest } from "./permissions.js"
  *
  * The specs are the one definition of each tool. The tools RPC
  * (`tools-rpc.ts`) runs the same specs for scripts, through
- * `scriptMethods`, with the same permission asserts: every tool is a
- * method, the six commit tools and events_list included.
+ * `scriptMethods`, with the same permission asserts. The read tools are
+ * methods, events_list included. The six commit tools are methods only
+ * when the `rpcCommits` option is on, for a host that confirms each change
+ * on its own screen before it calls the RPC.
  */
 
 export const NAMESPACE = {

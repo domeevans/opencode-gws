@@ -29,6 +29,12 @@ describe("config", () => {
     expect(() => testConfig({ allowUntestedHost: "yes" })).toThrow()
   })
 
+  it("takes rpcCommits as a boolean that defaults to false", () => {
+    expect(testConfig().rpcCommits).toBe(false)
+    expect(testConfig({ rpcCommits: true }).rpcCommits).toBe(true)
+    expect(() => testConfig({ rpcCommits: "yes" })).toThrow(/rpcCommits/)
+  })
+
   it("takes access as one of the three values, and defaults to all", () => {
     expect(testConfig().access).toBe("all")
     for (const access of ["all", "ask-changes", "read-only"] as const) expect(testConfig({ access }).access).toBe(access)
