@@ -66,6 +66,18 @@ describe("accounts", () => {
     }
   })
 
+  it("gives a named interactive account without enabledServices the default account's services, at Read-only", () => {
+    const services = loadManifest()
+      .services.map((service) => service.alias)
+      .filter((service) => !["keep", "modelarmor", "admin-reports"].includes(service))
+    expect(loadConfig({ accounts: { work: { mode: "interactive" } } }).accounts).toEqual({
+      work: { mode: "interactive", enabledServices: services, access: "read", scopes: [] },
+    })
+    expect(loadConfig({ accounts: { work: {} } }).accounts.work?.enabledServices).toEqual(services)
+    // A headless account still names its services.
+    expect(() => loadConfig({ accounts: { ci: { mode: "access_token", tokenEnv: "GWS_TOKEN" } } })).toThrow(/OPTIONS_INVALID/)
+  })
+
   it("says in the default form nothing about Keep, and in a Keep account's form that Keep needs domain-wide delegation", () => {
     expect(signInForm("default", loadConfig(undefined).accounts.default!, undefined)[2].description).not.toMatch(/delegation/)
     const notes = loadConfig({ accounts: { notes: { enabledServices: ["keep"], access: "write" } } }).accounts.notes!

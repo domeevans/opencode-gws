@@ -18,6 +18,14 @@ const READS = ["gws.catalog", "gws.events_list", "gws.plan", "gws.read", "gws.sc
 const RULES = defaultRules("all")
 
 describe("the jelly declaration", () => {
+  it("names each account with a value these options accept, so Jelly's added account loads", () => {
+    const signIn = (jelly.signIns as { account?: { option: string; value?: Record<string, unknown> } }[]).find((entry) => entry.account)
+    expect(signIn?.account?.option).toBe("accounts")
+    const config = loadConfig({ accounts: { work: { ...signIn?.account?.value } } })
+    expect(config.accounts.work?.mode).toBe("interactive")
+    expect(config.accounts.work?.enabledServices.length).toBeGreaterThan(0)
+  })
+
   it("declares the flat access option", () => {
     const settings = (jelly.contributes as { settings: { key: string; type: string; default: unknown }[] }).settings
     expect(settings.map(({ key, type }) => ({ key, type }))).toEqual([{ key: "access", type: "string" }])

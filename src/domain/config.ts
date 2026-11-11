@@ -59,11 +59,14 @@ const NOT_DEFAULT: readonly string[] = ["modelarmor", "admin-reports"]
  * delegation (Keep) are left out, as are NOT_DEFAULT. Every change still
  * needs a plan, the ask, and a commit; the form still offers Read-only.
  */
-function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
-  const services = loadManifest()
+function defaultServices(): string[] {
+  return loadManifest()
     .services.map((service) => service.alias)
     .filter((service) => !DELEGATION_SERVICES.includes(service) && !NOT_DEFAULT.includes(service))
-  return { default: { mode: "interactive", enabledServices: services, access: "write" } }
+}
+
+function defaultAccounts(): Record<string, { mode: "interactive"; enabledServices: string[]; access: "write" }> {
+  return { default: { mode: "interactive", enabledServices: defaultServices(), access: "write" } }
 }
 
 const enabledServices = z.array(z.string().min(1)).min(1)
@@ -76,7 +79,8 @@ const accountProfile = z.preprocess(
   z.discriminatedUnion("mode", [
     z.strictObject({
       mode: z.literal("interactive"),
-      enabledServices,
+      /** Omitted: the services the default account enables, which is what Jelly's declared account value writes. */
+      enabledServices: enabledServices.optional(),
       domains: domains.optional(),
       access: z.union([accessLevel, z.record(z.string().min(1), accessLevel)]).optional(),
       scopes: z.array(z.string().min(1)).optional(),
@@ -203,7 +207,7 @@ export function loadConfig(raw: unknown): PluginConfig {
   const known = new Set(loadManifest().services.map((service) => service.alias))
   const accounts: Record<string, AccountProfile> = {}
   for (const [alias, profile] of Object.entries(configured)) {
-    const enabled = [...new Set(profile.enabledServices.map(canonicalService))]
+    const enabled = [...new Set((profile.enabledServices ?? defaultServices()).map(canonicalService))]
     for (const service of enabled) {
       if (!known.has(service)) throw invalid(`Account '${alias}' enables the unknown service '${service}'`, `Fix accounts.${alias}.enabledServices in the plugin options.`)
     }

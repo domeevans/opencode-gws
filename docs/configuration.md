@@ -12,7 +12,7 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
 | Mode | Required | Meaning |
 | --- | --- | --- |
-| `interactive` | `enabledServices` | Run `/connect` and choose Google Workspace, or run `opencode auth login gws-<alias>`. |
+| `interactive` | none | Run `/connect` and choose Google Workspace, or run `opencode auth login gws-<alias>`. |
 | `credentials_file` | `enabledServices`, `credentialsFileEnv` | The named environment variable holds the path of a credentials file. Not a fallback. |
 | `access_token` | `enabledServices`, `tokenEnv` | The named environment variable holds an access token. Not a fallback. |
 
@@ -20,7 +20,7 @@ An annotated file is in [examples/opencode.jsonc](../examples/opencode.jsonc).
 
 | Field | Default | Meaning |
 | --- | --- | --- |
-| `enabledServices` | every manifest service except `keep`, `admin-reports` and `modelarmor`, on the implicit `default` account only | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
+| `enabledServices` | every manifest service except `keep`, `admin-reports` and `modelarmor`, on an interactive account (the implicit `default` one, or a named one that leaves it out, as Jelly's added account does); headless accounts must name theirs | Services this account may call. `reports` and `wf` canonicalize to `admin-reports` and `workflow`. |
 | `access` | `"read"`; `"write"` on the implicit `default` account | `"read"`, `"write"`, or a per-service map such as `{ "drive": "write" }`. A service a map omits stays read-only. Interactive accounts only. |
 | `scopes` | none | Extra scope URLs or short names, always shown at sign-in. Interactive accounts only. |
 | `oauthClient` | none | `{ "clientId", "clientSecret" }` of a Desktop app client, or Google's downloaded client JSON (`{ "installed": … }` or `{ "web": … }`), for this account. Overrides the plugin client. Interactive accounts only. |
