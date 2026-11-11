@@ -229,7 +229,17 @@ export function integrationConnection(
     return {
       connected: true,
       needsAuth,
-      ...(signIn ? { signIn: { access: signIn.access, clientSource: signIn.clientSource, grantedScopes: signIn.grantedScopes } } : {}),
+      ...(signIn
+        ? {
+            signIn: {
+              access: signIn.access,
+              clientSource: signIn.clientSource,
+              grantedScopes: signIn.grantedScopes,
+              ...(signIn.email ? { email: signIn.email } : {}),
+              ...(signIn.domain ? { domain: signIn.domain } : {}),
+            },
+          }
+        : {}),
     }
   }
 }

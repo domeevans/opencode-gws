@@ -45,6 +45,8 @@ afterEach(async () => {
 })
 
 const url = (scope: string) => `${SCOPE_PREFIX}${scope}`
+/** An id_token as Google's token endpoint returns it, with these claims. */
+const idToken = (claims: Record<string, unknown>) => `eyJhbGciOiJSUzI1NiJ9.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.c2ln`
 /** The account with no plugin options at all: every service, Read and write by default. */
 const defaultProfile = (): AccountProfile => loadConfig({}).accounts.default!
 const withoutIdentity = (scopes: readonly string[]) => scopes.filter((scope) => !IDENTITY_SCOPES.includes(scope))
@@ -346,6 +348,35 @@ describe("loopback browser flow", () => {
     }
   })
 
+  it("stores the signed-in email and Workspace domain from the id_token, and nothing else from it", async () => {
+    const id_token = idToken({ iss: "https://accounts.google.com", sub: "sub-never-stored", email: "ada@example.com", email_verified: true, hd: "example.com", name: "name-never-stored" })
+    const mock = await tokenServer(() => ({ status: 200, body: { access_token: "a", refresh_token: "r", expires_in: 60, id_token } }))
+    try {
+      const authorization = await integration(defaultProfile(), { auth: { tokenEndpoint: mock.url } }).authorize({ ...pasted(), access: "read" })
+      await completeCallback(authorization, { code: "c", state: stateOf(authorization) })
+      const { metadata } = await authorization.callback
+      expect(metadata).toMatchObject({ email: "ada@example.com", domain: "example.com" })
+      expect(JSON.stringify(metadata)).not.toMatch(/never-stored|id_token|eyJ/)
+    } finally {
+      await mock.close()
+    }
+  })
+
+  it("signs in without an identity when the token response has no id_token or a malformed one", async () => {
+    for (const extra of [{}, { id_token: "not-a-jwt" }]) {
+      const mock = await tokenServer(() => ({ status: 200, body: { access_token: "a", refresh_token: "r", expires_in: 60, ...extra } }))
+      try {
+        const authorization = await integration(defaultProfile(), { auth: { tokenEndpoint: mock.url } }).authorize({ ...pasted(), access: "read" })
+        await completeCallback(authorization, { code: "c", state: stateOf(authorization) })
+        const { metadata } = await authorization.callback
+        expect(metadata).not.toHaveProperty("email")
+        expect(metadata).not.toHaveProperty("domain")
+      } finally {
+        await mock.close()
+      }
+    }
+  })
+
   it("records the requested scopes as granted when Google's response omits the scope field", async () => {
     const mock = await tokenServer(() => ({ status: 200, body: { access_token: "a", refresh_token: "r", expires_in: 60 } }))
     try {
@@ -438,6 +469,25 @@ describe("refresh", () => {
       expect(credential.metadata).toEqual(signedIn().metadata)
     } finally {
       await mock.close()
+    }
+  })
+
+  it("follows the identity in a refresh's id_token, and keeps the stored one when the refresh has none", async () => {
+    const id_token = idToken({ email: "ada@example.com", email_verified: true, hd: "example.com" })
+    const withToken = await tokenServer(() => ({ status: 200, body: { access_token: "next", expires_in: 900, id_token } }))
+    try {
+      const refreshed = await refreshGoogle({ alias: "default", name: "Google Workspace", credential: signedIn(), options: { tokenEndpoint: withToken.url } })
+      expect(refreshed.metadata).toEqual({ ...signedIn().metadata, email: "ada@example.com", domain: "example.com" })
+    } finally {
+      await withToken.close()
+    }
+    const without = await tokenServer(() => ({ status: 200, body: { access_token: "next", expires_in: 900 } }))
+    try {
+      const stored = signedIn({ email: "ada@example.com", domain: "example.com" })
+      const refreshed = await refreshGoogle({ alias: "default", name: "Google Workspace", credential: stored, options: { tokenEndpoint: without.url } })
+      expect(refreshed.metadata).toEqual(stored.metadata)
+    } finally {
+      await without.close()
     }
   })
 

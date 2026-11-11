@@ -30,6 +30,10 @@ export interface GwsAccount {
   clientSource?: "account" | "plugin" | "pasted"
   /** Scopes Google granted to the current sign-in. */
   grantedScopes?: string[]
+  /** The signed-in account's verified email address, from the sign-in's id_token. */
+  email?: string
+  /** The signed-in account's Workspace domain (Google's `hd`); absent for a consumer account. */
+  domain?: string
   /** Scopes the enabled services need at this access level that were not granted. */
   missingScopes?: string[]
   /** Enabled services that need domain-wide delegation the account's scopes do not add, so none of their methods can run. */
@@ -88,6 +92,8 @@ const account = object(
     access: { enum: ACCESS },
     clientSource: { enum: CLIENT_SOURCES },
     grantedScopes: texts,
+    email: text,
+    domain: text,
     missingScopes: texts,
     delegationRequired: texts,
     nextStep: text,
@@ -144,6 +150,8 @@ function isAccount(value: unknown): value is GwsAccount {
     optional(value["access"], (entry) => ACCESS.includes(entry)) &&
     optional(value["clientSource"], (entry) => CLIENT_SOURCES.includes(entry)) &&
     optional(value["grantedScopes"], isStrings) &&
+    optional(value["email"], isText) &&
+    optional(value["domain"], isText) &&
     optional(value["missingScopes"], isStrings) &&
     optional(value["delegationRequired"], isStrings) &&
     optional(value["nextStep"], isText)

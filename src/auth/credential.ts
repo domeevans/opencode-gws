@@ -2,13 +2,14 @@ import * as z from "zod"
 import { ClientIdSchema, ClientSecretSchema } from "../domain/config.js"
 import type { AccessLevel } from "../domain/types.js"
 import type { ClientChoice } from "./client.js"
+import type { SignInIdentity } from "./identity.js"
 
 /**
  * What a Google sign-in stores in the OpenCode credential's `metadata`,
  * next to the tokens: the client it used (so refresh keeps working when the
  * default changes; a Web client also keeps its redirect URIs), the access
- * level, and the scopes it requested and Google granted. It lives only in OpenCode's credential store; the plugin
- * writes no credential or client file.
+ * level, the scopes it requested and Google granted, and the signed-in email and Workspace domain from the id_token.
+ * It lives only in OpenCode's credential store; the plugin writes no credential or client file.
  */
 
 const SignInMetadata = z.object({
@@ -19,6 +20,8 @@ const SignInMetadata = z.object({
   access: z.enum(["read", "write"]),
   requestedScopes: z.array(z.string()),
   grantedScopes: z.array(z.string()),
+  email: z.string().optional(),
+  domain: z.string().optional(),
 })
 
 export type SignInMetadata = z.output<typeof SignInMetadata>
@@ -28,6 +31,7 @@ export function signInMetadata(input: {
   access: AccessLevel
   requestedScopes: readonly string[]
   grantedScopes: readonly string[]
+  identity?: SignInIdentity | undefined
 }): SignInMetadata {
   const { redirectUris } = input.client.client
   return {
@@ -38,6 +42,8 @@ export function signInMetadata(input: {
     access: input.access,
     requestedScopes: [...input.requestedScopes],
     grantedScopes: [...input.grantedScopes],
+    ...(input.identity?.email ? { email: input.identity.email } : {}),
+    ...(input.identity?.domain ? { domain: input.identity.domain } : {}),
   }
 }
 

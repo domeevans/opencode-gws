@@ -15,7 +15,7 @@ export interface ConnectionView {
   /** The host marked the connection as needing sign-in again. */
   needsAuth: boolean
   /** The stored sign-in; absent when the credential could not be read. */
-  signIn?: Pick<SignInMetadata, "access" | "clientSource" | "grantedScopes">
+  signIn?: Pick<SignInMetadata, "access" | "clientSource" | "grantedScopes" | "email" | "domain">
 }
 
 interface AccountSignInStatus {
@@ -27,6 +27,10 @@ interface AccountSignInStatus {
   /** The client the sign-in used; before sign-in, the one it would use. */
   clientSource?: ClientSource
   grantedScopes?: string[]
+  /** The signed-in account's verified email address, from the sign-in's id_token. */
+  email?: string
+  /** The signed-in account's Workspace domain (Google's `hd`); absent for a consumer account. */
+  domain?: string
   /** Scopes the enabled services need at this access level that Google did not grant. */
   missingScopes?: string[]
   /** What to do next, as one sentence; absent when nothing is needed. */
@@ -77,7 +81,7 @@ export function accountSignInStatus(input: StatusInputs): AccountSignInStatus {
       ...(connection.needsAuth ? { needsAuth: true as const } : {}),
       access: signIn?.access ?? access,
       ...(signIn ? { clientSource: signIn.clientSource } : configured ? { clientSource: configured.source } : {}),
-      ...(signIn ? { grantedScopes: signIn.grantedScopes } : {}),
+      ...(signIn ? { grantedScopes: signIn.grantedScopes, ...identityOf(signIn) } : {}),
       nextStep: `To sign in again, ${connect}.`,
     }
   }
@@ -87,7 +91,12 @@ export function accountSignInStatus(input: StatusInputs): AccountSignInStatus {
     access: signIn.access,
     clientSource: signIn.clientSource,
     grantedScopes: signIn.grantedScopes,
+    ...identityOf(signIn),
     missingScopes: missing,
     ...(missing.length > 0 ? { nextStep: `To sign in again, ${connect}, and approve every scope Google lists.` } : {}),
   }
+}
+
+function identityOf(signIn: Pick<SignInMetadata, "email" | "domain">): { email?: string; domain?: string } {
+  return { ...(signIn.email ? { email: signIn.email } : {}), ...(signIn.domain ? { domain: signIn.domain } : {}) }
 }

@@ -139,6 +139,7 @@ describe("rpc contract", () => {
     const valid = { version: "1", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "sign_in_required", access: "all", nextStep: "Sign in.", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
     expect(isStatus(valid)).toBe(true)
     expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: ["keep"] }] })).toBe(true)
+    expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], email: "ada@example.com", domain: "example.com" }] })).toBe(true)
     for (const broken of [
       null,
       { ...valid, unguardedAgents: undefined },
@@ -151,11 +152,29 @@ describe("rpc contract", () => {
       { ...valid, access: "sometimes" },
       { ...valid, nextStep: undefined },
       { ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: "keep" }] },
+      { ...valid, accounts: [{ ...valid.accounts[0], email: 1 }] },
+      { ...valid, accounts: [{ ...valid.accounts[0], domain: ["example.com"] }] },
     ]) expect(isStatus(broken), JSON.stringify(broken)).toBe(false)
   })
 })
 
 describe("status", () => {
+  it("names the signed-in email and Workspace domain an account's sign-in recorded, and nothing for one that recorded none", async () => {
+    const scopes = requestedScopes(["gmail"], "read")
+    const signedIn = storedSignIn("read", scopes)
+    const h = await setup({
+      connections: {
+        "gws-personal": { type: "credential", id: "cred_1", label: "personal", method: "oauth" },
+        "gws-work": { type: "credential", id: "cred_2", label: "work", method: "oauth" },
+      },
+      credentials: { cred_1: { ...signedIn, metadata: { ...signedIn.metadata, email: "ada@example.com", domain: "example.com" } }, cred_2: storedSignIn("read", scopes) },
+    })
+    const [personal, work] = (await status(h)).accounts
+    expect(personal).toMatchObject({ alias: "personal", connected: true, email: "ada@example.com", domain: "example.com" })
+    expect(work).not.toHaveProperty("email")
+    expect(work).not.toHaveProperty("domain")
+  })
+
   it("reports a binary that is not installed with its coded problem and next step, and downloads nothing", async () => {
     const h = await setup({ noBinary: true })
     const output = await status(h)

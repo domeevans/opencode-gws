@@ -186,4 +186,6 @@ Google grants `https://www.googleapis.com/auth/keep`, `https://www.googleapis.co
 
 ## After sign-in
 
-`/gws-status` and `gws_status` show, per account, the mode, access, client source (`account`, `plugin`, or `pasted`), granted scopes, scopes still missing for the enabled services, and a next step. The TUI status dialog shows the same fields. The status RPC carries those account fields.
+`/gws-status` and `gws_status` show, per account, the mode, access, client source (`account`, `plugin`, or `pasted`), granted scopes, the signed-in `email` and Workspace `domain`, scopes still missing for the enabled services, and a next step. The TUI status dialog shows the same fields except `email` and `domain`. The status RPC carries all of those account fields.
+
+`email` and `domain` come from the `id_token` Google's token endpoint returns: the sign-in keeps two of its claims with its tokens, the email address, when Google says it is verified, as `email`, and the Workspace domain (`hd`) as `domain`, which a consumer account has none of. A refresh that returns an `id_token` updates them. Status shows both, so a host can tell which account and organisation is signed in; nothing else is read from the token, and neither decides what the plugin allows. A headless account has neither.
