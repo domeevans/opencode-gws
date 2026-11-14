@@ -97,7 +97,7 @@ A Calendar event write (`insert`, `patch`, `update`, `move`, `quickAdd`) becomes
 
 **Every tool is allowed by default.** The plugin inserts its default rules through `ctx.agent.transform`, immediately after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets none, so its default deny stays a deny. The block is the `gws.*` namespace, then the five reads, then the six commits; the `access` option decides the effect, and the README prints the block for each value:
 
-| `access` | The namespace and the six commits | The six reads, events_list included |
+| `access` | The namespace and the six commits | The six read tools, events_list included, and the source reads probe, calendar_today and images_read |
 | --- | --- | --- |
 | `"all"` (the default) | `allow` | `allow` |
 | `"ask-changes"` | `ask` | `allow` |
@@ -187,17 +187,40 @@ Two skills load automatically: `opencode-gws` (how the tools work: accounts, pla
 
 ## Events list
 
-`gws_events_list` (tools RPC method `events_list`) is Gmail's side of Memory's sources funnel: the shared `events_list` contract in `src/host/events-list.ts`, which every source plugin carries. Memory's collector calls it on a schedule, with no model and no one there.
+`gws_events_list` (tools RPC method `events_list`) is this plugin's side of the source contract
+([`@we-the-rebel-alliance/source-contract`](https://github.com/we-the-rebel-alliance/source-contract) v0.1.0, which the
+plugin bundles): the events sources `gws.gmail` and `gws.calendar` that `package.json` `sources` declares. Memory's
+collector and any other consumer call it with no model and no one there. See [Sources](#sources) for the declaration
+and the other source reads.
 
 | Input | Default | Rule |
 | --- | --- | --- |
+| `source` | `gmail` | The source to list: `gmail` or `calendar`. Any other is `SOURCE_UNKNOWN`. |
 | `since` | 24 hours ago | Where to start when there is no cursor: an ISO date (a UTC day) or an ISO date-time with `Z` or an offset. |
-| `cursor` | unset | The `cursor` of the previous result. It wins over `since`. A cursor from another account, another source, or the account before it signed in as another address is `CURSOR_INVALID`. |
+| `cursor` | unset | The `cursor` of the previous result. It wins over `since`. A cursor of another source, account or calendar, or of the account before it signed in as another address, is `CURSOR_INVALID`. |
 | `limit` | `100` | Events, 1–500. |
 | `account` | the only account | The account alias, as for every tool. |
-| `source` | `gmail` | The source to list. Only `gmail` exists until Calendar and Drive are added; any other is `GWS_VALIDATION_ERROR`. |
+| `scope` | unset | Calendar only: `{ "calendars": ["primary"] }`, the one calendar it reads (the primary calendar's own id is the same calendar). Gmail takes no scope. |
 
-The result is `{ source, account, owner, events, cursor, more, trust: "untrusted" }`. `source` is `gmail` and `account` the account alias on every result, an empty one included, so Memory can bind the source before it has anything to list. `owner` is `{ "id": "mailto:<address>", "label": "<address>" }`, the account's address from `gmail.users.getProfile`. Each event is one Gmail message:
+A malformed input, including a scope a source does not declare or another calendar, is `INPUT_INVALID`, and nothing runs.
+
+The result is `{ source, account, owner, events, cursor, more, trust: "untrusted", plugin, asOf }`, with `scope` for
+Calendar, and `refused`, `failed` and `gap` when they apply. `source` and `account` are on every result, an empty one
+included. `owner` is `{ "id": "mailto:<address>", "label": … }`: Gmail's address from `gmail.users.getProfile`, or the
+primary calendar's id and name from `calendar.calendarList.get`.
+
+- `refused[]` lists, for good, what the page leaves out: an item whose title or text holds a secret, by the contract's
+  screening (`{ external_id, reason: "secret", detail }`; the detail never holds the content). The cursor moves past it.
+- `failed[]` lists a Gmail message Google failed to answer this time (a 5xx is `UNAVAILABLE`, a 429 `RATE_LIMITED`).
+  The page then answers the cursor it was called with, so the next call reads that message again. Calendar never
+  answers `failed[]`: a page is one `calendar.events.list` answer.
+- `gap: { reason: "expired", since }` says the history behind the cursor is gone (Gmail no longer keeps the history id,
+  or Calendar's sync token answered 410), and the source read on from `since`, the last event it had listed.
+
+The cursor is the contract's version 2, bound to the plugin (`gws`), the source, the account and Calendar's calendar. A
+Gmail cursor from before this release (contract 1) is read for one release.
+
+Each Gmail event is one message:
 
 | Field | Value |
 | --- | --- |
@@ -211,9 +234,42 @@ The result is `{ source, account, owner, events, cursor, more, trust: "untrusted
 | `text` | The plain part, else the HTML part as text, else the snippet: without quoted lines, a quoted reply and its header ("On … wrote:", Outlook's "From: … Sent: …", "Original Message"), or the signature after `-- ` or "Sent from my …"; at most 4,096 characters. |
 | `labels` | Gmail's system labels it has: `inbox`, `sent`, `important`, `starred`, `unread`, `personal`, `updates`, `forums`. |
 
-Spam, trash, drafts, Promotions and Social are never events. The first listing (no cursor) notes the mailbox's history id, then searches `messages.list` for the messages after `since`, at most 10,000, and lists them oldest first. After that it follows `history.list` from the noted id, so a message that arrives meanwhile is listed too, at worst twice; Memory drops the repeat. When Gmail no longer keeps a cursor's history id, it searches again from the last event it listed. A message deleted after it was listed is skipped. The cursor holds where the listing stands, so calling again with an older cursor lists the same events again. A result stops early, with `more`, before its JSON passes 900,000 bytes.
+Spam, trash, drafts, Promotions and Social are never events. The first listing (no cursor) notes the mailbox's history id, then searches `messages.list` for the messages after `since`, at most 10,000, and lists them oldest first. After that it follows `history.list` from the noted id, so a message that arrives meanwhile is listed too, at worst twice; Memory drops the repeat. When Gmail no longer keeps a cursor's history id, it searches again from the last event it listed, with `gap`. A message deleted after it was listed is skipped. The cursor holds where the listing stands, so calling again with an older cursor lists the same events again. A result stops early, with `more`, before its JSON passes 262,144 bytes, the declared `maxBytes`.
 
-It only reads and never asks: it asserts `gws.events_list` on `<account>:gmail.users.history.list`, then `gws.read` on `<account>:<operation>` for `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.messages.list` and `gmail.users.messages.get`, before any read runs. Each read passes the plugin's read policy and audit like a `gws_read`. A deny rule on `gws.events_list` turns it off without touching `gws_read`.
+Each Calendar event is one event of the primary calendar, `kind` `meeting`: `occurred_at` when it starts (a cancellation: when it was cancelled), the organizer and attendees as `mailto:` actors, the title, the description and location as text, the event's link, and its status (`confirmed`, `tentative` or `cancelled`) as its label; a cancelled meeting carries no text or actors. The first listing is a full sync from `since` (`showDeleted` and `singleEvents` on); after it, Google's sync token lists what changed.
+
+It only reads and never asks: it asserts `gws.events_list` on `<account>:<operation>` for the operation the source follows (`gmail.users.history.list`, `calendar.events.list`), then `gws.read` on `<account>:<operation>` for every operation the source runs (Gmail: `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.messages.list` and `gmail.users.messages.get`; Calendar: `calendar.calendarList.get` and `calendar.events.list`), before any read runs. Each read passes the plugin's read policy and audit like a `gws_read`. A deny rule on `gws.events_list` turns it off without touching `gws_read`.
+
+## Sources
+
+`package.json` `sources` declares what any consumer may read (contract version 1), read from the installed package,
+never over RPC. Every source is private, free, and read over the tools RPC `google-workspace.gws.tools` (`sources.rpc`).
+
+| Source | Kind | Method and action | Operations | Answer |
+| --- | --- | --- | --- | --- |
+| `gws.gmail` | events (`message`) | `events_list`, `gws.events_list` | `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.messages.list`, `gmail.users.messages.get` | pages of at most 256 KB |
+| `gws.calendar` | events (`meeting`), scope `calendars` | `events_list`, `gws.events_list` | `calendar.calendarList.get`, `calendar.events.list` | pages of at most 256 KB |
+| `gws.calendar.today` | snapshot, `agenda` | `calendar_today`, `gws.calendar_today` | `calendar.calendars.get`, `calendar.events.list` | today's events, at most 64 KB, reused for 60 seconds |
+| `gws.image` | snapshot, `image`, param `url` | `images_read`, `gws.images_read` | `drive.files.get` | one picture, at most 1 MB |
+
+- **`probe`** (action `gws.probe`, `sources.probe`) answers whose a source is, per source (`gmail`, `calendar`,
+  `calendar-today` or `image`): `{ source, account, owner: { id: "mailto:<address>", label }, scopes, trust }`, from the
+  verified email Google returned at sign-in (the one `gws_status` shows) and the scopes Google granted for that source's
+  service. It calls no Google API and reads no content. An account with no verified email is `AUTH_REQUIRED`.
+- **`calendar_today`** answers Jelly's `calendar.today` read as the contract's snapshot, `{ data: { items }, asOf,
+  account, trust }`: the same reader (the calendar's own time zone, a 60-second reuse, a stale answer when Google fails
+  later the same day, with the `asOf` of the last good read), titles and locations cut to 120 characters. It asserts
+  `gws.calendar_today`, then `gws.read` on its two operations.
+- **`images_read`** answers Jelly's `images.read` read as the contract's snapshot, `{ data: { dataUri, alt }, asOf,
+  account?, trust }`, for `{ url, account? }`: a Drive file read as the account, or an address on Google's image servers,
+  with the account's token only when Google returned that address to the account. A GIF is `IMAGE_TYPE_REFUSED`, and a
+  picture whose data URI is over the contract's limit (1 MB less 4 KB, about 760 KB of picture) is `TOO_LARGE`, never
+  cut. It asserts `gws.images_read`, then `gws.read` on `<account>:drive.files.get` before a Drive read.
+
+The three are tools RPC methods only, never model tools, and reads, so `access` never holds them back. Jelly's
+`calendar.today` on the RPC named after the package answers as before until 0.1.0; once it is called, status says
+`Deprecated: …` with the method to use instead. `npm run check` runs the source contract's conformance kit over every
+source and writes its report to `reports/source-conformance.json`.
 
 ## Errors
 
@@ -230,7 +286,10 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `OPERATION_UNKNOWN` | The operation id is not in the gws manifest. | Find the exact method or helper id with gws_catalog, then retry. |
 | `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
 | `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
-| `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this account and its mailbox: another account's or source's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
+| `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this source, account and scope: another account's, source's or calendar's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
+| `INPUT_INVALID` | A source read refused its input: events_list, probe, calendar_today or images_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, or a calendar other than the primary one. Nothing ran. | Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry. |
+| `SOURCE_UNKNOWN` | A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran. | Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today or image for probe. |
+| `TOO_LARGE` | A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture). Nothing is cut short. | Read a smaller picture, such as the file's thumbnail. |
 | `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
 | `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
 | `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |
@@ -255,7 +314,7 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `GWS_API_ERROR` | Google returned an error; the message carries Google's text. | Fix the ids or parameters once from the message; if it fails again, tell the user Google's message. |
 | `CALENDAR_UNAVAILABLE` | The read Jelly's calendar makes, calendar.today, has no answer: no configured account enables calendar, or Google's answer for the primary calendar named no time zone. | Add calendar to an account's enabledServices; if it is enabled, retry later. |
 | `IMAGE_HOST_REFUSED` | The picture Jelly asked images.read for has an address the plugin does not take: not https, a user name, password, port or IP address in it, a host other than drive.google.com or Google's image servers (lh3 to lh7 under googleusercontent.com; any other googleusercontent.com name can be anyone's), or a Drive link that names no file. Nothing was fetched. | Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink. |
-| `IMAGE_TYPE_REFUSED` | The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. | Show a PNG, JPEG, GIF or WebP picture instead. |
+| `IMAGE_TYPE_REFUSED` | The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. The image source (images_read) also refuses a GIF, which the contract's image output does not take. | Show a PNG, JPEG, GIF or WebP picture instead; for images_read, a PNG, JPEG or WebP. |
 | `IMAGE_TOO_LARGE` | The picture is over 1 MB, the most Jelly draws; the plugin stops reading at that size and answers nothing. | Show the file's thumbnail (its thumbnailLink) instead. |
 | `IMAGE_UNAVAILABLE` | The picture could not be read: Google answered with an error or a redirect (never followed), a Drive file is not a picture and has no thumbnail, or too many pictures are being read at once. | Check that the account can open the file; retry later. |
 | `IMAGE_ACCOUNT_AMBIGUOUS` | No single account can read the picture: no account enables drive, or several could and none is the default account. The plugin never tries each account in turn. | Add drive to one account's enabledServices, or name an account default. |

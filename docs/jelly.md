@@ -68,6 +68,11 @@ the agent's rules before the call reaches the plugin: an RPC call carries no ses
 OpenCode itself. Outside Jelly, any client of the OpenCode server can call the method, as it can the status RPC.
 The read therefore exposes event titles, locations and meeting links to any client of the OpenCode server, as the tools RPC can already reach `gws_read`, so serving OpenCode beyond localhost needs the server's own authentication.
 
+`calendar.today` is deprecated until 0.1.0: the same read is the source contract's snapshot `gws.calendar.today`, the
+method `calendar_today` on the tools RPC `google-workspace.gws.tools` (action `gws.calendar_today`), which a source
+descriptor can name, answering `{ data: <agenda>, asOf, account, trust }` ([Sources](configuration.md#sources)). Jelly's
+Home binding moves there; until then the old method answers as before, and status says once it was called.
+
 What it answers: `{ account, at, state, events }`.
 
 - `account` is the alias of the account that answers: the implicit `default` account, or else the first configured

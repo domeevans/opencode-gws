@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The plugin declares its sources under the shared source contract ([`@we-the-rebel-alliance/source-contract`](https://github.com/we-the-rebel-alliance/source-contract) v0.1.0, contract version 1), in a top-level `sources` key of `package.json` that any consumer (Memory, Artifacts, Jelly) reads from the installed package: `gws.gmail` and `gws.calendar` (events, through `events_list`), `gws.calendar.today` (a snapshot, an `agenda`) and `gws.image` (a snapshot, an `image`, param `url`, at most 1 MB), each private and free, with the exact operations its reads assert; the tools RPC id `google-workspace.gws.tools` (`sources.rpc`) and the probe's action `gws.probe` (`sources.probe`). `npm run check` runs the contract's conformance kit over every source, through the real tools RPC methods against the fake gws with recorded, synthetic fixtures, and writes the report to `reports/source-conformance.json` for the release to attach ([Sources](docs/configuration.md#sources)).
+
+- **For Memory:** `events_list` serves Calendar (`source: "calendar"`, scope `{ "calendars": ["primary"] }`): the primary calendar's events since a cursor, a full sync and then Google's sync token, a cancellation as a meeting with the `cancelled` label. Every page now carries the contract's additions: `plugin`, `asOf`, `refused[]` (an item holding a secret, screened by the contract's detector; the cursor moves past it), `failed[]` (a Gmail message Google failed to answer this time; the page answers the cursor it was called with) and `gap: { reason: "expired", since }` (Gmail no longer kept the history id, or Calendar's sync token expired, and the source read on from `since`). The cursor is the contract's version 2, bound to (`gws`, the source, the account, Calendar's calendar); a Gmail cursor from before this release is read for one release. A malformed input is `INPUT_INVALID` and an unknown source `SOURCE_UNKNOWN`, the contract's codes, where they were `GWS_VALIDATION_ERROR`. A page stops at 262,144 bytes (the declared `maxBytes`), where it stopped at 900,000.
+
+- `probe`, a tools RPC method (action `gws.probe`): whose a source is, per source, `{ source, account, owner: { id: "mailto:<address>", label }, scopes, trust }`, from the verified email Google returned at sign-in and the scopes granted for that source's service. It calls no Google API and reads no content; an account with no verified email is `AUTH_REQUIRED`.
+
+- **For Jelly:** `calendar_today` (action `gws.calendar_today`) and `images_read` (action `gws.images_read`), tools RPC methods that answer the reads Jelly makes as the contract's snapshots, `{ data, asOf, account, trust }`: today's calendar as an `agenda` (titles and locations cut to 120 characters), and a picture as an `image` data URI (a GIF is `IMAGE_TYPE_REFUSED`; a data URI over the contract's 1 MB less 4 KB is the new `TOO_LARGE`, never cut). Jelly's Home binding moves to `calendar_today` on `google-workspace.gws.tools`, which a descriptor can name. The three are reads, so `access` never holds them back, and none is a model tool.
+
+### Changed
+
+- The tools RPC transport, the `events_list` page, event, screening and cursor are the source contract package's (pinned by tag as a devDependency, at its commit in the lockfile, and bundled into `dist/index.js`, so an install runs no build and has no runtime dependency): `src/host/tools-rpc.ts` and `src/host/events-list.ts`, the family's copies, are gone, with their `check-copies.mjs` pins and their copied test suites, which the package runs. Every existing method answers as before, on the same id; `describe` lists the three new methods.
+
+### Deprecated
+
+- **For Jelly:** `calendar.today` on the RPC named after the package answers as before until 0.1.0. Once it is called, status says so (`deprecated` in `gws_status` and the status RPC, a **Deprecated** row in `/gws-status` and the status dialog), naming `calendar_today` on `google-workspace.gws.tools` instead. `images.read` is unchanged.
+
 ## [0.0.4] - 2026-11-14
 
 ### Changed

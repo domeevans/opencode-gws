@@ -57,7 +57,9 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 - `plan-then-commit` is unchanged: a commit still needs a `planId` from
   `plan`, bound to the session, agent and account. The default allow is a
   permission default, not a shortcut past the plan.
-- The tools RPC's methods are the six reads. The `rpcCommits` option, off
+- The tools RPC's methods are the six read tools and the source contract's
+  three reads (`probe`, `calendar_today`, `images_read`, each with its own
+  `gws.<name>` read action). The `rpcCommits` option, off
   by default, makes the six commits methods too (`write`, `send`, `share`,
   `delete`, `export`, `admin`), for a host that confirms each change
   itself. Then a script whose session resolves the commit's action to
@@ -121,13 +123,18 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 
 ## Tools, errors, skills
 
-- `gws_events_list` is Gmail's side of Memory's sources funnel: a Code
-  Mode read that never asks, asserting `gws.events_list` and then
-  `gws.read` on each Gmail read it makes. `src/host/events-list.ts` is the
-  shared `events_list` contract every source plugin carries unchanged
-  (`scripts/check-copies.mjs` pins it); change it in every source plugin
-  at once. Its tests run the contract's conformance check against the fake
-  gws's synthetic mailbox (`FAKE_GWS_MAILBOX`).
+- `package.json` `sources` declares the plugin's sources under the source
+  contract (`@we-the-rebel-alliance/source-contract`, pinned by tag as a
+  devDependency and bundled into `dist/index.js`): `gws.gmail` and
+  `gws.calendar` (`events_list`), `gws.calendar.today` and `gws.image`
+  (snapshots), with `probe`. The page, event, screening, cursor and the
+  tools RPC transport are the package's; never copy them back. Every tool
+  a source names is a read, and its `permission.operations` are exactly
+  what its code asserts: `test/source-conformance.test.ts` runs the
+  contract's conformance kit over the real methods against the fake gws
+  (`FAKE_GWS_MAILBOX`, `FAKE_GWS_CALENDAR`), and fails on any difference.
+  It writes `reports/source-conformance.json`. Change a declaration and
+  its code together.
 
 - `manifest/generated.json` is the coverage contract. Regenerate it with
   `npm run manifest`; never hand-edit it or any other generated file.

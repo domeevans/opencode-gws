@@ -17,7 +17,8 @@ can plan a change, but only the model's approved commit tool runs the plan, so a
 | `schema` | `gws_schema` |
 | `read` | `gws_read` |
 | `plan` | `gws_plan` |
-| `events_list` | Code Mode only: the Gmail messages since a cursor, as Memory's events ([configuration.md](configuration.md#events-list)) |
+| `events_list` | Code Mode only: the Gmail messages or Calendar events since a cursor, as the source contract's events ([configuration.md](configuration.md#events-list)) |
+| `probe`, `calendar_today`, `images_read` | none: the source contract's probe and its two snapshot reads, `gws.calendar.today` and `gws.image`, each with its own read action ([Sources](configuration.md#sources)) |
 | `write`, `send`, `share`, `delete`, `export`, `admin` | Only with `rpcCommits`: `gws_write`, `gws_send`, `gws_share`, `gws_delete`, `gws_export` and `gws_admin`, each taking only `{ planId }` ([Plans and commits](#plans-and-commits)) |
 | `describe` | none: lists the methods with their class and their input and output as JSON Schema; with `sessionID`, each method also reports its resolved `permission` |
 
@@ -199,7 +200,9 @@ envelope, with one message per problem, in the wording every plugin's tools RPC 
 | `input` missing | `"input" is missing` |
 | `describe` given anything but nothing, `{}`, or `{"sessionID": "…"}` | `describe takes nothing, or {"sessionID":"<session>"}` |
 
-The tool's own input is checked by the tool, as `GWS_VALIDATION_ERROR`.
+The tool's own input is checked by the tool, as `GWS_VALIDATION_ERROR`; the source reads (`events_list`, `probe`,
+`calendar_today`, `images_read`) refuse it as the source contract does, with `INPUT_INVALID`, and an unknown source with
+`SOURCE_UNKNOWN`.
 
 `opencode api` exits with status 1 on any RPC error, and prints the error body, so a shell script can test `$?` and
 read `data.code`.
