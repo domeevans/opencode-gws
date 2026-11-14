@@ -1,0 +1,114 @@
+{
+  "id": "sam.rivera@example.com",
+  "summary": "Sam Rivera",
+  "timeZone": "Europe/London",
+  "listings": {
+    "full": [
+      {
+        "items": [
+          {
+            "id": "evt-a",
+            "status": "confirmed",
+            "summary": "Quarterly plan",
+            "description": "Agenda: Q4 numbers, hiring, the board pack.",
+            "location": "Room 3",
+            "start": {
+              "dateTime": "2026-11-01T10:00:00Z"
+            },
+            "end": {
+              "dateTime": "2026-11-01T11:00:00Z"
+            },
+            "updated": "2026-10-28T09:00:00Z",
+            "htmlLink": "https://www.google.com/calendar/event?eid=evt-a",
+            "organizer": {
+              "email": "ama.mensah@example.com",
+              "displayName": "Ama Mensah"
+            },
+            "attendees": [
+              {
+                "email": "ama.mensah@example.com",
+                "displayName": "Ama Mensah",
+                "responseStatus": "accepted"
+              },
+              {
+                "email": "sam.rivera@example.com",
+                "displayName": "Sam Rivera",
+                "responseStatus": "accepted",
+                "self": true
+              }
+            ]
+          },
+          {
+            "id": "evt-b",
+            "status": "cancelled",
+            "summary": "Lunch with Jordan",
+            "start": {
+              "dateTime": "2026-11-02T15:00:00Z"
+            },
+            "end": {
+              "dateTime": "2026-11-02T16:00:00Z"
+            },
+            "updated": "2026-11-01T09:00:00Z",
+            "htmlLink": "https://www.google.com/calendar/event?eid=evt-b"
+          },
+          {
+            "id": "evt-secret",
+            "status": "confirmed",
+            "summary": "Office wifi",
+            "description": "The guest wifi password: Ku7pLm2QzR9w",
+            "start": {
+              "dateTime": "2026-11-01T11:00:00Z"
+            },
+            "end": {
+              "dateTime": "2026-11-01T12:00:00Z"
+            },
+            "updated": "2026-10-28T09:00:00Z",
+            "htmlLink": "https://www.google.com/calendar/event?eid=evt-secret"
+          }
+        ]
+      },
+      {
+        "items": [
+          {
+            "id": "evt-c",
+            "status": "confirmed",
+            "summary": "Design review",
+            "description": "Bring the API sketch.",
+            "start": {
+              "dateTime": "2026-11-03T09:00:00Z"
+            },
+            "end": {
+              "dateTime": "2026-11-03T10:00:00Z"
+            },
+            "updated": "2026-11-01T12:00:00Z",
+            "htmlLink": "https://www.google.com/calendar/event?eid=evt-c",
+            "organizer": {
+              "email": "sam.rivera@example.com"
+            },
+            "attendees": [
+              {
+                "email": "jordan.lee@example.org",
+                "displayName": "Jordan Lee",
+                "responseStatus": "tentative"
+              }
+            ]
+          }
+        ],
+        "nextSyncToken": "sync-1"
+      }
+    ],
+    "sync-1": [
+      {
+        "items": [],
+        "nextSyncToken": "sync-2"
+      }
+    ],
+    "sync-2": [
+      {
+        "items": [],
+        "nextSyncToken": "sync-3"
+      }
+    ],
+    "sync-expired": 410
+  }
+}

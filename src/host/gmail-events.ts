@@ -1,25 +1,28 @@
 import { createHash } from "node:crypto"
-import { GwsError, throwIfCancelled } from "../domain/errors.js"
-import { type GmailMessage, MESSAGE_FIELDS, type MessageFacts, NOISE_QUERY, isNoise, messageFacts } from "../domain/gmail.js"
-import type { CallContext } from "../runtime/accounts.js"
-import type { Runtime } from "../runtime/index.js"
+import { decodeBoundCursor, encodeBoundCursor } from "@we-the-rebel-alliance/source-contract/cursor"
 import {
+  type EventsGap,
   type EventsListRequest,
   type EventsListResult,
+  type FailedEvent,
   type SourceEvent,
-  decodeCursor,
-  encodeCursor,
   eventsListResult,
   fitPage,
   makeEvent,
   oldestFirst,
-  parseEventsListInput,
+  screenEvents,
   startTime,
-} from "./events-list.js"
+} from "@we-the-rebel-alliance/source-contract/events"
+import { GwsError, throwIfCancelled } from "../domain/errors.js"
+import { type GmailMessage, MESSAGE_FIELDS, type MessageFacts, NOISE_QUERY, isNoise, messageFacts } from "../domain/gmail.js"
+import type { CallContext } from "../runtime/accounts.js"
+import type { Runtime } from "../runtime/index.js"
+import { CURSOR_PLUGIN, PAGE_MAX_BYTES, PLUGIN_PACKAGE } from "./source-page.js"
 
 /**
- * events_list for Gmail: the messages that arrived since a cursor, as the
- * funnel's events (`events-list.ts`), for Memory's collector. Every call is
+ * events_list for Gmail, the source `gws.gmail`: the messages that arrived
+ * since a cursor, as the source contract's events, for Memory's collector
+ * and any other consumer. Every call is
  * plain reads through the runtime, so each one passes the plugin's policy
  * and audit like a gws_read; the tool asserts gws.events_list, then
  * gws.read on each operation, before any of them runs.
@@ -29,18 +32,28 @@ import {
  *   Then it follows history.list from that id, so a message that arrives
  *   meanwhile is listed too (at worst twice; Memory drops the repeat).
  * - A history id Gmail no longer keeps (it answers 404) falls back to the
- *   search, from the last event listed.
+ *   search, from the last event listed, and the page says so with
+ *   `gap: { reason: "expired", since }`.
  * - Spam, trash, drafts, Promotions and Social are left out
  *   (`NOISE_LABELS`); a message deleted after it was listed is skipped.
- * - The cursor names the account and a digest of the mailbox's address, so
- *   a cursor from another account or a changed sign-in is refused.
+ * - A message holding a secret is refused for good (`refused[]`, reason
+ *   `secret`, by the contract's screening); a message Google failed to
+ *   answer this time (a 5xx or a rate limit) is `failed[]`, and the page
+ *   answers the cursor it was called with, so the next call reads it again.
+ * - The cursor is the contract's version 2, bound to (gws, gmail, account),
+ *   and still names a digest of the mailbox's address, so a cursor from
+ *   another account or a changed sign-in is refused. A contract 1 cursor is
+ *   read for one release (`acceptV1`).
  */
 
 /** The `source` of Gmail events. */
 export const GMAIL_SOURCE = "gmail"
 
-/** Every read events_list makes, the history read second. The tool asserts gws.read on `<account>:<operation>` for each before it runs any. */
-export const EVENT_READS = ["gmail.users.getProfile", "gmail.users.history.list", "gmail.users.messages.list", "gmail.users.messages.get"] as const
+/** Every read events_list makes for Gmail. The tool asserts gws.read on `<account>:<operation>` for each before it runs any. */
+export const GMAIL_READS = ["gmail.users.getProfile", "gmail.users.history.list", "gmail.users.messages.list", "gmail.users.messages.get"] as const
+
+/** The operation `gws.events_list` is asserted on: the history the listing follows. */
+export const GMAIL_FOLLOW = "gmail.users.history.list"
 
 /** Ids per messages.list or history.list page. */
 const PAGE_SIZE = 500
@@ -92,25 +105,13 @@ const step = (id: string, by: bigint) => {
 }
 const before = (a: string, b: string) => BigInt(a) < BigInt(b)
 
-/** The sources events_list lists today. Calendar and Drive come later, each as its own source. */
-export const EVENT_SOURCES: readonly string[] = [GMAIL_SOURCE]
+/** The cursor's binding: the plugin, the source and the account; Gmail declares no scope. */
+const binding = (account: string) => ({ plugin: CURSOR_PLUGIN, source: GMAIL_SOURCE, account, scope: {} })
 
-/** A request's problems as GWS_VALIDATION_ERROR, or the parsed request; a source other than gmail is refused. */
-export function eventsRequest(input: unknown): EventsListRequest {
-  const parsed = parseEventsListInput(input)
-  if (!parsed.ok) throw new GwsError("GWS_VALIDATION_ERROR", parsed.problems.join("; "))
-  const { source } = parsed.value
-  if (source !== undefined && !EVENT_SOURCES.includes(source)) {
-    throw new GwsError("GWS_VALIDATION_ERROR", `the source '${source}' is not available: events_list lists Gmail only, until Calendar and Drive are added`, {
-      next: 'Call events_list without source, or with source "gmail".',
-    })
-  }
-  return parsed.value
-}
-
-/** The state a cursor holds, when this account's mailbox issued it. */
+/** The state a cursor holds, when this account's mailbox issued it; a contract 1 cursor of the same mailbox too. */
 function stateOf(cursor: string, account: string, mailbox: string): State {
-  const state = decodeCursor(GMAIL_SOURCE, cursor)
+  const decoded = decodeBoundCursor(binding(account), cursor, { acceptV1: true })
+  const state = decoded.ok ? decoded.state : undefined
   const refuse = () => new GwsError("CURSOR_INVALID", `the cursor was not issued by events_list for account '${account}' and its mailbox`)
   if (!state || state["a"] !== account || state["o"] !== mailbox) throw refuse()
   const { p, t } = state
@@ -156,6 +157,14 @@ function toEvent(facts: MessageFacts, account: string): SourceEvent {
     url: thread ? `https://mail.google.com/mail/u/0/#all/${thread}` : null,
     labels: facts.labels,
   })
+}
+
+/** A message read Google failed this time, as the contract's retryable code; undefined for a failure that is not per message. */
+function retryable(error: unknown): FailedEvent["code"] | undefined {
+  const status = GwsError.from(error)?.status
+  if (status === 429) return "RATE_LIMITED"
+  if (status !== undefined && status >= 500) return "UNAVAILABLE"
+  return undefined
 }
 
 /**
@@ -237,10 +246,12 @@ export async function gmailEvents(runtime: Pick<Runtime, "read">, account: strin
     return { added, state, more: true }
   }
 
-  let state: State = request.cursor === undefined ? { p: "s", h0: head, t: startTime(request, now) } : stateOf(request.cursor, account, mailbox)
+  const started: State = request.cursor === undefined ? { p: "s", h0: head, t: startTime(request, now) } : stateOf(request.cursor, account, mailbox)
+  let state = started
   const candidates: Candidate[] = []
   let more = false
   let fellBack = false
+  let gap: EventsGap | undefined
   while (candidates.length < request.limit) {
     throwIfCancelled(ctx.signal)
     if (state.p === "s") {
@@ -263,6 +274,8 @@ export async function gmailEvents(runtime: Pick<Runtime, "read">, account: strin
     if (followed === "expired") {
       if (fellBack) throw new GwsError("GWS_API_ERROR", "Gmail refused a history id it had just given")
       fellBack = true
+      // The search reads on from the last event listed; the page says the history behind the cursor is gone.
+      gap = { reason: "expired", since: new Date(state.t).toISOString() }
       state = { p: "s", h0: head, t: state.t }
       continue
     }
@@ -272,6 +285,7 @@ export async function gmailEvents(runtime: Pick<Runtime, "read">, account: strin
     break
   }
 
+  const failed: FailedEvent[] = []
   const fetched = await each(candidates, FETCHES, async (candidate): Promise<GmailMessage | undefined> => {
     const get = (fields: string, format: string) => read("gmail.users.messages.get", { id: candidate.id, format }, fields) as Promise<GmailMessage>
     try {
@@ -280,7 +294,10 @@ export async function gmailEvents(runtime: Pick<Runtime, "read">, account: strin
       const known = GwsError.from(error)
       if (known?.status === 404) return undefined
       if (known?.code === "OUTPUT_LIMIT") return get(METADATA_FIELDS, "metadata")
-      throw error
+      const code = retryable(error)
+      if (code === undefined) throw error
+      failed.push({ external_id: candidate.id, code })
+      return undefined
     }
   })
   const listed: Array<{ event: SourceEvent; after: State }> = []
@@ -291,18 +308,34 @@ export async function gmailEvents(runtime: Pick<Runtime, "read">, account: strin
     if (!facts || (candidate.after.p === "s" && facts.time < candidate.after.t)) continue
     listed.push({ event: toEvent(facts, account), after: candidate.after })
   }
+  // A message holding a secret is refused for good; the cursor moves past it.
+  const screened = screenEvents(listed.map((item) => item.event))
+  const refusedIds = new Set(screened.refused.map((entry) => entry.external_id))
+  const delivered = listed.filter((item) => !refusedIds.has(item.event.external_id))
   const kept = fitPage(
-    listed.map((item) => item.event),
+    delivered.map((item) => item.event),
     request.limit,
+    PAGE_MAX_BYTES,
   )
-  if (kept < listed.length) {
+  if (kept < delivered.length) {
     more = true
-    state = listed[kept - 1]!.after
+    state = delivered[kept - 1]!.after
   }
-  const events = listed.slice(0, kept).map((item) => item.event)
+  const events = delivered.slice(0, kept).map((item) => item.event)
+  // A refused message after the last one this page carries is not refused yet: the next page reaches it again.
+  const lastKept = kept < delivered.length ? listed.indexOf(delivered[kept - 1]!) : listed.length - 1
+  const refused = screened.refused.filter((entry) => listed.findIndex((item) => item.event.external_id === entry.external_id) <= lastKept)
   if (state.p === "h") {
     const last = Math.max(state.t, ...events.map((event) => Date.parse(event.occurred_at)))
     state = { ...state, t: last }
   }
-  return eventsListResult({ source: GMAIL_SOURCE, account, owner }, oldestFirst(events), encodeCursor(GMAIL_SOURCE, { a: account, o: mailbox, ...state }), more)
+  // A failed message holds the cursor back: the page answers the cursor it was called with, or its own start.
+  const cursor = failed.length > 0 ? (request.cursor ?? encodeBoundCursor(binding(account), { a: account, o: mailbox, ...started })) : encodeBoundCursor(binding(account), { a: account, o: mailbox, ...state })
+  return eventsListResult({ source: GMAIL_SOURCE, account, owner }, oldestFirst(events), cursor, more, {
+    plugin: PLUGIN_PACKAGE,
+    asOf: new Date(now).toISOString(),
+    refused,
+    failed,
+    ...(gap === undefined ? {} : { gap }),
+  })
 }

@@ -26,8 +26,19 @@
  *   answers getProfile, messages.list (newest first, after:<seconds> and
  *   the noise terms events_list sends), history.list (records after
  *   startHistoryId; one below historyStart is a 404) and messages.get (an
- *   unknown id is a 404) as Gmail does, with maxResults and pageToken. It
- *   is read on every call, so a test can deliver mail between calls.
+ *   unknown id is a 404, an id in failIds a 500) as Gmail does, with
+ *   maxResults and pageToken. It is read on every call, so a test can
+ *   deliver mail between calls.
+ * - FAKE_GWS_CALENDAR, a JSON file holding a synthetic calendar
+ *   ({ id, summary, timeZone, listings }), answers calendar.calendarList.get
+ *   (the primary calendar) and calendar.events.list as Google does:
+ *   `listings.full` is the first full sync's pages, `listings[<syncToken>]`
+ *   the pages after that token (a value of 410 answers HTTP 410 GONE, an
+ *   expired token), a page is one entry with `items`, the last page carries
+ *   `nextSyncToken`, and a `pageToken` is the next page's index. A call
+ *   without a syncToken must carry `timeMin`; a call with one must not
+ *   carry a window, and must set `showDeleted: true`. It is re-read on every
+ *   call, so a test can change the calendar between calls.
  */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -128,10 +139,69 @@ function mailbox(box) {
     return [{ ...page(box.history.filter((record) => BigInt(record.id) > start), "history"), historyId: box.historyId }, 0]
   }
   if (call === "messages.get") {
+    // A test can fail one message while the others answer, for the retryable-drop path.
+    if (Array.isArray(box.failIds) && box.failIds.includes(params.id)) {
+      return [{ error: { code: 500, message: "Backend Error", status: "INTERNAL", errors: [{ reason: "backendError" }] } }, 1]
+    }
     const message = box.messages.find((candidate) => candidate.id === params.id)
     return message ? [message, 0] : notFound
   }
   return [{ error: { code: 400, message: `the fake mailbox has no answer for gmail users ${call}` } }, 3]
+}
+
+// FAKE_GWS_CALENDAR: Calendar reads answered from a synthetic calendar file, the way Google answers them.
+if (process.env.FAKE_GWS_CALENDAR && !argv.includes("--dry-run") && argv[0] === "calendar") {
+  const [answer, code] = calendar(JSON.parse(readFileSync(process.env.FAKE_GWS_CALENDAR, "utf8")))
+  process.stdout.write(JSON.stringify(answer), () => process.exit(code))
+  await new Promise(() => {})
+}
+
+/** One Calendar read against `box`: the answer and the exit code. */
+function calendar(box) {
+  const at = argv.indexOf("--params")
+  const params = at === -1 ? {} : JSON.parse(argv[at + 1])
+  const flags = argv.findIndex((arg) => arg.startsWith("--"))
+  const call = (flags < 0 ? argv : argv.slice(0, flags)).join(".")
+  const invalid = (message) => [{ error: { code: 400, message, status: "INVALID_ARGUMENT", errors: [{ reason: "invalid" }] } }, 3]
+  const gone = [
+    { error: { code: 410, message: "Sync token is no longer valid, a full sync is required.", status: "GONE", errors: [{ reason: "expired" }] } },
+    1,
+  ]
+  if (call === "calendar.calendarList.get") {
+    if (params.calendarId !== "primary") return [{ error: FAILURES.api[1] }, 1]
+    return [{ id: box.id, summary: box.summary, timeZone: box.timeZone }, 0]
+  }
+  if (call !== "calendar.events.list") return invalid(`the fake calendar has no answer for ${call}`)
+  if (params.showDeleted !== true) return invalid("showDeleted must be true for a sync or a full listing")
+  let listing
+  if (params.syncToken !== undefined) {
+    // Google refuses a window with a sync token, and must be told to include deletions.
+    if (params.timeMin !== undefined || params.timeMax !== undefined || params.updatedMin !== undefined || params.orderBy !== undefined) {
+      return invalid("a syncToken cannot be combined with timeMin, timeMax, updatedMin or orderBy")
+    }
+    const found = box.listings?.[params.syncToken]
+    if (found === 410) return gone
+    if (!Array.isArray(found)) return invalid("the fake calendar does not know that sync token")
+    listing = found
+  } else {
+    if (params.timeMin === undefined) return invalid("a full sync must carry timeMin")
+    listing = box.listings?.full
+  }
+  const index = Number(params.pageToken ?? 0)
+  if (!Array.isArray(listing) || !Number.isInteger(index) || index < 0 || index >= listing.length) return invalid("the fake calendar has no such page")
+  const source = listing[index]
+  // A full sync lists only what starts at or after its window; a sync token lists every change.
+  const since = params.syncToken === undefined && typeof params.timeMin === "string" ? Date.parse(params.timeMin) : undefined
+  const items = (Array.isArray(source.items) ? source.items : []).filter((item) => {
+    if (since === undefined) return true
+    const start = item.start?.dateTime ?? (typeof item.start?.date === "string" ? `${item.start.date}T00:00:00Z` : undefined)
+    return start === undefined || Date.parse(start) >= since
+  })
+  const page = { ...(items.length > 0 ? { items } : {}) }
+  // nextSyncToken is on the last page only.
+  if (index + 1 < listing.length) page.nextPageToken = String(index + 1)
+  else if (typeof source.nextSyncToken === "string") page.nextSyncToken = source.nextSyncToken
+  return [page, 0]
 }
 
 const flags = argv.findIndex((arg) => arg.startsWith("--"))
