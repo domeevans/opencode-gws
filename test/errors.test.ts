@@ -7,12 +7,18 @@ import { ErrorCode, GwsError, cancelledError, isErrorCode } from "../src/domain/
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..")
 const TABLE = join(ROOT, "src", "domain", "errors.ts")
 
-function files(dir: string): string[] {
+function files(dir: string, pattern = /\.tsx?$/): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
-    return entry.isDirectory() ? files(path) : /\.tsx?$/.test(entry.name) ? [path] : []
+    return entry.isDirectory() ? files(path, pattern) : pattern.test(entry.name) ? [path] : []
   })
 }
+
+/**
+ * The tools RPC's own refusals (SESSION_UNKNOWN, SESSION_AGENT_REQUIRED, PERMISSION_DENIED) are raised by the source
+ * contract package's transport, which dist/index.js bundles, so its code is part of the source this plugin reports from.
+ */
+const PACKAGE_DIST = join(ROOT, "node_modules", "@we-the-rebel-alliance", "source-contract", "dist")
 
 describe("error code table", () => {
   it("has an entry for every code the source raises", () => {
@@ -30,7 +36,7 @@ describe("error code table", () => {
 
   // The other direction: the table, and so the documented Errors section, lists no code nothing raises.
   it("lists only codes the source names", () => {
-    const source = files(join(ROOT, "src"))
+    const source = [...files(join(ROOT, "src")), ...files(PACKAGE_DIST, /^tools-rpc\.js$|^chunk-.*\.js$/)]
       .filter((file) => file !== TABLE)
       .map((file) => readFileSync(file, "utf8"))
       .join("\n")

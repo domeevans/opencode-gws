@@ -36,8 +36,9 @@ describe("entry bundles", () => {
   /** The packages esbuild inlined into one bundle, from the `// node_modules/<package>/` path comments it writes. */
   const inlined = (name: string) => [...new Set([...read(name).matchAll(/^\/\/ node_modules\/((?:@[^/]+\/)?[^/]+)\//gm)].map((match) => match[1]!))].sort()
 
-  it("bundles zod into the server part only, and nothing into the TUI part", () => {
-    expect(inlined("index.js")).toEqual(["zod"])
+  it("bundles zod and the source contract into the server part only, and nothing into the TUI part", () => {
+    // The source contract's events, cursor and tools-rpc modules: an install runs no build and has no runtime dependency.
+    expect(inlined("index.js")).toEqual(["@we-the-rebel-alliance/source-contract", "zod"])
     expect(inlined("tui.js")).toEqual([])
     expect(read("tui.js")).not.toMatch(/zod|\$Zod/i)
   })
