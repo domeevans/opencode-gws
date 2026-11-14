@@ -54,6 +54,20 @@ export interface ImagesOptions {
   readonly fetchImpl?: typeof fetch
 }
 
+/**
+ * How one read runs as the image source (`images_read` on the tools RPC) asks: as a named account rather than the one
+ * the address picks, with the source's own permission check before the Drive read, and told which account read it.
+ * Jelly's `images.read` passes none of these.
+ */
+export interface ImageReadAs {
+  /** Read as this account: a Drive file through its sign-in, and another address with its token only when Google returned it to this account. */
+  readonly account?: string
+  /** Called with the account and operation before the Drive read runs; it throws to refuse. */
+  readonly authorize?: (account: string, operation: string) => Promise<void>
+  /** Told the account whose sign-in read the picture; not called for a picture fetched without credentials. */
+  readonly onAccount?: (account: string) => void
+}
+
 /** `images.read` over `runtime`, as the module says. */
 export function imagesRead(runtime: Reader, options: ImagesOptions = {}) {
   let active = 0
@@ -64,10 +78,11 @@ export function imagesRead(runtime: Reader, options: ImagesOptions = {}) {
     return fetchImage(url, { token, signal, fetchImpl: options.fetchImpl })
   }
 
-  const drive = async (url: URL, signal: AbortSignal): Promise<{ account: string; bytes: Uint8Array }> => {
+  const drive = async (url: URL, signal: AbortSignal, as: ImageReadAs): Promise<{ account: string; bytes: Uint8Array }> => {
     const fileId = driveFileId(url)
-    const account = imageAccount(runtime.config, runtime.imageSources.accounts(url))
+    const account = as.account ?? imageAccount(runtime.config, runtime.imageSources.accounts(url))
     const ctx = { sessionId: "", agentId: "", caller: "rpc" as const, signal }
+    await as.authorize?.(account, "drive.files.get")
     const meta = await runtime.read({ account, operation: "drive.files.get", params: { fileId, "supportsAllDrives": true, fields: "mimeType,size,thumbnailLink" } }, ctx)
     const { mimeType, size, thumbnailLink } = (meta.data ?? {}) as { mimeType?: unknown; size?: unknown; thumbnailLink?: unknown }
     const bytesOf = typeof size === "string" && /^\d{1,15}$/.test(size) ? Number(size) : undefined
@@ -85,14 +100,19 @@ export function imagesRead(runtime: Reader, options: ImagesOptions = {}) {
     throw new GwsError("IMAGE_UNAVAILABLE", "the Drive file is not a picture and has no thumbnail")
   }
 
-  const hosted = async (url: URL, signal: AbortSignal): Promise<{ account?: string; bytes: Uint8Array }> => {
+  const hosted = async (url: URL, signal: AbortSignal, as: ImageReadAs): Promise<{ account?: string; bytes: Uint8Array }> => {
     const returnedTo = runtime.imageSources.accounts(url)
+    // A named account's token goes only to an address Google returned to that account.
+    if (as.account !== undefined) {
+      const own = returnedTo.includes(as.account)
+      return { ...(own ? { account: as.account } : {}), bytes: await fetchAs(url.href, own ? as.account : undefined, signal) }
+    }
     if (returnedTo.length === 0) return { bytes: await fetchAs(url.href, undefined, signal) }
     const account = imageAccount(runtime.config, returnedTo)
     return { account, bytes: await fetchAs(url.href, account, signal) }
   }
 
-  return async (address: unknown, signal?: AbortSignal): Promise<ImageAnswer> => {
+  return async (address: unknown, signal?: AbortSignal, as: ImageReadAs = {}): Promise<ImageAnswer> => {
     const started = Date.now()
     let account: string | undefined
     const audit = (outcome: "success" | "error", errorCode?: string) =>
@@ -116,9 +136,10 @@ export function imagesRead(runtime: Reader, options: ImagesOptions = {}) {
       const url = imageUrl(address)
       // A read counts against the limit until its work settles, even after the deadline has answered for it.
       active++
-      const work = (isDriveLink(url) ? drive(url, composed) : hosted(url, composed))
+      const work = (isDriveLink(url) ? drive(url, composed, as) : hosted(url, composed, as))
         .then((read) => {
           account = read.account
+          if (read.account !== undefined) as.onAccount?.(read.account)
           return imageAnswer(read.bytes)
         })
         .finally(() => {

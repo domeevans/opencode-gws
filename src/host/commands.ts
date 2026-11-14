@@ -139,6 +139,7 @@ export function formatStatus(status: GwsStatus, plans: readonly PlanSummary[] = 
     lines.push(`Agents without default rules: ${status.unguardedAgents.join(", ")}`, status.permissionsBlock ?? "")
   }
   if (status.auditDegraded) lines.push("Audit: some records could not be saved, so the audit log may be incomplete.")
+  if (status.deprecated) lines.push(`Deprecated: ${status.deprecated}`)
   lines.push(`OpenCode: ${openCodeLabel(status)}`, `Next step: ${status.nextStep}`)
   return lines.join("\n")
 }

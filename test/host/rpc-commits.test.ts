@@ -13,7 +13,8 @@ import { startHost, type Harness } from "./harness.js"
  * process is all the SDK supports.
  */
 
-const READS = ["status", "catalog", "schema", "read", "plan", "events_list"]
+/** The read methods: the six read tools, and the source contract's probe and snapshot reads, which are methods only. */
+const READS = ["status", "catalog", "schema", "read", "plan", "events_list", "probe", "calendar_today", "images_read"]
 const COMMIT_CLASSES = { write: "write", send: "send", share: "send", delete: "destructive", export: "export", admin: "destructive" } as const
 
 // The client side only names the methods: the plugin checks each input against the tool's own contract.

@@ -18,8 +18,11 @@ export const ACCESS_EFFECT: Readonly<Record<Access, "allow" | "ask" | "deny">> =
 /** The plugin's namespace: a tool a later release adds has this action too. */
 export const NAMESPACE_ACTION = "gws.*"
 
-/** The tool actions that change nothing: status, catalog, schema, read and plan. */
-export const READ_ACTIONS = ["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan", "gws.events_list"] as const
+/**
+ * The actions that change nothing: the tools status, catalog, schema, read, plan and events_list, and the source
+ * contract's three reads that are tools RPC methods only, probe, calendar_today and images_read.
+ */
+export const READ_ACTIONS = ["gws.status", "gws.catalog", "gws.schema", "gws.read", "gws.plan", "gws.events_list", "gws.probe", "gws.calendar_today", "gws.images_read"] as const
 
 /** The six commit actions: a change, a send, a share, a delete, an export or an admin operation. */
 export const CHANGING_ACTIONS = ["gws.write", "gws.export", "gws.send", "gws.share", "gws.delete", "gws.admin"] as const

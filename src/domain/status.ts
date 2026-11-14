@@ -53,6 +53,7 @@ export const StatusOutput = z.object({
   auditDegraded: z.boolean().describe("Audit records were dropped, failed, or exceeded the sink deadline; sticky until reload"),
   unguardedAgentCount: z.number().int().describe("How many agents lack the default rules; /gws-status names them"),
   permissions: z.string().optional().describe("Present when an agent lacks the default rules: where to find the fix"),
+  deprecated: z.string().optional().describe("Present once a deprecated method was called: the old method, the one to use, and when the old one goes"),
   nextStep: z.string().describe('The one thing to do next; "Nothing to do." when nothing is needed'),
 })
 

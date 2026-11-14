@@ -146,6 +146,9 @@ function StatusBody(props: { readonly status: GwsStatus; readonly colors: Colors
         <Show when={props.status.auditDegraded}>
           <Row label="Audit" value="some records could not be saved, so the audit log may be incomplete" fg={tone("warning")} muted={muted()} />
         </Show>
+        <Show when={props.status.deprecated}>
+          {(note) => <Row label="Deprecated" value={note()} fg={tone("warning")} muted={muted()} />}
+        </Show>
         <Row label="OpenCode" value={openCodeLabel(props.status)} fg={tone(props.status.host.tested ? "success" : "warning")} muted={muted()} />
         <Row label="Next step" value={props.status.nextStep} fg={base()} muted={muted()} />
       </box>

@@ -98,8 +98,9 @@ export function calendarToday(runtime: Reader, now: () => number = Date.now) {
     return fitted.answer
   }
 
-  return async (signal?: AbortSignal): Promise<CalendarToday> => {
-    const account = calendarAccount(runtime.config)
+  /** Today's answer for `named`, or for the account `calendarAccount` picks when the call names none. */
+  return async (signal?: AbortSignal, named?: string): Promise<CalendarToday> => {
+    const account = named ?? calendarAccount(runtime.config)
     if (account === undefined)
       throw new GwsError("CALENDAR_UNAVAILABLE", "no configured account enables calendar", {
         next: "Add calendar to an account's enabledServices, or remove accounts so the default account enables it.",
