@@ -9,7 +9,7 @@ import { TESTED_HOSTS } from "../src/domain/host.js"
 import { defaultRules } from "../src/host/agents.js"
 import type { StatusSource } from "../src/host/rpc.js"
 import { NAMESPACE, toolSpecs } from "../src/host/tools.js"
-import { NEXT_STEPS, TOOLS_RPC_ID } from "../src/host/tools-rpc.js"
+import { NEXT_STEPS, TOOLS_RPC_ID } from "../src/host/script-methods.js"
 import type { Runtime } from "../src/runtime/index.js"
 
 /**
@@ -91,6 +91,8 @@ describe("the README's generated blocks", () => {
       "CODE",
       // Sheets' own valueInputOption and majorDimension values, and a JWK's key type, in the UI action's schemas.
       "RAW", "ROWS", "COLUMNS", "OKP",
+      // The source contract's codes on a failed[] entry of an events_list page: an item not read this time, not a refusal.
+      "RATE_LIMITED", "UNAVAILABLE",
     ])
     // "NATIVE_*" are the shared release-binary installer's own codes (src/process/install.ts, the kit's module). Its
     // one caller, src/process/binary.ts, maps each to a GWS_ code before any tool reports it.

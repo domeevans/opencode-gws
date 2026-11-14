@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { METHODS, registerToolsRpc, scriptMethods } from "../src/host/tools-rpc.js"
+import { registerToolsRpc, scriptMethods } from "../src/host/script-methods.js"
 import type { Runtime } from "../src/runtime/index.js"
 import { testRuntime } from "./support/config.js"
 
@@ -39,7 +39,7 @@ async function setup(listAgents: () => Promise<Agent[]>) {
     },
     permission: { hook: async () => ({ dispose: async () => {} }), assert: async () => {} },
   }
-  await registerToolsRpc(ctx as never, { methods: [...METHODS, ...scriptMethods({ runtime, assert: async () => {}, status: status as never, listAgents })] })
+  await registerToolsRpc(ctx, scriptMethods({ runtime, assert: async () => {}, status: status as never, listAgents }))
   const describeOnce = async () => (await handlers.describe!({}, { signal: new AbortController().signal, error: () => undefined })) as { methods: Array<{ name: string; description: string }> }
   return { describeOnce, runtimeStatus, status }
 }
