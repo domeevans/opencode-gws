@@ -1,6 +1,6 @@
 name: CI
 
-# Runs on GitHub-hosted runners for every push to master and every pull request.
+# Runs on GitHub-hosted runners for every push to master (Linux and macOS) and every pull request (Linux).
 # Every step also runs locally: npm ci && npm run fetch:gws && npm run check.
 
 on:
@@ -46,15 +46,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: macos-26
-            target: darwin-arm64
-          - runner: macos-26-intel
-            target: darwin-x64
-          - runner: ubuntu-24.04
-            target: linux-x64-gnu
-          - runner: ubuntu-24.04-arm
-            target: linux-arm64-gnu
+        # A pull request runs the two Linux runners; a push to master, or a run by hand, runs all four, macOS too. macOS
+        # runs on master and for releases only, and the release planner requires that push run with every runner.
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"runner":"ubuntu-24.04","target":"linux-x64-gnu"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64-gnu"}]' || '[{"runner":"macos-26","target":"darwin-arm64"},{"runner":"macos-26-intel","target":"darwin-x64"},{"runner":"ubuntu-24.04","target":"linux-x64-gnu"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64-gnu"}]') }}
 
     steps:
       - name: Checkout
