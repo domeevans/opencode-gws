@@ -59,7 +59,7 @@ skill ids collide with another plugin's or the agent's own.
 
 ## Today's calendar
 
-`jelly.nativeData` is `[{ "v": 1, "capability": "calendar", "view": "calendar-native", "read": "calendar.today" }]`:
+`jelly.nativeData` is `[{ "v": 1, "capability": "calendar", "view": "calendar-native", "read": "calendar.today", "source": "gws.calendar.today" }]`:
 Jelly's own calendar reads the same method the **Today** tile calls, and draws it natively. `calendar.today` is
 declared in `jelly.rpc` with `readOnly: true`, the label "read today's calendar", and the permission `gws.read`, the
 permission `gws_read` already declares. Jelly calls it on the plugin's RPC named after the package,
@@ -69,9 +69,11 @@ OpenCode itself. Outside Jelly, any client of the OpenCode server can call the m
 The read therefore exposes event titles, locations and meeting links to any client of the OpenCode server, as the tools RPC can already reach `gws_read`, so serving OpenCode beyond localhost needs the server's own authentication.
 
 `calendar.today` is deprecated until 0.1.0: the same read is the source contract's snapshot `gws.calendar.today`, the
-method `calendar_today` on the tools RPC `google-workspace.gws.tools` (action `gws.calendar_today`), which a source
-descriptor can name, answering `{ data: <agenda>, asOf, account, trust }` ([Sources](configuration.md#sources)). Jelly's
-Home binding moves there; until then the old method answers as before, and status says once it was called.
+method `calendar_today` on the tools RPC `google-workspace.gws.tools` (action `gws.calendar_today`), answering
+`{ data: <agenda>, asOf, account, trust }` ([Sources](configuration.md#sources)). The hint names it:
+`nativeData[0].source` is `gws.calendar.today`, so a Jelly with the source setting on reads Home's calendar from
+`calendar_today`, and `view` and `read` stay for a Jelly without it (they go at contract version 2). The old method
+answers as before for any other caller, and status says once it was called.
 
 What it answers: `{ account, at, state, events }`.
 

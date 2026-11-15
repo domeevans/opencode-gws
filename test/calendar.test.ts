@@ -465,8 +465,9 @@ describe("the jelly declaration of calendar.today", () => {
     tools: { permission: string; readOnly?: boolean }[]
     rpc: { name: string; permission: string; readOnly: boolean; input: unknown; output: unknown }[]
     views: { id: string; page?: string; grants: string[]; rpc?: string[] }[]
-    nativeData: { v: number; capability: string; view: string; read: string }[]
+    nativeData: { v: number; capability: string; view: string; read: string; source?: string }[]
   }
+  const sources = (pkg as unknown as { sources: { items: { id: string; kind: string; tool: string; output?: string }[] } }).sources
 
   it("is registered under the package's own name, which Jelly calls a view's methods on", () => {
     expect(PACKAGE_NAME).toBe(pkg.name)
@@ -484,7 +485,9 @@ describe("the jelly declaration of calendar.today", () => {
   // nativeDataIssues): a read-only method under a declared tool permission, named by a page view with the rpc grant.
   it("follows Jelly's native data rules", () => {
     const [hint] = jelly.nativeData
-    expect(jelly.nativeData).toEqual([{ v: 1, capability: "calendar", view: "calendar-native", read: "calendar.today" }])
+    expect(jelly.nativeData).toEqual([{ v: 1, capability: "calendar", view: "calendar-native", read: "calendar.today", source: "gws.calendar.today" }])
+    // D202: while Jelly's source setting is on, Home reads the source the hint names, the agenda snapshot on the tools RPC.
+    expect(sources.items.find((item) => item.id === hint?.source)).toMatchObject({ kind: "snapshot", tool: "calendar_today", output: "agenda" })
     const view = jelly.views.find((entry) => entry.id === hint?.view)
     expect(view?.page).toBe("views/calendar.html")
     expect(view?.grants).toEqual(["rpc"])

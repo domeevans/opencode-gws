@@ -751,7 +751,8 @@
         "v": 1,
         "capability": "calendar",
         "view": "calendar-native",
-        "read": "calendar.today"
+        "read": "calendar.today",
+        "source": "gws.calendar.today"
       }
     ],
     "imageHosts": [
