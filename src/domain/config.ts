@@ -1,7 +1,6 @@
 import { isAbsolute } from "node:path"
 import * as z from "zod"
 import { ACCESS_VALUES } from "./access.js"
-import { UI_ACTION_OPERATIONS } from "./ui-action.js"
 import { GwsError } from "./errors.js"
 import type { AccountProfile, PluginConfig } from "./types.js"
 import { adminServices, canonicalService, loadManifest } from "./manifest.js"
@@ -169,7 +168,6 @@ const configSchema = z.strictObject({
     .optional(),
   allowUntestedHost: z.boolean().optional(),
   rpcCommits: z.boolean().optional(),
-  uiActions: z.array(z.enum(UI_ACTION_OPERATIONS)).max(UI_ACTION_OPERATIONS.length).optional(),
   access: z.enum(ACCESS_VALUES).optional(),
   admin: z
     .strictObject({
@@ -275,7 +273,6 @@ export function loadConfig(raw: unknown): PluginConfig {
     },
     allowUntestedHost: parsed.allowUntestedHost ?? false,
     rpcCommits: parsed.rpcCommits ?? false,
-    uiActions: [...new Set(parsed.uiActions ?? [])],
     access: parsed.access ?? "all",
     policy: {
       planTtlSeconds: parsed.policy?.planTtlSeconds ?? 300,

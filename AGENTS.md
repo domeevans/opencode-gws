@@ -109,14 +109,8 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   commit tool with `{ planId }`. The RPC, TUI and commands never approve or
   commit, except the tools RPC's commit methods, which exist only when the
   `rpcCommits` option is on (off by default; for a host that confirms each
-  change itself), and Jelly's `commit` action (`src/host/ui-action.ts`),
-  which exists only for the operations the `uiActions` option lists (none by
-  default): it runs only under a verified Jelly action grant for that exact
-  input from an owner device, confirmed every time (`cfm: "always"`),
-  re-runs `access` (read-only refuses), policy
-  and the admin gate through plan then commit, and audits as
-  `caller: "person"`. Never widen its operation list, accept a grant of
-  another class or a weaker confirmation, or let `access` stop short of it.
+  change itself). The plugin declares no Jelly action: an agent's UI hands
+  the person's input back to its agent, which plans and commits as usual.
 - Every call reads a sign-in with `readSignIn` (no client needed: Jelly's
   copy for an agent has no client secret); only a renewal and a new
   sign-in's reuse of the previous client use `renewableSignIn`.

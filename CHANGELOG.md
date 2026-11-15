@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- **Breaking: the agent-UI change path for Jelly.** The `uiActions` option, Jelly's `commit` action (`ui: true`) with its RPC methods `act.commit` and `plan.preview`, its grant check (with `cfm`), and the **Changes from agent UIs** settings section (`views/ui-changes.html`) are gone, with the `UI_ACTION_OFF`, `UI_ACTION_REFUSED` and `UI_GRANT_REFUSED` errors and the `ui.act` audit record. Jelly's permission model covers the same path: an agent's UI sends what the person enters back to its agent, which makes the change with `gws_plan` and the commit tool under Jelly's rules for that agent and the plugin's `access`. Every other tool, method and source is unchanged.
+- A config that still sets `uiActions` is refused as any unknown option is: `OPTIONS_INVALID: The plugin options are not valid (options: Unrecognized key: "uiActions"). Next step: Fix the plugin options in opencode.json.` Remove the key.
+
+### What Jelly should change
+
+- Nothing: the declaration no longer has `actions`, the `plan.preview` method or the `ui-changes` view, and still parses with Jelly's `PluginDeclarationSchema`.
+
 ## [0.0.7] - 2026-11-15
 
 ### Fixed

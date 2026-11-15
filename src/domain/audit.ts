@@ -3,7 +3,7 @@ import { dirname } from "node:path"
 import { GwsError, isErrorCode } from "./errors.js"
 import { commandIndex } from "./manifest.js"
 
-const EVENTS = new Set(["plugin.loaded", "operation.read", "helper.read", "operation.plan", "operation.commit", "calendar.today", "images.read", "ui.act"])
+const EVENTS = new Set(["plugin.loaded", "operation.read", "helper.read", "operation.plan", "operation.commit", "calendar.today", "images.read"])
 const CATEGORIES = new Set(["read", "write", "send", "share", "delete", "export", "admin"])
 /** Recorded for an error that is not a plugin error. */
 const UNKNOWN_ERROR = "UNKNOWN_ERROR"
@@ -21,15 +21,8 @@ interface AuditEvent {
   operation?: string
   durationMs?: number
   errorCode?: string
-  /**
-   * `rpc` for a read, plan or commit a script made through the tools RPC; `person` for a change a person approved in a
-   * UI an agent made in Jelly, under Jelly's action grant; absent for a tool call.
-   */
-  caller?: "rpc" | "person"
-  /** `person` only: the Jelly member whose owner device approved the change (the grant's `mbr`). */
-  member?: string
-  /** `person` only: the id of the single-use Jelly action grant (its `jti`). */
-  grant?: string
+  /** `rpc` for a read, plan or commit a script made through the tools RPC; absent for a tool call. */
+  caller?: "rpc"
   /** `calendar.today`: how many of today's events were left out so the answer fits Jelly's 64 KB. */
   omitted?: number
 }
@@ -83,9 +76,7 @@ export class Audit {
       operation: event.operation && (index.methods.has(event.operation) || index.helpers.has(event.operation)) ? event.operation : undefined,
       durationMs: Number.isFinite(event.durationMs) && event.durationMs! >= 0 ? Math.round(event.durationMs!) : undefined,
       errorCode: event.errorCode === undefined ? undefined : isErrorCode(event.errorCode) ? event.errorCode : UNKNOWN_ERROR,
-      caller: event.caller === "rpc" || event.caller === "person" ? event.caller : undefined,
-      member: event.caller === "person" && typeof event.member === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(event.member) ? event.member : undefined,
-      grant: event.caller === "person" && typeof event.grant === "string" && /^[A-Za-z0-9_-]{22,128}$/.test(event.grant) ? event.grant : undefined,
+      caller: event.caller === "rpc" ? event.caller : undefined,
       omitted: Number.isSafeInteger(event.omitted) && event.omitted! > 0 ? event.omitted : undefined,
     })}\n`)
     this.pump()

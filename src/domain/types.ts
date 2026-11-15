@@ -3,7 +3,6 @@
  * Types the model sends or receives are inferred from contract.ts.
  */
 
-import type { UiActionOperation } from "./ui-action.js"
 import type { Access } from "./access.js"
 import type { HelperEntry, Preview, RequestInput } from "./contract.js"
 import type { FileSpecs, PlannedFiles } from "./files.js"
@@ -182,11 +181,6 @@ export interface PluginConfig {
    * confirms each change itself before it calls the RPC turns it on.
    */
   rpcCommits: boolean
-  /**
-   * The operations a person may approve from a UI an agent made in Jelly (the `commit` action), each with its own
-   * every-time confirmation and gws's preview. Empty by default: off.
-   */
-  uiActions: UiActionOperation[]
   /** What the generated default rules allow: everything, changes ask, or read-only. */
   access: Access
   policy: PolicyConfig
