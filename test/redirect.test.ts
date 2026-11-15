@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http"
 import { afterEach, describe, expect, it } from "vitest"
-import { readSignIn, signInClient } from "../src/auth/credential.js"
+import { renewableSignIn, signInClient } from "../src/auth/credential.js"
 import type { GoogleOAuthAuthorization } from "../src/auth/google.js"
 import { accountSignInStatus } from "../src/auth/status.js"
 import { loadConfig } from "../src/domain/config.js"
@@ -130,7 +130,7 @@ describe("a host-supplied redirect", () => {
     expect(tokens.requests[0]!.get("code_verifier")).toBeTruthy()
 
     // A re-sign-in can reuse the Web client: its redirect URIs are kept with it.
-    const signIn = readSignIn(credential.metadata)!
+    const signIn = renewableSignIn(credential.metadata)!
     expect(signInClient(signIn).client).toEqual(web())
   })
 

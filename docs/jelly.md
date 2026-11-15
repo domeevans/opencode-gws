@@ -210,8 +210,10 @@ operation or `access` is `read-only`.
 order, the plugin:
 
 1. checks Jelly's grant, as Jelly's own verifier does: Jelly's action key (published in the engine), this plugin,
-   the action `commit`, the digest of exactly this input, at most 60 seconds old, and never used before; and the
-   class must be `local`. In stock OpenCode there is no Jelly key, so nothing can take the action;
+   the action `commit`, the digest of exactly this input, at most 60 seconds old, and never used before; the
+   class must be `local`, and the grant's `cfm`, the confirmation Jelly drew before the person chose, must be
+   `always`: a grant without one, or with `never` or `session`, is `UI_GRANT_REFUSED` before anything reaches Google.
+   In stock OpenCode there is no Jelly key, so nothing can take the action;
 2. refuses any operation but `sheets.spreadsheets.values.update`, `USER_ENTERED` (a value would be read as a
    formula, and a formula can send the sheet's contents elsewhere), any extra field, and more than 100 rows of 26
    cells (`UI_ACTION_REFUSED`);
@@ -234,9 +236,6 @@ agents are not consulted, because no agent or session makes the call: a rule of 
 
 What the plugin cannot check yet, and has asked Jelly for:
 
-- **The confirmation.** The grant does not say how Jelly asked. Jelly's host refuses an act whose confirmation is not
-  the action's own, so the plugin relies on Jelly for "every time"; a confirmation claim in the grant would let the
-  plugin refuse on its own.
 - **That the preview was shown.** The grant binds the input, and the preview is worked out from that same input, so
   what is committed is what the preview describes; but nothing in the grant says the preview was drawn.
 - **The receipt.** Jelly words it from the rows picked; the plugin's answer says what changed.
@@ -259,6 +258,12 @@ and the declaration against Jelly's action rules.
 These need Jelly 0.3.2 or later; an older Jelly refuses the declaration's new keys. When the engine runs on another machine than the person's browser, a host can also fill the form's hidden `redirectUri` and `callbackPort` fields, and answer `clientJson` with a Web application client that lists the redirect, so Google's redirect comes back through the host to the engine's listener; see [docs/auth.md](auth.md#sign-in-when-opencode-runs-on-another-machine). The sign-in declares `"relay": { "redirectField": "redirectUri", "portField": "callbackPort" }`: those are the two fields a Jelly web tab fills with its fixed relay address at Jelly ID and a loopback port for the listener (Jelly ADR 0019). The plugin's code is the same either way, and the Web application client must list that relay address.
 
 Jelly folds the declared sign-ins into this plugin's one card, which shows each as Connected, Not signed in or Sign in again (expired or revoked), and starts, renews and signs out of each. An agent's `jelly_connection_request`, or a tool result that names this plugin's "Run /connect and choose …" next step, opens the same card. The plugin still signs in through OpenCode, as it does without Jelly; the declaration only tells Jelly which of the engine's integrations and servers are this plugin's.
+
+The account's name on the card is its verified email: the method's `label` is the email Google returned at sign-in, else the alias. OpenCode keeps the label it gets at sign-in, so an account signed in with an earlier release shows its alias until the person signs it in again.
+
+**An agent's copy.** The person signs in once, in their own engine; an agent given the account gets Jelly's copy of that sign-in (D210): the access token, `jelly-host-owns-refresh` in place of the refresh token, an expiry a day ahead, and every metadata key but the secret-named ones, so the client secret stays with the person. Every call reads the copy as it reads a sign-in: the token, the access level, the scopes Google granted, the email and the domain, which is all a tool, status, `/gws-status` or the source contract's `probe` needs. The client is read only to renew or to sign in again. Jelly renews the person's sign-in in their engine and puts the next copy in before this one runs out; the plugin reads the credential from OpenCode on every call and keeps no token, so it uses the new copy at once. If OpenCode ever asks the plugin to renew a copy (the refresh token is `jelly-host-owns-refresh`), it refuses with `AUTH_REQUIRED` and the sign-in-again step, without calling Google, and Jelly puts this card in front of the person. A sign-in without its client secret is never renewed either.
+
+**Headless accounts are outside Jelly.** Jelly adds only interactive accounts. A `credentials_file` account hands gws a credentials file, and gws exchanges it for a token and caches that token, encrypted, in the plugin's own per-account directory, by design; an `access_token` account reads its environment variable, whose value is fixed when OpenCode starts. Neither is read from OpenCode's credential store, so neither is a copy Jelly can put in or replace.
 
 ## Settings
 

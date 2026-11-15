@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **In Jelly, an agent can use a Google account the person signed in.** Jelly gives an agent a copy of the person's sign-in with every secret-named metadata key left out (D210), so it has no `clientSecret`; the plugin required one to read any sign-in, so every tool, status and the source contract's `probe` failed on the copy with `AUTH_REQUIRED`. A sign-in is now read without its client (the token, access level, scopes, email and domain); the client ID and secret are read only to renew it or to reuse its client at a new sign-in, and a sign-in without them is never renewed.
+- A renewal of Jelly's copy, whose refresh token is `jelly-host-owns-refresh`, is refused first, with `AUTH_REQUIRED` and the sign-in-again step, and no request to Google: Jelly renews the person's sign-in and puts the next copy in.
+
+### Changed
+
+- An account's sign-in is labelled with the verified email Google returned at sign-in, where it was the alias, so Jelly and OpenCode can tell two accounts apart. OpenCode keeps the label it gets at sign-in, so an account signed in with an earlier release keeps its alias until the person signs it in again.
+- Jelly's `commit` action refuses a grant whose confirmation (`cfm`, which Jelly now signs) is not `always`, or that has none, with `UI_GRANT_REFUSED`, before anything reaches Google.
+
+### What Jelly should change
+
+- Nothing for the fixes. Keep a gws credential among the agent-copy fixtures (`provision-value.test.ts` or D210's tests), so a key Jelly starts leaving out that gws reads is caught: gws reads `access`, `requestedScopes`, `grantedScopes`, `email`, `domain` and `clientSource`.
+- Sign `cfm` on every `commit` grant; a Jelly that does not is refused.
+
 ## [0.0.6] - 2026-11-15
 
 ### Changed

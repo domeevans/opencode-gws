@@ -47,6 +47,7 @@ function hostKey() {
       dev: "dev_1",
       mbr: "acc_person1",
       cls: "local",
+      cfm: "always",
       iat,
       exp: iat + 60,
       jti: randomBytes(16).toString("base64url"),
@@ -164,6 +165,16 @@ describe("the grant", () => {
     const bare = uiAction(runtime)
     expect((globalThis as Record<symbol, unknown>)[ACTION_KEY_SYMBOL]).toBeUndefined()
     await expect(bare.commit({ input: CHANGE, grant: host.grant(CHANGE) })).rejects.toThrow(/^UI_GRANT_REFUSED: Jelly handed this engine no action key\./)
+  })
+
+  it("a grant whose confirmation (cfm) is not always is refused before any Google call", async () => {
+    const { host, ui, ran } = await setup()
+    for (const cfm of [undefined, "never", "session"]) {
+      await expect(ui.commit({ input: CHANGE, grant: host.grant(CHANGE, { cfm }) })).rejects.toThrow(/^UI_GRANT_REFUSED: The grant does not say the person confirmed this change\./)
+    }
+    await expect(ui.commit({ input: CHANGE, grant: host.grant(CHANGE, { cfm: "twice" }) })).rejects.toThrow(/^UI_GRANT_REFUSED: The grant's confirmation is not one\./)
+    expect(ran()).toEqual([])
+    await expect(ui.commit({ input: CHANGE, grant: host.grant(CHANGE, { cfm: "always" }) })).resolves.toMatchObject({ updatedCells: 2 })
   })
 })
 

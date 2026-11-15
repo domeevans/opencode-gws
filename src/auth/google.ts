@@ -4,7 +4,7 @@ import { checkClientRedirect, isLoopback, resolveRedirect, type Redirect } from 
 import { grantedScopes } from "../domain/scopes.js"
 import type { AccessLevel } from "../domain/types.js"
 import type { ClientChoice } from "./client.js"
-import { readSignIn, signInClient, signInMetadata } from "./credential.js"
+import { isHostOwnedRefresh, renewableSignIn, signInClient, signInMetadata } from "./credential.js"
 import { idTokenIdentity, type IdTokenExpectation, type SignInIdentity } from "./identity.js"
 
 /**
@@ -526,10 +526,12 @@ export async function authorizeGoogle(input: GoogleAuthorizeInput): Promise<Goog
  * Google may report a changed grant; the stored granted scopes follow it.
  */
 export async function refreshGoogle(input: GoogleRefreshInput): Promise<OAuthCredential> {
-  const signIn = readSignIn(input.credential.metadata)
-  if (!input.credential.refresh || !signIn) {
-    throw new Error(`AUTH_REQUIRED: The Google Workspace sign-in for ${input.alias} cannot be refreshed. Next step: Run /connect, choose ${input.name}, and sign in again.`)
-  }
+  const cannotRefresh = () =>
+    new Error(`AUTH_REQUIRED: The Google Workspace sign-in for ${input.alias} cannot be refreshed. Next step: Run /connect, choose ${input.name}, and sign in again.`)
+  // Jelly's agent copy: the host renews the person's sign-in and puts the next copy in. Never send its sentinel to Google.
+  if (isHostOwnedRefresh(input.credential)) throw cannotRefresh()
+  const signIn = renewableSignIn(input.credential.metadata)
+  if (!input.credential.refresh || !signIn) throw cannotRefresh()
   const options = input.options ?? {}
   const now = options.now ?? Date.now
   const fetchImpl = options.fetch ?? globalThis.fetch
