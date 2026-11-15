@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { PluginMethod, ToolCall } from "@we-the-rebel-alliance/source-contract/tools-rpc"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { deprecatedNote, markCalendarTodayCalled, resetDeprecated } from "../src/host/deprecated.js"
 import type { PermissionRequest } from "../src/host/permissions.js"
 import { scriptMethods } from "../src/host/script-methods.js"
@@ -51,7 +51,7 @@ async function harness(services: string[], signedIn: Signed[] = [{ alias: "perso
   }) as PluginMethod[]
   const call = (): ToolCall => ({ sessionID: "ses_sources", agent: "build", messageID: "msg_sources", id: "call_sources", signal: new AbortController().signal, progress: async () => {} })
   const run = (name: string, input: unknown) => methods.find((method) => method.name === name)!.run(input, call()) as Promise<Record<string, unknown>>
-  return { run, asserted }
+  return { run, asserted, runtime }
 }
 
 describe("probe", () => {
@@ -155,6 +155,28 @@ describe("images_read", () => {
       ["gws.images_read", ["*"]],
       ["gws.read", ["personal:drive.files.get"]],
     ])
+  })
+})
+
+describe("images_read on Google's image servers", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("fetches with no account's token, even an address Google returned to the account, asserts no gws.read, and names no account", async () => {
+    const address = "https://lh3.googleusercontent.com/drive-storage/AJQWtBfake=s220"
+    const requests: Array<{ url: string; authorization: string | null }> = []
+    vi.stubGlobal("fetch", async (url: string, init: { headers: Record<string, string> }) => {
+      requests.push({ url, authorization: new Headers(init.headers).get("authorization") })
+      return new Response(PNG, { status: 200, headers: { "content-type": "image/png" } })
+    })
+    const { run, asserted, runtime } = await harness(["drive"])
+    runtime.imageSources.record("personal", { thumbnailLink: address })
+    const answer = await run("images_read", { url: address, account: "personal" })
+    expect(requests).toEqual([{ url: address, authorization: null }])
+    expect(answer).toMatchObject({ data: { dataUri: `data:image/png;base64,${Buffer.from(PNG).toString("base64")}` }, trust: "untrusted" })
+    expect(answer["account"]).toBeUndefined()
+    expect(asserted.map((request) => request.action)).toEqual(["gws.images_read"])
   })
 })
 

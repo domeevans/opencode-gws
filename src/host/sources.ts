@@ -27,9 +27,11 @@ import type { StatusSource } from "./rpc.js"
  *   trust }`, where `asOf` is when Google was read. It asserts `gws.calendar_today`, then `gws.read` on
  *   `<account>:calendar.calendars.get` and `<account>:calendar.events.list`, before any read.
  * - `images_read` is Jelly's `images.read` as the contract's snapshot: `{ data: { dataUri, alt }, asOf, account?,
- *   trust }`. It asserts `gws.images_read`, and `gws.read` on `<account>:drive.files.get` before a Drive read. A GIF is
- *   refused (the image output takes PNG, JPEG and WebP), and a picture whose data URI is over the output's limit is
- *   TOO_LARGE, never cut.
+ *   trust }`. It asserts `gws.images_read`, and `gws.read` on `<account>:drive.files.get` before a Drive read (the
+ *   file's thumbnail, when it is not itself a picture, is fetched with the token of that same, asserted read). An
+ *   address on Google's image servers is fetched without any account's token: that fetch is no gws operation, so no
+ *   declared grant could cover it, and it carries no `account`. A GIF is refused (the image output takes PNG, JPEG and
+ *   WebP), and a picture whose data URI is over the output's limit is TOO_LARGE, never cut.
  */
 
 /** The probe's permission action, `sources.probe.action`. */
@@ -213,6 +215,7 @@ export function sourceMethods({ runtime, assert, status }: SourceMethodsInput): 
         (settled) =>
           image(url.href, settled, {
             ...(named === undefined ? {} : { account: drive?.account ?? named }),
+            hostedWithoutToken: true,
             authorize: async (account, operation) =>
               authorize(call, operationRequest(host(call), "gws.read", drive ?? runtime.inspect({ account, operation }, "read"))),
             onAccount: (account) => {

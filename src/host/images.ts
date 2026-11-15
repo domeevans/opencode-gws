@@ -60,8 +60,14 @@ export interface ImagesOptions {
  * Jelly's `images.read` passes none of these.
  */
 export interface ImageReadAs {
-  /** Read as this account: a Drive file through its sign-in, and another address with its token only when Google returned it to this account. */
+  /** Read a Drive file as this account, through its sign-in. */
   readonly account?: string
+  /**
+   * Fetch an address on Google's image servers without any account's token, even one Google returned to an account. The
+   * image source sets it: a credentialed fetch from an image server is no gws operation, so no grant could name it, and
+   * the source fetches only what needs no sign-in.
+   */
+  readonly hostedWithoutToken?: true
   /** Called with the account and operation before the Drive read runs; it throws to refuse. */
   readonly authorize?: (account: string, operation: string) => Promise<void>
   /** Told the account whose sign-in read the picture; not called for a picture fetched without credentials. */
@@ -101,12 +107,8 @@ export function imagesRead(runtime: Reader, options: ImagesOptions = {}) {
   }
 
   const hosted = async (url: URL, signal: AbortSignal, as: ImageReadAs): Promise<{ account?: string; bytes: Uint8Array }> => {
+    if (as.hostedWithoutToken) return { bytes: await fetchAs(url.href, undefined, signal) }
     const returnedTo = runtime.imageSources.accounts(url)
-    // A named account's token goes only to an address Google returned to that account.
-    if (as.account !== undefined) {
-      const own = returnedTo.includes(as.account)
-      return { ...(own ? { account: as.account } : {}), bytes: await fetchAs(url.href, own ? as.account : undefined, signal) }
-    }
     if (returnedTo.length === 0) return { bytes: await fetchAs(url.href, undefined, signal) }
     const account = imageAccount(runtime.config, returnedTo)
     return { account, bytes: await fetchAs(url.href, account, signal) }

@@ -262,7 +262,8 @@ never over RPC. Every source is private, free, and read over the tools RPC `goog
   `gws.calendar_today`, then `gws.read` on its two operations.
 - **`images_read`** answers Jelly's `images.read` read as the contract's snapshot, `{ data: { dataUri, alt }, asOf,
   account?, trust }`, for `{ url, account? }`: a Drive file read as the account, or an address on Google's image servers,
-  with the account's token only when Google returned that address to the account. A GIF is `IMAGE_TYPE_REFUSED`, and a
+  fetched with no account's token, even one Google returned to an account (that fetch is no gws operation, so no
+  declared grant could cover it), and answered with no `account`. A GIF is `IMAGE_TYPE_REFUSED`, and a
   picture whose data URI is over the contract's limit (1 MB less 4 KB, about 760 KB of picture) is `TOO_LARGE`, never
   cut. It asserts `gws.images_read`, then `gws.read` on `<account>:drive.files.get` before a Drive read.
 
