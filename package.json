@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-gws",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "private": true,
   "description": "Unofficial OpenCode plugin for Google Workspace (gws CLI)",
   "type": "module",

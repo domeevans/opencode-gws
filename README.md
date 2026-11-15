@@ -15,7 +15,7 @@ Google is a trademark of Google LLC; this unofficial plugin is not endorsed by t
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-gws#v0.0.6
+opencode plugin add github:joe-broadhead/opencode-gws#v0.0.7
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
@@ -25,7 +25,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.6" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.7" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -95,7 +95,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.6", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.7", "options": { "access": "read-only" } }] }
    ```
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
@@ -219,7 +219,7 @@ Create a Desktop app OAuth client in your organisation's Google Cloud project (u
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-gws#v0.0.6",
+      "package": "github:joe-broadhead/opencode-gws#v0.0.7",
       "options": {
         "oauthClient": {
           "clientId": "<your client ID>.apps.googleusercontent.com",
@@ -325,7 +325,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 2. Remove the plugin:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.6
+   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.7
    ```
 
 3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.
@@ -349,6 +349,8 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 - **Output and time limits.** A result that is too large stops with `OUTPUT_LIMIT`, and a slow call with `TIMEOUT`. Narrow the request with `fields`, a smaller page size, `maxPages` or `maxItems`.
 - **Changes from an agent's UI in Jelly.** Off by default, and only Sheets value updates: RAW values (never formulas), at most 100 rows of 26 cells, with a preview that fits Jelly's 4,000-character confirmation. The preview shows the new values, not the cells' current ones. It works only in Jelly, which holds the key its grants are signed with; the plugin refuses a grant that does not say Jelly asked every time. `/gws-status` does not show the option yet.
 - **Pictures in Jelly over about 47 KB.** `images.read` answers pictures up to 1 MB, as Jelly's picture contract allows, but Jelly's host currently refuses any plugin RPC answer over 64 KB of JSON (`VIEW_DATA_MAX_BYTES`), so a picture over about 47 KB shows no picture in Jelly until Jelly lifts that limit for pictures. That limit is Jelly's, not the plugin's.
+- **Jelly sign-in labels.** An account is labelled with its verified email only from a sign-in made with 0.0.7 or later; one signed in earlier keeps its alias until it is signed in again.
+- **Jelly's probe.** The sources declare no `permission.identity` yet: source-contract v0.1.0's conformance kit refuses one that a content read also asserts. Until a source-contract tag allows it, Jelly fences `probe` with all of a source's operations, though it calls no Google API.
 - **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. A later 2.2 or 2.3 release loads, and `/gws-status` marks it untested.
 - **Audit lines can drop.** The audit log is written off the call path, with a 100 ms budget per line. A write that stalls past it is abandoned: its line and any queued behind it are lost. The call's result is not affected. The sink then stops writing until the plugin reloads, and `/gws-status` shows that some audit records could not be saved.
