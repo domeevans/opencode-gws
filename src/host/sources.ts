@@ -167,6 +167,8 @@ export function sourceMethods({ runtime, assert, status }: SourceMethodsInput): 
       for (const target of targets) await authorize(call, operationRequest(host(call), "gws.read", target))
       const account = targets[0]!.account
       const answer = await runtime.wait((settled) => today(settled, account), call.signal)
+      // The reader keys every read and kept answer by account; an answer for another account is never labelled this one.
+      if (answer.account !== account) throw new GwsError("CALENDAR_UNAVAILABLE", `the calendar read answered for another account than '${account}'`, { next: "Retry later." })
       const items = answer.events.map((event) => ({
         id: event.id,
         title: clip(event.title, AGENDA_TEXT_MAX),
@@ -177,7 +179,7 @@ export function sourceMethods({ runtime, assert, status }: SourceMethodsInput): 
         ...(event.url === undefined ? {} : { url: event.url }),
         ...(event.joinUrl === undefined ? {} : { joinUrl: event.joinUrl }),
       }))
-      return { data: { items }, asOf: new Date(Date.parse(answer.at)).toISOString(), account, trust: "untrusted" }
+      return { data: { items }, asOf: new Date(Date.parse(answer.at)).toISOString(), account: answer.account, trust: "untrusted" }
     },
   }
 
