@@ -1,3 +1,4 @@
+import { deprecatedNote } from "./deprecated.js"
 import { Gws, NOTHING_TO_DO, SHELL_LABEL, UNGUARDED_NEXT_STEP, type GwsAccount, type GwsState, type GwsStatus } from "../rpc.js"
 import type { Access } from "../domain/access.js"
 import type { Runtime } from "../runtime/index.js"
@@ -53,6 +54,7 @@ export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills
     const shadowed = shadowedSkills(skills)
     const shell = shellSkills(skills)
     const next = nextStep(base.accounts, shadowed, shell, agents)
+    const deprecated = deprecatedNote()
     return {
       version: base.version,
       host: base.host,
@@ -67,6 +69,7 @@ export function statusSource(runtime: Runtime, listAgents: AgentList, listSkills
       ...(shell.length > 0 ? { shellSkills: shell } : {}),
       unguardedAgents: agents,
       ...(agents.length > 0 ? { permissionsBlock: permissionsBlock(agents, access) } : {}),
+      ...(deprecated === undefined ? {} : { deprecated }),
       nextStep: next ?? NOTHING_TO_DO,
     }
   }

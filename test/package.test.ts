@@ -80,7 +80,10 @@ describe("main package", () => {
   })
 
   it("pins every dev dependency exactly, with the OpenCode SDKs at 2.2.3", () => {
-    expect(Object.entries(pkg.devDependencies).filter(([, version]) => !/^\d+\.\d+\.\d+$/.test(version as string))).toEqual([])
+    // The source contract is a tagged GitHub Release, not an npm version: pinned by its tag, and by its commit in the lockfile.
+    const exact = (name: string, version: string) =>
+      /^\d+\.\d+\.\d+$/.test(version) || (name === "@we-the-rebel-alliance/source-contract" && /^github:we-the-rebel-alliance\/source-contract#v\d+\.\d+\.\d+$/.test(version))
+    expect(Object.entries(pkg.devDependencies).filter(([name, version]) => !exact(name, version as string))).toEqual([])
     for (const name of ["@opencode/plugin", "@opencode/sdk", "@opencode/client"]) expect(pkg.devDependencies[name], name).toBe("2.2.3")
   })
 })
@@ -93,6 +96,12 @@ describe("lockfile", () => {
     expect(root.optionalDependencies).toBeUndefined()
     expect(root.devDependencies).toEqual(pkg.devDependencies)
     expect(root.dependencies).toBeUndefined()
+  })
+
+  it("pins the source contract's tag to its commit", () => {
+    const entry = lock.packages["node_modules/@we-the-rebel-alliance/source-contract"]
+    expect(entry.resolved).toMatch(/^git\+ssh:\/\/git@github\.com\/we-the-rebel-alliance\/source-contract\.git#[0-9a-f]{40}$/)
+    expect(entry.dev).toBe(true)
   })
 
   it("records no gws package: nothing optional is installed for the binary", () => {

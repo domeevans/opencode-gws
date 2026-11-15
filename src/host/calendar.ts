@@ -65,10 +65,14 @@ type Kept = { account: string; zone: string; day: string; at: number; events: Ca
 /** The sign-in codes: the kept events are dropped, so a signed-out calendar is never shown as stale. */
 const SIGN_IN = new Set(["AUTH_REQUIRED", "AUTH_SCOPE_MISSING"])
 
-/** Today's calendar, read through `runtime`, kept and answered stale as the module says. `now` is the clock. */
+/**
+ * Today's calendar, read through `runtime`, kept and answered stale as the module says. `now` is the clock. Each account
+ * has its own read in flight and its own kept answer, so a call for one account never waits on, is answered from, or is
+ * labelled with another account's calendar.
+ */
 export function calendarToday(runtime: Reader, now: () => number = Date.now) {
-  let kept: Kept | undefined
-  let reading: Promise<Kept> | undefined
+  const kept = new Map<string, Kept>()
+  const reading = new Map<string, Promise<Kept>>()
 
   const read = async (account: string, signal: AbortSignal): Promise<Kept> => {
     const ctx = { sessionId: "", agentId: "", caller: "rpc" as const, signal }
@@ -98,37 +102,45 @@ export function calendarToday(runtime: Reader, now: () => number = Date.now) {
     return fitted.answer
   }
 
-  return async (signal?: AbortSignal): Promise<CalendarToday> => {
-    const account = calendarAccount(runtime.config)
+  /** Today's answer for `named`, or for the account `calendarAccount` picks when the call names none. */
+  return async (signal?: AbortSignal, named?: string): Promise<CalendarToday> => {
+    const account = named ?? calendarAccount(runtime.config)
     if (account === undefined)
       throw new GwsError("CALENDAR_UNAVAILABLE", "no configured account enables calendar", {
         next: "Add calendar to an account's enabledServices, or remove accounts so the default account enables it.",
       })
-    if (kept && kept.account !== account) kept = undefined
-    if (kept && now() - kept.at < FRESH_MS && dayKey(now(), kept.zone) === kept.day) return answer(kept, "ready")
+    const fresh = kept.get(account)
+    if (fresh && now() - fresh.at < FRESH_MS && dayKey(now(), fresh.zone) === fresh.day) return answer(fresh, "ready")
     // The deadline holds even if the read ignores its signal: the call stops waiting, and the next one reads afresh.
     const deadline = new AbortController()
-    reading ??= read(account, signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal).finally(() => {
-      if (reading === started) reading = undefined
-    })
-    const started = reading
+    let started = reading.get(account)
+    if (started === undefined) {
+      const begun = read(account, signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal).finally(() => {
+        if (reading.get(account) === begun) reading.delete(account)
+      })
+      reading.set(account, begun)
+      started = begun
+    }
+    const own = started
     let timer: ReturnType<typeof setTimeout> | undefined
     const late = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         const error = new GwsError("TIMEOUT", `the calendar read did not finish within ${READ_DEADLINE_MS / 1000} seconds`, { next: "Retry later." })
-        if (reading === started) reading = undefined
+        if (reading.get(account) === own) reading.delete(account)
         deadline.abort(error)
         reject(error)
       }, READ_DEADLINE_MS)
     })
     try {
-      kept = await Promise.race([started, late])
-      return answer(kept, "ready")
+      const entry = await Promise.race([own, late])
+      kept.set(account, entry)
+      return answer(entry, "ready")
     } catch (error) {
       if (signal?.aborted) throw error
       const code = GwsError.from(error)?.code
-      if (code !== undefined && SIGN_IN.has(code)) kept = undefined
-      else if (kept && dayKey(now(), kept.zone) === kept.day) return answer(kept, "stale")
+      const stale = kept.get(account)
+      if (code !== undefined && SIGN_IN.has(code)) kept.delete(account)
+      else if (stale && dayKey(now(), stale.zone) === stale.day) return answer(stale, "stale")
       throw error
     } finally {
       clearTimeout(timer)

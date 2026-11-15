@@ -5,8 +5,18 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { z } from "zod"
 import { EventsListInput, EventsListOutput } from "../src/domain/contract.js"
-import { EVENT_LIMITS, type EventsListInput as Input, type EventsListResult, PAGE, assertEventsListConformance, encodeCursor, resultProblems } from "../src/host/events-list.js"
-import { EVENT_READS, GMAIL_SOURCE } from "../src/host/gmail-events.js"
+import { encodeBoundCursor } from "@we-the-rebel-alliance/source-contract/cursor"
+import {
+  EVENT_LIMITS,
+  type EventsListInput as Input,
+  type EventsListResult,
+  PAGE,
+  assertEventsListConformance,
+  encodeCursor,
+  resultProblems,
+} from "@we-the-rebel-alliance/source-contract/events"
+import { GMAIL_READS, GMAIL_SOURCE } from "../src/host/gmail-events.js"
+import { PAGE_MAX_BYTES } from "../src/host/source-page.js"
 import type { PermissionRequest } from "../src/host/permissions.js"
 import { type Call, parse, toolSpecs } from "../src/host/tools.js"
 import type { Runtime } from "../src/runtime/index.js"
@@ -15,9 +25,12 @@ import { account, testRuntime } from "./support/config.js"
 /**
  * gws_events_list, through its tool spec and the runtime, against the fake
  * gws answering from a synthetic mailbox (test/fixtures/gmail-mailbox.json):
- * the shared contract's conformance check, the event each message makes,
- * the first listing's search, history after it, a history id Gmail no
- * longer keeps, accounts, and the asserts that run before any read.
+ * the source contract's events_list conformance check (the package's
+ * `events`, with every option of the final design on), the event each
+ * message makes, the first listing's search, history after it, a history id
+ * Gmail no longer keeps, a secret, a message Google fails to answer,
+ * accounts, cursors, and the asserts that run before any read. The source
+ * contract kit's own run is test/source-conformance.test.ts.
  */
 
 const FIXTURE = fileURLToPath(new URL("./fixtures/gmail-mailbox.json", import.meta.url))
@@ -29,6 +42,7 @@ interface Mailbox {
   emailAddress: string
   historyId: string
   historyStart?: string
+  failIds?: string[]
   messages: Array<Record<string, unknown> & { id: string; threadId: string; labelIds: string[]; internalDate: string }>
   history: Array<{ id: string; messagesAdded: Array<{ message: { id: string; threadId: string; labelIds: string[] } }> }>
 }
@@ -97,35 +111,41 @@ async function harness(overrides: Record<string, unknown> = {}, assert: (request
     runtime: { sessionId: "ses_collect", agentId: "build", signal: new AbortController().signal },
   }
   /** events_list as the tool and the RPC method run it: the input schema, then the spec. */
-  const list = async (input: Input): Promise<EventsListResult> => (await spec.run(parse(spec.input, input), call)).output as EventsListResult
+  const list = async (input: Input): Promise<EventsListResult> => (await spec.run(parse(spec.input, input, spec.invalid), call)).output as EventsListResult
   return { runtime, asserted, spec, list }
 }
 
 const ids = (result: EventsListResult) => result.events.map((event) => event.external_id)
+/** A cursor's JSON: the contract's cursors are base64url JSON, opaque to a consumer and not to this test. */
+const decodedState = (cursor: string) => JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>
 
-describe("gws_events_list keeps the shared contract", () => {
+/** The final design's options of the events conformance check, each on. */
+const FULL = { maxBytes: PAGE_MAX_BYTES, kinds: ["message"], codes: true, binding: { plugin: "gws" } } as const
+
+describe("gws_events_list keeps the source contract", () => {
   it("passes the conformance check over the synthetic mailbox, page by page", async () => {
     const { list } = await harness()
-    await assertEventsListConformance(list, { source: GMAIL_SOURCE, account: "personal", owner: OWNER, since: SINCE, expected: LISTED })
+    await assertEventsListConformance(list, { source: GMAIL_SOURCE, account: "personal", owner: OWNER, since: SINCE, expected: LISTED, ...FULL })
   })
 
   it("passes it one event a page, with the default account", async () => {
     const { list } = await harness()
-    await assertEventsListConformance(list, { source: GMAIL_SOURCE, owner: OWNER, since: SINCE, expected: LISTED, pageSize: 1 })
+    await assertEventsListConformance(list, { source: GMAIL_SOURCE, owner: OWNER, since: SINCE, expected: LISTED, pageSize: 1, ...FULL })
   })
 
   it("passes it with source named on every call, as the collector names it for a plugin with several sources", async () => {
     const { list } = await harness()
-    await assertEventsListConformance(list, { source: GMAIL_SOURCE, account: "personal", owner: OWNER, since: SINCE, expected: LISTED, sourceInput: true })
+    await assertEventsListConformance(list, { source: GMAIL_SOURCE, account: "personal", owner: OWNER, since: SINCE, expected: LISTED, sourceInput: true, ...FULL })
   })
 
-  it("names the source and account on an empty first page, and refuses any source but gmail", async () => {
+  it("names the source and account on an empty first page, and refuses a source it does not serve or a scope Gmail does not take", async () => {
     const { list } = await harness()
-    expect(await list({ since: "2026-12-01T00:00:00Z" })).toMatchObject({ source: "gmail", account: "personal", owner: OWNER, events: [], more: false })
-    await expect(list({ since: SINCE, source: "calendar" })).rejects.toThrow(
-      /^GWS_VALIDATION_ERROR: The source 'calendar' is not available: events_list lists Gmail only, until Calendar and Drive are added\. Next step: Call events_list without source, or with source "gmail"\.$/,
+    expect(await list({ since: "2026-12-01T00:00:00Z" })).toMatchObject({ source: "gmail", account: "personal", owner: OWNER, events: [], more: false, plugin: "@joe-broadhead/opencode-gws" })
+    await expect(list({ since: SINCE, source: "drive" })).rejects.toThrow(
+      /^SOURCE_UNKNOWN: The source 'drive' is not one events_list serves\. Next step: Call events_list without source, or with source "gmail" or "calendar"\.$/,
     )
-    await expect(list({ since: SINCE, source: "Drive" })).rejects.toThrow(/^GWS_VALIDATION_ERROR: "source" must be a source's name/)
+    await expect(list({ since: SINCE, source: "Drive" })).rejects.toThrow(/^SOURCE_UNKNOWN: The source named is not one events_list serves/)
+    await expect(list({ since: SINCE, scope: { labels: ["INBOX"] } })).rejects.toThrow(/^INPUT_INVALID: /)
   })
 
   it("states the contract's limits in its schemas", () => {
@@ -187,7 +207,7 @@ describe("the events", () => {
     await list({ since: SINCE, limit: 1 })
     expect(asserted.map((request) => [request.action, request.resources])).toEqual([
       ["gws.events_list", ["personal:gmail.users.history.list"]],
-      ...EVENT_READS.map((operation) => ["gws.read", [`personal:${operation}`]]),
+      ...GMAIL_READS.map((operation) => ["gws.read", [`personal:${operation}`]]),
     ])
     expect(asserted.every((request) => request.source?.type === "tool")).toBe(true)
 
@@ -240,10 +260,44 @@ describe("after the first listing", () => {
     deliver([{ id: "18f0000000000030", at: "2026-11-03T09:00:00Z" }])
     save({ ...mailbox(), historyStart: mailbox().historyId })
     const next = await list({ cursor: first.cursor })
-    // The last event already listed may come again; Memory drops the repeat.
+    // The last event already listed may come again; Memory drops the repeat. The page says the history is gone.
     expect(ids(next).filter((id) => id !== "18f0000000000008")).toEqual(["18f0000000000030"])
+    expect(next.gap).toEqual({ reason: "expired", since: "2026-11-01T15:00:00.000Z" })
     expect(next.more).toBe(false)
+    const after = await list({ cursor: next.cursor })
+    expect(after).toMatchObject({ events: [], more: false })
+    expect(after.gap).toBeUndefined()
+  })
+
+  it("refuses a message holding a secret for good, and moves past it", async () => {
+    const { list } = await harness()
+    const first = await list({ since: SINCE })
+    deliver([{ id: "18f0000000000040", at: "2026-11-02T09:00:00Z" }, { id: "18f0000000000041", at: "2026-11-02T09:01:00Z" }])
+    const box = mailbox()
+    const secret = box.messages.find((message) => message.id === "18f0000000000040")!
+    secret["snippet"] = "The wifi password: Ku7pLm2QzR9w"
+    secret["payload"] = { mimeType: "text/plain", headers: [{ name: "From", value: "ama.mensah@example.com" }, { name: "Subject", value: "Wifi" }], body: { data: Buffer.from("The wifi password: Ku7pLm2QzR9w").toString("base64url") } }
+    save(box)
+    const next = await list({ cursor: first.cursor })
+    expect(ids(next)).toEqual(["18f0000000000041"])
+    expect(next.refused).toEqual([{ external_id: "18f0000000000040", reason: "secret", detail: "holds a secret (password)" }])
+    expect(JSON.stringify(next)).not.toContain("Ku7pLm2QzR9w")
     expect(await list({ cursor: next.cursor })).toMatchObject({ events: [], more: false })
+  })
+
+  it("lists a message Google failed to answer as failed, and holds the cursor back so the next call reads it again", async () => {
+    const { list } = await harness()
+    const first = await list({ since: SINCE })
+    deliver([{ id: "18f0000000000050", at: "2026-11-02T09:00:00Z" }, { id: "18f0000000000051", at: "2026-11-02T09:01:00Z" }])
+    save({ ...mailbox(), failIds: ["18f0000000000050"] })
+    const held = await list({ cursor: first.cursor })
+    expect(ids(held)).toEqual(["18f0000000000051"])
+    expect(held.failed).toEqual([{ external_id: "18f0000000000050", code: "UNAVAILABLE" }])
+    expect(held.cursor).toBe(first.cursor)
+    save({ ...mailbox(), failIds: [] })
+    const again = await list({ cursor: held.cursor })
+    expect(ids(again)).toEqual(["18f0000000000050", "18f0000000000051"])
+    expect(again.failed).toBeUndefined()
   })
 })
 
@@ -265,11 +319,24 @@ describe("accounts and cursors", () => {
     save({ ...mailbox(), emailAddress: "someone.else@example.com" })
     await expect(list({ cursor: personal.cursor, account: "personal" })).rejects.toThrow(/^CURSOR_INVALID:/)
     await expect(list({ cursor: encodeCursor("history", { a: "personal" }), account: "personal" })).rejects.toThrow(/^CURSOR_INVALID:/)
+    // A version 2 cursor bound to another account, with this account's state, is refused too.
+    const forged = encodeBoundCursor({ plugin: "gws", source: "gmail", account: "work", scope: {} }, { a: "personal" })
+    await expect(list({ cursor: forged, account: "personal" })).rejects.toThrow(/^CURSOR_INVALID:/)
+  })
+
+  it("reads a contract 1 cursor of the same mailbox for one release, and answers a bound one", async () => {
+    const { list } = await harness()
+    const first = await list({ since: SINCE })
+    const { v: _v, s: _s, b: _b, ...kept } = decodedState(first.cursor)
+    const legacy = encodeCursor(GMAIL_SOURCE, kept)
+    const next = await list({ cursor: legacy })
+    expect(next).toMatchObject({ events: [], more: false })
+    expect(decodedState(next.cursor)["v"]).toBe(2)
   })
 
   it("refuses a since without a zone or that is not a time, naming the field", async () => {
     const { list } = await harness()
-    await expect(list({ since: "2026-11-01T09:00" })).rejects.toThrow(/^GWS_VALIDATION_ERROR: Since: must be an ISO date/)
-    await expect(list({ since: "2026-13-01" })).rejects.toThrow(/^GWS_VALIDATION_ERROR: "since"/)
+    await expect(list({ since: "2026-11-01T09:00" })).rejects.toThrow(/^INPUT_INVALID: Since: must be an ISO date/)
+    await expect(list({ since: "2026-13-01" })).rejects.toThrow(/^INPUT_INVALID: "since"/)
   })
 })

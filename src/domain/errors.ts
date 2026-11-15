@@ -40,8 +40,21 @@ export const ErrorCode = {
   },
   CURSOR_INVALID: {
     meaning:
-      "The events_list cursor was not issued by events_list for this account and its mailbox: another account's or source's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran.",
+      "The events_list cursor was not issued by events_list for this source, account and scope: another account's, source's or calendar's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran.",
     next: "Call events_list without cursor, with since where the listing should start; Memory drops events it already has.",
+  },
+  INPUT_INVALID: {
+    meaning:
+      "A source read refused its input: events_list, probe, calendar_today or images_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, or a calendar other than the primary one. Nothing ran.",
+    next: "Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry.",
+  },
+  SOURCE_UNKNOWN: {
+    meaning: "A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran.",
+    next: "Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today or image for probe.",
+  },
+  TOO_LARGE: {
+    meaning: "A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture). Nothing is cut short.",
+    next: "Read a smaller picture, such as the file's thumbnail.",
   },
   FIELDS_INVALID: {
     meaning: "The fields mask's parentheses do not balance, so gws was not called.",
@@ -157,8 +170,9 @@ export const ErrorCode = {
     next: "Show the picture from a Drive file link or an address Google returned, such as a file's thumbnailLink.",
   },
   IMAGE_TYPE_REFUSED: {
-    meaning: "The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused.",
-    next: "Show a PNG, JPEG, GIF or WebP picture instead.",
+    meaning:
+      "The picture's first bytes are not a PNG, JPEG, GIF or WebP; SVG and every other kind are refused. The image source (images_read) also refuses a GIF, which the contract's image output does not take.",
+    next: "Show a PNG, JPEG, GIF or WebP picture instead; for images_read, a PNG, JPEG or WebP.",
   },
   IMAGE_TOO_LARGE: {
     meaning: "The picture is over 1 MB, the most Jelly draws; the plugin stops reading at that size and answers nothing.",

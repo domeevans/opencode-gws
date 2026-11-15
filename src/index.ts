@@ -10,7 +10,7 @@ import { registerJellyRpc } from "./host/jelly-rpc.js"
 import { registerRpc, statusSource } from "./host/rpc.js"
 import { registerSkills, skillLister } from "./host/skills.js"
 import { registerTools } from "./host/tools.js"
-import { METHODS, registerToolsRpc, scriptMethods } from "./host/tools-rpc.js"
+import { registerToolsRpc, scriptMethods } from "./host/script-methods.js"
 import { Runtime } from "./runtime/index.js"
 
 /**
@@ -70,9 +70,7 @@ async function start(ctx: Plugin.Context): Promise<() => Promise<void>> {
     await registerSkills(ctx, config)
     stopRpc = await registerRpc(ctx, runtime, status)
     stopJellyRpc = await registerJellyRpc(ctx, runtime)
-    stopToolsRpc = await registerToolsRpc(ctx, {
-      methods: [...METHODS, ...scriptMethods({ runtime, assert: (request) => ctx.permission.assert(request as never), status, listAgents: agentLister(ctx) })],
-    })
+    stopToolsRpc = await registerToolsRpc(ctx, scriptMethods({ runtime, assert: (request) => ctx.permission.assert(request as never), status, listAgents: agentLister(ctx) }))
     stopCommands = await registerCommands(ctx, {
       status,
       plans: (sessionID) => runtime.plans.list({ sessionId: sessionID }).map(planSummary),

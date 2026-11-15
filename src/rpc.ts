@@ -69,6 +69,8 @@ export interface GwsStatus {
   unguardedAgents: string[]
   /** The permission block to add first in each unguarded agent's own permissions; present when any is unguarded. */
   permissionsBlock?: string
+  /** One line once a deprecated method was called in this process: the old method, the one to use, and when the old one goes. */
+  deprecated?: string
   /** The one thing to do next, as one sentence; NOTHING_TO_DO when nothing is needed. */
   nextStep: string
 }
@@ -118,6 +120,7 @@ const status = object(
     shellSkills: { type: "array", items: object({ id: text, path: text }, ["id", "path"]) },
     unguardedAgents: texts,
     permissionsBlock: text,
+    deprecated: text,
     nextStep: text,
   },
   ["version", "host", "state", "access", "rpcCommits", "gws", "services", "accounts", "unguardedAgents", "nextStep"],
@@ -184,6 +187,7 @@ export function isStatus(value: unknown): value is GwsStatus {
     optional(value["shellSkills"], isSkills) &&
     isStrings(value["unguardedAgents"]) &&
     optional(value["permissionsBlock"], isText) &&
+    optional(value["deprecated"], isText) &&
     isText(value["nextStep"])
   )
 }

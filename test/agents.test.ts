@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { CHANGING_ACTIONS, NAMESPACE_ACTION, READ_ACTIONS, type Access } from "../src/domain/access.js"
 import { defaultRules, hasDefaultRules, insertDefaultRules, permissionsBlock, unguardedAgents, type Rule } from "../src/host/agents.js"
-import { evaluate } from "../src/host/tools-rpc.js"
+import { evaluate } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 
 /**
  * The default rules: the block every agent gets after its base allow. At the

@@ -3,6 +3,7 @@ import { GwsError } from "../domain/errors.js"
 import { PACKAGE_NAME } from "../domain/version.js"
 import type { Runtime } from "../runtime/index.js"
 import { TODAY_INPUT, TODAY_OUTPUT, calendarToday } from "./calendar.js"
+import { markCalendarTodayCalled } from "./deprecated.js"
 import type { PluginContext } from "./context.js"
 import { IMAGE_INPUT, IMAGE_OUTPUT, type ImagesOptions, imagesRead } from "./images.js"
 import { UI_CHANGE_INPUT, UI_CHANGE_OUTPUT, UI_PREVIEW_OUTPUT } from "../domain/ui-action.js"
@@ -11,7 +12,8 @@ import { type UiActionOptions, uiAction } from "./ui-action.js"
 /**
  * The RPC Jelly calls a plugin's declared methods on (`jelly.rpc`): its id is the package's own name, and the engine
  * lets one registration hold an id, so every method Jelly calls lives in this one definition: `calendar.today`
- * (`./calendar.ts`), `images.read` (`./images.ts`), and the `commit` action a person approves in an agent's UI with
+ * (`./calendar.ts`; deprecated until 0.1.0, for `calendar_today` on the tools RPC, `./deprecated.ts`), `images.read`
+ * (`./images.ts`), and the `commit` action a person approves in an agent's UI with
  * its preview, `act.commit` and `plan.preview` (`./ui-action.ts`). A failure is the declared error `failed`, with the
  * plugin's code and next step.
  */
@@ -46,6 +48,7 @@ export async function registerJellyRpc(ctx: Pick<PluginContext, "rpc">, runtime:
   const ui = uiAction(runtime, options.ui)
   const registration = await ctx.rpc.register(JellyRpc, {
     "calendar.today": async (_input, context) => {
+      markCalendarTodayCalled()
       try {
         return await runtime.wait((settled) => today(settled), context.signal)
       } catch (error) {

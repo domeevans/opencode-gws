@@ -10,3 +10,4 @@ native/*/
 .fake-gws-*/
 .tools-test-*/
 .backend-test-*/
+reports/

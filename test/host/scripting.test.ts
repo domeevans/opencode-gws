@@ -66,9 +66,9 @@ const get = request("gmail.users.messages.get", { params: { userId: "me", id: "m
 const asked = (session: string) => host.events.filter((event) => event.type === "permission.asked" && event.data?.sessionID === session)
 
 describe("tools RPC on a real host", () => {
-  it("describes exactly the read tools as methods, each with its input and output schema", async () => {
+  it("describes exactly the read tools and the source contract's reads as methods, each with its input and output schema", async () => {
     const description = (await tools().describe!({}, at())) as { methods: Array<{ name: string; input: unknown; output: unknown }> }
-    expect(description.methods.map((method) => method.name).sort()).toEqual(["catalog", "events_list", "plan", "read", "schema", "status"])
+    expect(description.methods.map((method) => method.name).sort()).toEqual(["calendar_today", "catalog", "events_list", "images_read", "plan", "probe", "read", "schema", "status"])
     for (const method of description.methods) expect({ name: method.name, input: method.input, output: method.output }).toMatchObject({ input: { type: "object" }, output: { type: "object" } })
   })
 

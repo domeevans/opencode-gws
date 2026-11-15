@@ -274,6 +274,61 @@ describe("calendar.today's answer", () => {
     await expect(today()).rejects.toThrow(/^TIMEOUT: /)
   })
 
+  describe("several accounts", () => {
+    /** A read path whose answers depend on the account, and whose events.list waits until the test releases that account. */
+    function perAccount() {
+      const gates = new Map<string, () => void>()
+      const calls: string[] = []
+      const reader = {
+        wait: <T>(start: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal) => start(signal ?? new AbortController().signal),
+        config: loadConfig({ accounts: { work: account({ services: ["calendar"] }), home: account({ services: ["calendar"] }) } }),
+        read: async (request: { account: string; operation: string }) => {
+          calls.push(`${request.account}:${request.operation}`)
+          if (request.operation === "calendar.calendars.get") return { ok: true, operation: request.operation, category: "read", data: { timeZone: ZONE }, truncated: false }
+          await new Promise<void>((resolve) => gates.set(request.account, resolve))
+          const items = [timed(`${request.account}-meeting`, "2026-11-12T17:00:00Z", "2026-11-12T18:00:00Z")]
+          return { ok: true, operation: request.operation, category: "read", data: { items }, truncated: false }
+        },
+      } as unknown as Pick<Runtime, "config" | "read">
+      const release = async (alias: string) => {
+        for (let tries = 0; !gates.has(alias) && tries < 100; tries++) await new Promise((resolve) => setTimeout(resolve, 1))
+        gates.get(alias)?.()
+        gates.delete(alias)
+      }
+      return { reader, calls, release }
+    }
+
+    it("reads each account on its own when two reads overlap, and labels each answer with the account it read", async () => {
+      const { reader, calls, release } = perAccount()
+      const today = calendarToday(reader, () => NOW)
+      const work = today(undefined, "work")
+      const home = today(undefined, "home")
+      await release("home")
+      await release("work")
+      const [forWork, forHome] = await Promise.all([work, home])
+      expect(forWork).toMatchObject({ account: "work", events: [{ id: "work-meeting" }] })
+      expect(forHome).toMatchObject({ account: "home", events: [{ id: "home-meeting" }] })
+      expect(calls.filter((call) => call.endsWith("calendar.events.list")).sort()).toEqual(["home:calendar.events.list", "work:calendar.events.list"])
+    })
+
+    it("never answers one account from another's kept reading", async () => {
+      const { reader, calls, release } = perAccount()
+      const today = calendarToday(reader, () => NOW)
+      const work = today(undefined, "work")
+      await release("work")
+      expect(await work).toMatchObject({ account: "work", events: [{ id: "work-meeting" }] })
+      // Within the minute work's reading is kept, and home still reads its own calendar.
+      const home = today(undefined, "home")
+      await release("home")
+      expect(await home).toMatchObject({ account: "home", events: [{ id: "home-meeting" }] })
+      expect(calls.filter((call) => call.startsWith("home:"))).toHaveLength(2)
+      // Each kept reading still answers its own account.
+      expect(await today(undefined, "work")).toMatchObject({ account: "work", events: [{ id: "work-meeting" }] })
+      expect(await today(undefined, "home")).toMatchObject({ account: "home", events: [{ id: "home-meeting" }] })
+      expect(calls).toHaveLength(4)
+    })
+  })
+
   describe("the read's own deadline", () => {
     afterEach(() => {
       vi.useRealTimers()
@@ -410,8 +465,9 @@ describe("the jelly declaration of calendar.today", () => {
     tools: { permission: string; readOnly?: boolean }[]
     rpc: { name: string; permission: string; readOnly: boolean; input: unknown; output: unknown }[]
     views: { id: string; page?: string; grants: string[]; rpc?: string[] }[]
-    nativeData: { v: number; capability: string; view: string; read: string }[]
+    nativeData: { v: number; capability: string; view: string; read: string; source?: string }[]
   }
+  const sources = (pkg as unknown as { sources: { items: { id: string; kind: string; tool: string; output?: string }[] } }).sources
 
   it("is registered under the package's own name, which Jelly calls a view's methods on", () => {
     expect(PACKAGE_NAME).toBe(pkg.name)
@@ -429,7 +485,9 @@ describe("the jelly declaration of calendar.today", () => {
   // nativeDataIssues): a read-only method under a declared tool permission, named by a page view with the rpc grant.
   it("follows Jelly's native data rules", () => {
     const [hint] = jelly.nativeData
-    expect(jelly.nativeData).toEqual([{ v: 1, capability: "calendar", view: "calendar-native", read: "calendar.today" }])
+    expect(jelly.nativeData).toEqual([{ v: 1, capability: "calendar", view: "calendar-native", read: "calendar.today", source: "gws.calendar.today" }])
+    // D202: while Jelly's source setting is on, Home reads the source the hint names, the agenda snapshot on the tools RPC.
+    expect(sources.items.find((item) => item.id === hint?.source)).toMatchObject({ kind: "snapshot", tool: "calendar_today", output: "agenda" })
     const view = jelly.views.find((entry) => entry.id === hint?.view)
     expect(view?.page).toBe("views/calendar.html")
     expect(view?.grants).toEqual(["rpc"])

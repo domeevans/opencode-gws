@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-gws",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "description": "Unofficial OpenCode plugin for Google Workspace (gws CLI)",
   "type": "module",
@@ -102,12 +102,136 @@
     "@opentui/core": "0.8.0",
     "@opentui/solid": "0.8.0",
     "@types/node": "24.19.2",
+    "@we-the-rebel-alliance/source-contract": "github:we-the-rebel-alliance/source-contract#v0.1.0",
     "babel-preset-solid": "1.9.16",
     "esbuild": "0.28.2",
     "solid-js": "1.9.17",
     "typescript": "5.9.3",
     "vitest": "5.0.5",
     "zod": "4.6.7"
+  },
+  "sources": {
+    "contractVersion": 1,
+    "rpc": "google-workspace.gws.tools",
+    "probe": {
+      "action": "gws.probe"
+    },
+    "items": [
+      {
+        "id": "gws.gmail",
+        "kind": "events",
+        "reads": "message",
+        "tool": "events_list",
+        "input": {
+          "source": "gmail"
+        },
+        "accounts": {
+          "named": true
+        },
+        "permission": {
+          "events": "gws.events_list",
+          "operations": [
+            "gmail.users.getProfile",
+            "gmail.users.history.list",
+            "gmail.users.messages.list",
+            "gmail.users.messages.get"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxBytes": 262144,
+        "urlHosts": [
+          "mail.google.com"
+        ]
+      },
+      {
+        "id": "gws.calendar",
+        "kind": "events",
+        "reads": "meeting",
+        "tool": "events_list",
+        "input": {
+          "source": "calendar"
+        },
+        "accounts": {
+          "named": true
+        },
+        "scope": {
+          "keys": [
+            "calendars"
+          ],
+          "describe": "Which calendar to read: the account's primary calendar, \"primary\", the only one it reads."
+        },
+        "permission": {
+          "events": "gws.events_list",
+          "operations": [
+            "calendar.calendarList.get",
+            "calendar.events.list"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxBytes": 262144
+      },
+      {
+        "id": "gws.calendar.today",
+        "kind": "snapshot",
+        "tool": "calendar_today",
+        "input": {
+          "source": "calendar-today"
+        },
+        "output": "agenda",
+        "accounts": {
+          "named": true
+        },
+        "permission": {
+          "tool": "gws.calendar_today",
+          "operations": [
+            "calendar.calendars.get",
+            "calendar.events.list"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxAgeSec": 60,
+        "maxBytes": 65536
+      },
+      {
+        "id": "gws.image",
+        "kind": "snapshot",
+        "tool": "images_read",
+        "input": {
+          "source": "image"
+        },
+        "output": "image",
+        "params": {
+          "url": {
+            "type": "string",
+            "required": true,
+            "describe": "A Drive file link, or an address on Google's image servers that Google returned to the account"
+          }
+        },
+        "accounts": {
+          "named": true
+        },
+        "permission": {
+          "tool": "gws.images_read",
+          "operations": [
+            "drive.files.get"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxBytes": 1048576
+      }
+    ]
   },
   "jelly": {
     "title": "Google Workspace",
@@ -627,7 +751,8 @@
         "v": 1,
         "capability": "calendar",
         "view": "calendar-native",
-        "read": "calendar.today"
+        "read": "calendar.today",
+        "source": "gws.calendar.today"
       }
     ],
     "imageHosts": [
