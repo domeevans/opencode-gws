@@ -103,7 +103,7 @@ async function setup(options: SetupOptions = {}): Promise<Harness> {
       accounts: options.accounts ?? { personal: account(), work: account({ services: ["gmail", "drive"] }) },
       ...(options.rpcCommits === undefined ? {} : { rpcCommits: options.rpcCommits }),
     },
-    { host: options.host ?? { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, connection: integrationConnection(ctx as never, ids) },
+    { host: options.host ?? { version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true }, connection: integrationConnection(ctx as never, ids) },
   )
   const handlers: Record<string, Handler> = {}
   let disposed = false
@@ -138,7 +138,7 @@ describe("rpc contract", () => {
   })
 
   it("accepts only the status shape in isStatus", () => {
-    const valid = { version: "1", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, state: "sign_in_required", access: "all", rpcCommits: false, nextStep: "Sign in.", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
+    const valid = { version: "1", host: { version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true }, state: "sign_in_required", access: "all", rpcCommits: false, nextStep: "Sign in.", gws: { path: "/g", version: "gws 0.22.5" }, services: [], accounts: [{ alias: "a", mode: "interactive", services: [], connected: false, access: "read" }], unguardedAgents: [] }
     expect(isStatus(valid)).toBe(true)
     expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], delegationRequired: ["keep"] }] })).toBe(true)
     expect(isStatus({ ...valid, accounts: [{ ...valid.accounts[0], email: "ada@example.com", domain: "example.com" }] })).toBe(true)
@@ -204,7 +204,7 @@ describe("status", () => {
       credentials: { cred_1: storedSignIn("read", requestedScopes(["gmail"], "read"), "plugin"), cred_2: storedSignIn("write", work) },
     })
     const output = await status(h)
-    expect(output).toMatchObject({ version: "test", host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true }, gws: { path: binary, version: "gws 0.22.5" }, services: ["drive", "gmail"], auditDegraded: false })
+    expect(output).toMatchObject({ version: "test", host: { version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true }, gws: { path: binary, version: "gws 0.22.5" }, services: ["drive", "gmail"], auditDegraded: false })
     expect(output.accounts).toEqual([
       {
         alias: "personal",
@@ -360,7 +360,7 @@ describe("status", () => {
     expect(await status(signedOut)).toMatchObject({ version: "test", state: "sign_in_required", unguardedAgents: [], nextStep: expect.stringMatching(/^personal: /) })
     await signedOut.stop()
     await signedOut.runtime.close()
-    const untested = { version: "2.2.9", range: ">=2.2.3 <2.3.0", tested: false }
+    const untested = { version: "2.2.9", range: ">=2.2.3 <2.4.0", tested: false }
     const headless = { ci: { mode: "access_token", enabledServices: ["gmail"], tokenEnv: "GWS_RPC_TEST_TOKEN" } }
     process.env["GWS_RPC_TEST_TOKEN"] = "ya29.test"
     try {

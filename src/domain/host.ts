@@ -4,13 +4,13 @@
  */
 
 /** The supported OpenCode line; equal to package.json `opencode.host`. */
-export const HOST_RANGE = ">=2.2.3 <2.3.0"
+export const HOST_RANGE = ">=2.2.3 <2.4.0"
 
 /**
  * The OpenCode releases the checks run on (the host, pack and stock stages).
  * The one list: scripts/pack-smoke.mjs reads it from this file.
  */
-export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.6"]
+export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0"]
 
 /** The host as status reports it. */
 export interface HostCheck {
@@ -48,6 +48,13 @@ function satisfies(version: string, range: string): boolean {
   return compare(triple, floor) >= 0 && compare(triple, ceiling) < 0
 }
 
+/** The minor lines a range spans, as prose: `2.2 or 2.3` for `>=2.2.3 <2.4.0`, `2.2` for `>=2.2.3 <2.3.0`. */
+function lines(floor: Triple, ceiling: Triple): string {
+  const last = ceiling[0] === floor[0] && ceiling[2] === 0 ? ceiling[1] - 1 : floor[1]
+  const minors = Array.from({ length: Math.max(1, last - floor[1] + 1) }, (_, i) => `${floor[0]}.${floor[1] + i}`)
+  return minors.length === 1 ? minors[0] : `${minors.slice(0, -1).join(", ")} or ${minors.at(-1)}`
+}
+
 /**
  * Refuse an OpenCode host outside the supported range, unless the operator
  * set allowUntestedHost. A host inside the range but not in TESTED_HOSTS
@@ -56,9 +63,9 @@ function satisfies(version: string, range: string): boolean {
 export function checkHost(version: unknown, range: string, allowUntested: boolean): HostCheck {
   const text = typeof version === "string" && version.trim() ? version.trim() : undefined
   if (!(text && satisfies(text, range)) && !allowUntested) {
-    const [major, minor, patch] = bounds(range).floor
+    const { floor, ceiling } = bounds(range)
     throw new Error(
-      `HOST_UNTESTED: Supports OpenCode ${range}, found ${text ?? "unknown"}. Next step: Use OpenCode ${major}.${minor}.${patch} or a later ${major}.${minor}.x release, or set "allowUntestedHost": true.`,
+      `HOST_UNTESTED: Supports OpenCode ${range}, found ${text ?? "unknown"}. Next step: Use OpenCode ${floor.join(".")} or a later ${lines(floor, ceiling)} release, or set "allowUntestedHost": true.`,
     )
   }
   return { version: text ?? null, range, tested: text !== undefined && TESTED_HOSTS.includes(text.replace(/^v/, "")) }

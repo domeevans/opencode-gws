@@ -19,7 +19,7 @@ one OpenCode sign-in per account, `/gws-status`,
   No Google OAuth client ships, not even a placeholder: Google's OAuth policy
   forbids one in public code. Clients come from `oauthClient` or the form.
 - Public OpenCode 2.2.3 plugin API only. `opencode.host` is exactly
-  `>=2.2.3 <2.3.0`; setup refuses any other host with `HOST_UNTESTED`
+  `>=2.2.3 <2.4.0`; setup refuses any other host with `HOST_UNTESTED`
   unless `allowUntestedHost` is set. Setup makes no network calls.
 - `ctx.storage` is shared by every project and is not secret-safe.
   Credentials live only in OpenCode's credential store.
@@ -177,6 +177,6 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 `npm run check` runs lint, typecheck (`src` and the whole test tree), build,
 unit tests, the release kit's tests (`scripts/release-kit.test.mjs`), the
 embedded-host suite, the pack test on stock OpenCode 2.2.3,
-2.2.4, 2.2.5 and 2.2.6 (`TESTED_HOSTS` in `src/domain/host.ts`, the one list),
+2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 (`TESTED_HOSTS` in `src/domain/host.ts`, the one list),
 the generated-file check and the TUI render. Tests never need a live
 Google account; a live check needs the owner's approval for each run.

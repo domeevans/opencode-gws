@@ -8,7 +8,7 @@ Google is a trademark of Google LLC; this unofficial plugin is not endorsed by t
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Another release in that range, such as 2.2.99, works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
+- OpenCode `>=2.2.3 <2.4.0`, tested on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. Another release in that range, such as 2.2.99, works as usual, and status marks it untested. Outside the range the plugin does not start, unless you set `allowUntestedHost`.
 - macOS (arm64, x64) or Linux (arm64, x64, glibc).
 - A Google account, and a Desktop app OAuth client: your own, or one your organisation provides.
 
@@ -295,7 +295,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `DOWNLOAD_INVALID` | The destination is not absolute, its directory does not exist, it is a directory, or gws wrote no file. | Fix the destination path; if gws wrote no file, tell the user. |
 | `DOWNLOAD_NOT_PERMITTED` | The destination is outside the project, so OpenCode asks for its own external_directory permission as well, and the rules denied it or the person rejected the prompt. Nothing was written, and the plan is still ready. | Allow the folder with {"action": "external_directory", "resource": "<folder>/*", "effect": "allow"} in OpenCode's permissions, or download to a path inside the project. |
 | `DOWNLOAD_LIMIT` | The download is larger than execution.maxDownloadBytes; nothing was written to the destination. | Tell the user; they can raise execution.maxDownloadBytes. The plan is used up. |
-| `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.3.0). | Use OpenCode 2.2.3 or a later 2.2.x release, or set "allowUntestedHost": true. |
+| `HOST_UNTESTED` | The OpenCode version is outside the supported range in package.json opencode.host (>=2.2.3 <2.4.0). | Use OpenCode 2.2.3 or a later 2.2 or 2.3 release, or set "allowUntestedHost": true. |
 | `OPTIONS_INVALID` | The plugin options are not valid: an unknown key, a wrong type, an unknown service, an access value that is not all, ask-changes or read-only, or scopes that name something the account does not enable. | Fix the plugin options in opencode.json; the message names the option. |
 | `STATUS_UNAVAILABLE` | The status could not be read from the plugin. | Run /gws-status in a session for the details. |
 | `SKILLS_INVALID` | A skill file that ships with the plugin is missing or unreadable. | Reinstall the plugin. |
@@ -348,7 +348,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 - **Changes from an agent's UI in Jelly.** Off by default, and only Sheets value updates: RAW values (never formulas), at most 100 rows of 26 cells, with a preview that fits Jelly's 4,000-character confirmation. The preview shows the new values, not the cells' current ones. It works only in Jelly, which holds the key its grants are signed with; Jelly's grant does not yet say how Jelly asked, so the plugin relies on Jelly for asking every time. `/gws-status` does not show the option yet.
 - **Pictures in Jelly over about 47 KB.** `images.read` answers pictures up to 1 MB, as Jelly's picture contract allows, but Jelly's host currently refuses any plugin RPC answer over 64 KB of JSON (`VIEW_DATA_MAX_BYTES`), so a picture over about 47 KB shows no picture in Jelly until Jelly lifts that limit for pictures. That limit is Jelly's, not the plugin's.
 - **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
-- **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6. A later 2.2 release loads, and `/gws-status` marks it untested.
+- **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. A later 2.2 or 2.3 release loads, and `/gws-status` marks it untested.
 - **Audit lines can drop.** The audit log is written off the call path, with a 100 ms budget per line. A write that stalls past it is abandoned: its line and any queued behind it are lost. The call's result is not affected. The sink then stops writing until the plugin reloads, and `/gws-status` shows that some audit records could not be saved.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 

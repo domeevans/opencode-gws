@@ -1,6 +1,6 @@
 # Architecture
 
-Unofficial plugin. Not affiliated with Google. Requires OpenCode 2.2.3 or a later 2.2.x (`>=2.2.3 <2.3.0`).
+Unofficial plugin. Not affiliated with Google. Requires OpenCode 2.2.3 or a later 2.2 or 2.3 release (`>=2.2.3 <2.4.0`).
 
 ```
 OpenCode
@@ -84,7 +84,7 @@ Only `index.ts`, `host/`, `rpc.ts`, and `tui.tsx` import `@opencode/plugin`. Onl
 
 ## Platform facts
 
-Facts about OpenCode 2.2.x that this plugin relies on, and how each was checked. These hold on 2.2.3, 2.2.4, 2.2.5 and 2.2.6.
+Facts about OpenCode 2.2 and 2.3 that this plugin relies on, and how each was checked. These hold on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.
 
 | Fact | How it was checked |
 | --- | --- |
