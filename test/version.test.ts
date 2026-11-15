@@ -14,38 +14,38 @@ describe("package versions", () => {
     expect(PLUGIN_VERSION).toBe(pkg.version)
   })
 
-  it("keeps the host range equal to package.json opencode.host, the tested 2.2 line from 2.2.3", () => {
+  it("keeps the host range equal to package.json opencode.host, the tested 2.2 and 2.3 lines from 2.2.3", () => {
     expect(HOST_RANGE).toBe(pkg.opencode.host)
-    expect(HOST_RANGE).toBe(">=2.2.3 <2.3.0")
+    expect(HOST_RANGE).toBe(">=2.2.3 <2.4.0")
   })
 })
 
 describe("checkHost", () => {
-  it("accepts 2.2.3 and later 2.2 releases, and calls only the listed ones tested", () => {
-    expect(TESTED_HOSTS).toEqual(["2.2.3", "2.2.4", "2.2.5", "2.2.6"])
-    for (const version of ["2.2.3", "2.2.4", "2.2.5", "2.2.6", "v2.2.3", " 2.2.3 "]) {
+  it("accepts 2.2.3 and later 2.2 and 2.3 releases, and calls only the listed ones tested", () => {
+    expect(TESTED_HOSTS).toEqual(["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0"])
+    for (const version of ["2.2.3", "2.2.4", "2.2.5", "2.2.6", "2.2.7", "2.3.0", "v2.2.3", " 2.2.3 "]) {
       expect(checkHost(version, HOST_RANGE, false)).toEqual({ version: version.trim(), range: HOST_RANGE, tested: true })
     }
-    for (const version of ["2.2.99", "2.2.10", "2.2.4+build.7"]) {
+    for (const version of ["2.2.99", "2.2.10", "2.3.1", "2.3.99", "2.2.4+build.7"]) {
       expect(checkHost(version, HOST_RANGE, false)).toEqual({ version, range: HOST_RANGE, tested: false })
     }
   })
 
   it("refuses older, untested-minor, newer-major, prerelease, dev, malformed and missing versions with HOST_UNTESTED", () => {
-    for (const version of ["2.1.9", "2.2.2", "2.3.0", "2.10.0", "3.0.0", "2.2.4-beta.1", "2.2.3-rc.1", "0.0.0-dev-1", "latest", "", undefined, 2]) {
-      expect(() => checkHost(version, HOST_RANGE, false), String(version)).toThrow(/^HOST_UNTESTED: Supports OpenCode >=2\.2\.3 <2\.3\.0, found /)
+    for (const version of ["2.1.9", "2.2.2", "2.4.0", "2.10.0", "3.0.0", "2.2.4-beta.1", "2.2.3-rc.1", "0.0.0-dev-1", "latest", "", undefined, 2]) {
+      expect(() => checkHost(version, HOST_RANGE, false), String(version)).toThrow(/^HOST_UNTESTED: Supports OpenCode >=2\.2\.3 <2\.4\.0, found /)
     }
   })
 
   it("names the found version and the next step", () => {
-    expect(() => checkHost("2.3.0", HOST_RANGE, false)).toThrow(
-      `HOST_UNTESTED: Supports OpenCode >=2.2.3 <2.3.0, found 2.3.0. Next step: ${ErrorCode.HOST_UNTESTED.next}`,
+    expect(() => checkHost("2.4.0", HOST_RANGE, false)).toThrow(
+      `HOST_UNTESTED: Supports OpenCode >=2.2.3 <2.4.0, found 2.4.0. Next step: ${ErrorCode.HOST_UNTESTED.next}`,
     )
     expect(() => checkHost(undefined, HOST_RANGE, false)).toThrow("found unknown.")
   })
 
   it("continues, untested, when allowUntestedHost is set", () => {
-    for (const version of ["2.2.2", "2.3.0", "3.0.0", "2.2.4-beta.1", "0.0.0-dev-1"]) {
+    for (const version of ["2.2.2", "2.4.0", "3.0.0", "2.2.4-beta.1", "0.0.0-dev-1"]) {
       expect(checkHost(version, HOST_RANGE, true)).toEqual({ version, range: HOST_RANGE, tested: false })
     }
     expect(checkHost(undefined, HOST_RANGE, true)).toEqual({ version: null, range: HOST_RANGE, tested: false })
@@ -53,7 +53,7 @@ describe("checkHost", () => {
   })
 
   it("rejects any range outside the one supported comparator form", () => {
-    for (const range of ["^2.2.3", ">=2.2.3", "2.2.x", ">=2.2.3 <2.3.0 || >=3.0.0"]) {
+    for (const range of ["^2.2.3", ">=2.2.3", "2.2.x", ">=2.2.3 <2.4.0 || >=3.0.0"]) {
       expect(() => checkHost("2.2.3", range, false), range).toThrow(`invalid host range ${range}`)
     }
   })

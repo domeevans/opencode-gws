@@ -37,7 +37,7 @@ describe("main package", () => {
 
   it("states the tested host line and has no lifecycle scripts", () => {
     expect(pkg.opencode).toMatchObject({
-      host: ">=2.2.3 <2.3.0",
+      host: ">=2.2.3 <2.4.0",
       vendor: { id: "google-workspace", name: "Google Workspace", domain: "workspace.google.com" },
       icons: [
         { src: "assets/icon.svg", mimeType: "image/svg+xml", sizes: ["any"] },

@@ -166,7 +166,7 @@ describe("tool execution", () => {
 
     expect(status).toMatchObject({
       version: packageJson.version,
-      host: { version: host.hostVersion, range: ">=2.2.3 <2.3.0" },
+      host: { version: host.hostVersion, range: ">=2.2.3 <2.4.0" },
       gws: { path: realpathSync(FAKE_GWS), version: "gws 0.22.5" },
       services: [...SERVICES].sort(),
       accounts: [{ alias: ACCOUNT, mode: "interactive", services: SERVICES }],

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2026-11-15
+
+### Changed
+
+- The plugin admits OpenCode 2.3: the host range is `>=2.2.3 <2.4.0` (`opencode.host` and `HOST_RANGE`), and it is tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 (`TESTED_HOSTS`); CI and the release's install check run every one of them. Below 2.2.3 or from 2.4.0 the plugin refuses with `HOST_UNTESTED`, whose next step now reads "Use OpenCode 2.2.3 or a later 2.2 or 2.3 release". Nothing in the plugin relied on what 2.3 changes: it starts no subagent and reads no `session.tool.failed` event; each tool already passes its `signal` to the `gws` process it runs, so Stop on 2.3 ends that process.
+
 ## [0.0.5] - 2026-11-15
 
 ### Added
