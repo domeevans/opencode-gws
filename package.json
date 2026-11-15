@@ -80,6 +80,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "lint": "biome check && node scripts/check-copies.mjs && node scripts/check-icons.mjs && node scripts/check-forbidden.mjs && node scripts/check-workflows.mjs",
     "test": "vitest run",
+    "conformance": "vitest run test/source-conformance.test.ts",
     "test:host": "vitest run -c vitest.host.config.ts",
     "test:pack": "node scripts/pack-smoke.mjs",
     "test:tui": "bun --conditions=browser test/tui-renderer.mjs",
