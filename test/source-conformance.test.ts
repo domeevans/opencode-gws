@@ -27,11 +27,11 @@ import { account, testRuntime } from "./support/config.js"
  *
  * Every snapshot answer is also passed through the contract's `read.acceptAnswer`, as a consumer accepts it: the
  * output schema (`agenda`, `image`), `asOf`, the account, `trust` and `maxBytes`. The kit's report for every source is
- * written to reports/source-conformance.json, the file a release attaches.
+ * written to reports/conformance-report.json, the file a release attaches.
  */
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url))
-const REPORT = join(ROOT, "reports", "source-conformance.json")
+const REPORT = join(ROOT, "reports", "conformance-report.json")
 const MAILBOX = fileURLToPath(new URL("./fixtures/gmail-mailbox.json", import.meta.url))
 const CALENDAR = fileURLToPath(new URL("./fixtures/calendar-events.json", import.meta.url))
 const ACCOUNT = "personal"

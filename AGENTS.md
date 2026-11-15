@@ -133,7 +133,7 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   what its code asserts: `test/source-conformance.test.ts` runs the
   contract's conformance kit over the real methods against the fake gws
   (`FAKE_GWS_MAILBOX`, `FAKE_GWS_CALENDAR`), and fails on any difference.
-  It writes `reports/source-conformance.json`. Change a declaration and
+  It writes `reports/conformance-report.json`. Change a declaration and
   its code together.
 
 - `manifest/generated.json` is the coverage contract. Regenerate it with

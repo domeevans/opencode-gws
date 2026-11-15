@@ -270,7 +270,7 @@ never over RPC. Every source is private, free, and read over the tools RPC `goog
 The three are tools RPC methods only, never model tools, and reads, so `access` never holds them back. Jelly's
 `calendar.today` on the RPC named after the package answers as before until 0.1.0; once it is called, status says
 `Deprecated: …` with the method to use instead. `npm run check` runs the source contract's conformance kit over every
-source and writes its report to `reports/source-conformance.json`.
+source and writes its report to `reports/conformance-report.json`.
 
 ## Errors
 
