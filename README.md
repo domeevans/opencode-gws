@@ -15,7 +15,7 @@ Google is a trademark of Google LLC; this unofficial plugin is not endorsed by t
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-gws#v0.0.6
+opencode plugin add github:joe-broadhead/opencode-gws#v0.0.7
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
@@ -25,7 +25,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.6" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.7" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -39,7 +39,7 @@ Run `/connect` and choose **Google Workspace**. The TUI shows the sign-in link: 
 opencode auth login gws-default
 ```
 
-No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 42 scopes (35 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**.
+No Google OAuth client ships with the plugin. The first time, the form asks for the client ID and secret of your own Desktop app OAuth client, unless your organisation set one (see [Organisation rollout](#organisation-rollout)). To make one, follow [Create your Desktop client](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#create-your-desktop-client). The form lists the exact scopes before Google's consent screen. Read and write is the default for the `default` account and needs an acknowledgment; Read-only is the other choice. The default consent lists 42 scopes (35 for Read-only), and an External client in Testing shows unverified-app warnings and expires refresh tokens after 7 days: see [What the default consent asks for](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/auth.md#what-the-default-consent-asks-for). With several accounts, each `/connect` entry is named **Google Workspace (`<alias>`)**. A signed-in account is labelled with the verified email Google returned; an account signed in with an earlier release keeps its alias as the label until you sign it in again.
 
 To update, install the new release tag as in [Install](#install), then run `opencode reload`. Your options and sign-ins are kept.
 
@@ -58,11 +58,13 @@ Ask the agent for what you need. It works in four steps:
 
 `gws_events_list` is for Memory's collector, not for answering questions: it lists the Gmail messages that arrived, or the primary calendar's events that changed, since a cursor as normalised events (people, subject or title, a link, labels, and the text, at most 4,096 characters), oldest first, leaving out spam, trash, drafts, Promotions and Social, and anything holding a secret. It only reads and never asks. The plugin declares its sources in `package.json` `sources` under the shared [source contract](https://github.com/we-the-rebel-alliance/source-contract) (Gmail and Calendar events, today's calendar and a picture), and passes its conformance kit ([configuration](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/configuration.md#sources)).
 
+In Jelly, you sign in once, and an agent given the account works with Jelly's copy of that sign-in: its token, scopes and email, without your client secret or refresh token. The plugin reads the copy as it reads any sign-in, never renews it, and asks for a new sign-in instead of calling Google if it is ever asked to ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#signing-in)).
+
 In Jelly, the plugin also answers `calendar.today`, a read-only RPC method that lists today's events on one account's primary calendar for Jelly's calendar and the **Today** Home tile. It is deprecated until 0.1.0 for `calendar_today` on the tools RPC, the source contract's `gws.calendar.today`. It reads with that account's own sign-in, never writes, and returns no descriptions or guests ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#todays-calendar)).
 
 Off by default, a person can also approve one kind of change from a UI an agent made in Jelly: a Sheets value update. List it in the `uiActions` option to turn it on. Jelly then asks every time, showing the plugin's own dry-run preview of every cell, and the plugin checks Jelly's single-use grant for that exact change, your `access` (read-only refuses it) and your policy before it plans and commits it as you. You are the one acting there, so your OpenCode permission rules for agents (such as a deny on `gws_write`) are not consulted; `access`, `uiActions` and the policy are what stop it. Its preview is a dry run that needs no grant and writes no audit record ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#changes-a-person-approves-in-an-agents-ui)).
 
-It also answers `images.read`, which Jelly calls to draw a Google Drive or Workspace picture an agent puts in a UI: a Drive file link, or an address on Google's own image servers, such as a file's `thumbnailLink`. It reads with the account's own sign-in, which Jelly never sees, and answers a PNG, JPEG, GIF or WebP of at most 1 MB, judged from its bytes; never SVG ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#pictures-in-an-agents-ui)).
+It also answers `images.read`, which Jelly calls to draw a Google Drive or Workspace picture an agent puts in a UI: a Drive file link, or an address on Google's own image servers, such as a file's `thumbnailLink`. It reads with the account's own sign-in, whose token the UI never sees, and answers a PNG, JPEG, GIF or WebP of at most 1 MB, judged from its bytes; never SVG ([In Jelly](https://github.com/joe-broadhead/opencode-gws/blob/HEAD/docs/jelly.md#pictures-in-an-agents-ui)).
 
 ### Scripts
 
@@ -93,7 +95,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.6", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.7", "options": { "access": "read-only" } }] }
    ```
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
@@ -217,7 +219,7 @@ Create a Desktop app OAuth client in your organisation's Google Cloud project (u
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-gws#v0.0.6",
+      "package": "github:joe-broadhead/opencode-gws#v0.0.7",
       "options": {
         "oauthClient": {
           "clientId": "<your client ID>.apps.googleusercontent.com",
@@ -280,7 +282,7 @@ Generated from `src/domain/errors.ts` by `npm run docs:coverage`. Do not edit th
 | `IMAGE_ACCOUNT_AMBIGUOUS` | No single account can read the picture: no account enables drive, or several could and none is the default account. The plugin never tries each account in turn. | Add drive to one account's enabledServices, or name an account default. |
 | `UI_ACTION_OFF` | A person approved a change from a UI an agent made in Jelly, and the uiActions option does not list its operation. It is empty by default, so nothing a UI asks for changes anything. Nothing ran. | Make the change with gws_plan and gws_write, or ask the user to add the operation to the uiActions option. |
 | `UI_ACTION_REFUSED` | The change a UI asked for is not one a person may approve there: access is read-only, the operation is not a Sheets value update, the input is not the exact shape the action takes (RAW values only, at most 100 rows of 26 cells), or its preview would not fit Jelly's confirmation. Nothing ran. | Make the change with gws_plan and gws_write instead, or tell the user why it was refused. |
-| `UI_GRANT_REFUSED` | The action carried no valid Jelly action grant for this exact input from an owner device: no grant, another host's key, another plugin, action or input, an expired grant, one used already, or no Jelly action key in this engine. Only a person's confirmed click in Jelly carries one. Nothing ran. | Ask the person to approve the change again in Jelly; an agent or a script makes it with gws_plan and gws_write. |
+| `UI_GRANT_REFUSED` | The action carried no valid Jelly action grant for this exact input from an owner device, confirmed every time: no grant, another host's key, another plugin, action or input, an expired grant, one used already, a grant whose confirmation (cfm) is not always, or no Jelly action key in this engine. Only a person's confirmed click in Jelly carries one. Nothing ran. | Ask the person to approve the change again in Jelly; an agent or a script makes it with gws_plan and gws_write. |
 | `GWS_DISCOVERY_ERROR` | gws could not load the API description (the Discovery document) it builds requests from. | Check that this machine can reach www.googleapis.com, then retry. |
 | `GWS_INTERNAL_ERROR` | gws failed unexpectedly. | Retry once; if it fails again, report the message. |
 | `TIMEOUT` | gws did not finish within execution.timeoutMs. | Narrow the request with fields, a smaller page size, maxPages, or maxItems, then retry. |
@@ -323,7 +325,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 2. Remove the plugin:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.6
+   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.7
    ```
 
 3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.
@@ -345,8 +347,10 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 - **A cancelled commit may have been applied.** `CANCELLED` means the call stopped while `gws` ran. Check the state with `gws_read` before planning the change again.
 - **Asks need an answerer.** At `access: "ask-changes"`, `opencode run` and scripts cannot answer a prompt, so a commit there needs an allow rule for it, or `access: "all"`.
 - **Output and time limits.** A result that is too large stops with `OUTPUT_LIMIT`, and a slow call with `TIMEOUT`. Narrow the request with `fields`, a smaller page size, `maxPages` or `maxItems`.
-- **Changes from an agent's UI in Jelly.** Off by default, and only Sheets value updates: RAW values (never formulas), at most 100 rows of 26 cells, with a preview that fits Jelly's 4,000-character confirmation. The preview shows the new values, not the cells' current ones. It works only in Jelly, which holds the key its grants are signed with; Jelly's grant does not yet say how Jelly asked, so the plugin relies on Jelly for asking every time. `/gws-status` does not show the option yet.
+- **Changes from an agent's UI in Jelly.** Off by default, and only Sheets value updates: RAW values (never formulas), at most 100 rows of 26 cells, with a preview that fits Jelly's 4,000-character confirmation. The preview shows the new values, not the cells' current ones. It works only in Jelly, which holds the key its grants are signed with; the plugin refuses a grant that does not say Jelly asked every time. `/gws-status` does not show the option yet.
 - **Pictures in Jelly over about 47 KB.** `images.read` answers pictures up to 1 MB, as Jelly's picture contract allows, but Jelly's host currently refuses any plugin RPC answer over 64 KB of JSON (`VIEW_DATA_MAX_BYTES`), so a picture over about 47 KB shows no picture in Jelly until Jelly lifts that limit for pictures. That limit is Jelly's, not the plugin's.
+- **Jelly sign-in labels.** An account is labelled with its verified email only from a sign-in made with 0.0.7 or later; one signed in earlier keeps its alias until it is signed in again.
+- **Jelly's probe.** The sources declare no `permission.identity` yet: source-contract v0.1.0's conformance kit refuses one that a content read also asserts. Until a source-contract tag allows it, Jelly fences `probe` with all of a source's operations, though it calls no Google API.
 - **Jelly.** The `access` setting declares its choices, which only a Jelly that includes app#1301 reads; an older Jelly refuses the plugin's declaration.
 - **Tested hosts.** Tested on OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0. A later 2.2 or 2.3 release loads, and `/gws-status` marks it untested.
 - **Audit lines can drop.** The audit log is written off the call path, with a 100 ms budget per line. A write that stalls past it is abandoned: its line and any queued behind it are lost. The call's result is not affected. The sink then stops writing until the plugin reloads, and `/gws-status` shows that some audit records could not be saved.

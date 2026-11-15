@@ -112,10 +112,16 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   change itself), and Jelly's `commit` action (`src/host/ui-action.ts`),
   which exists only for the operations the `uiActions` option lists (none by
   default): it runs only under a verified Jelly action grant for that exact
-  input from an owner device, re-runs `access` (read-only refuses), policy
+  input from an owner device, confirmed every time (`cfm: "always"`),
+  re-runs `access` (read-only refuses), policy
   and the admin gate through plan then commit, and audits as
   `caller: "person"`. Never widen its operation list, accept a grant of
-  another class, or let `access` stop short of it.
+  another class or a weaker confirmation, or let `access` stop short of it.
+- Every call reads a sign-in with `readSignIn` (no client needed: Jelly's
+  copy for an agent has no client secret); only a renewal and a new
+  sign-in's reuse of the previous client use `renewableSignIn`.
+  `refreshGoogle` refuses `jelly-host-owns-refresh` first, with no network
+  call.
 - Only `src/process/**` spawns `gws`, with an argv array and `shell: false`.
 - Never log or preview bodies, tokens, credentials or file contents.
   Workspace content is untrusted data.

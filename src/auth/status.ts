@@ -1,6 +1,6 @@
 import type { AccessLevel, AccountProfile, OAuthClient } from "../domain/types.js"
 import { resolveClient, type ClientSource } from "./client.js"
-import type { SignInMetadata } from "./credential.js"
+import type { SignIn } from "./credential.js"
 import { defaultAccess, signInScopes } from "./form.js"
 
 /**
@@ -15,7 +15,7 @@ export interface ConnectionView {
   /** The host marked the connection as needing sign-in again. */
   needsAuth: boolean
   /** The stored sign-in; absent when the credential could not be read. */
-  signIn?: Pick<SignInMetadata, "access" | "clientSource" | "grantedScopes" | "email" | "domain">
+  signIn?: Pick<SignIn, "access" | "clientSource" | "grantedScopes" | "email" | "domain">
 }
 
 interface AccountSignInStatus {
@@ -80,7 +80,7 @@ export function accountSignInStatus(input: StatusInputs): AccountSignInStatus {
       connected: false,
       ...(connection.needsAuth ? { needsAuth: true as const } : {}),
       access: signIn?.access ?? access,
-      ...(signIn ? { clientSource: signIn.clientSource } : configured ? { clientSource: configured.source } : {}),
+      ...(signIn?.clientSource ? { clientSource: signIn.clientSource } : configured ? { clientSource: configured.source } : {}),
       ...(signIn ? { grantedScopes: signIn.grantedScopes, ...identityOf(signIn) } : {}),
       nextStep: `To sign in again, ${connect}.`,
     }
@@ -89,7 +89,7 @@ export function accountSignInStatus(input: StatusInputs): AccountSignInStatus {
   return {
     connected: true,
     access: signIn.access,
-    clientSource: signIn.clientSource,
+    ...(signIn.clientSource ? { clientSource: signIn.clientSource } : {}),
     grantedScopes: signIn.grantedScopes,
     ...identityOf(signIn),
     missingScopes: missing,
@@ -97,6 +97,6 @@ export function accountSignInStatus(input: StatusInputs): AccountSignInStatus {
   }
 }
 
-function identityOf(signIn: Pick<SignInMetadata, "email" | "domain">): { email?: string; domain?: string } {
+function identityOf(signIn: Pick<SignIn, "email" | "domain">): { email?: string; domain?: string } {
   return { ...(signIn.email ? { email: signIn.email } : {}), ...(signIn.domain ? { domain: signIn.domain } : {}) }
 }

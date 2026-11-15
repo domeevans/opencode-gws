@@ -29,7 +29,7 @@ import {
 } from "../src/host/integrations.js"
 import { buildChildEnv } from "../src/process/env.js"
 import type { Runtime } from "../src/runtime/index.js"
-import { TEST_CLIENT, account, accountDir, fakeTokens, testConfig, testRuntime } from "./support/config.js"
+import { TEST_CLIENT, account, accountDir, fakeTokens, storedSignIn, testConfig, testRuntime } from "./support/config.js"
 import { request } from "./support/requests.js"
 
 const tempDirs: string[] = []
@@ -136,7 +136,7 @@ describe("integration identity", () => {
       },
     })
     const integrations = new Map<string, { id: string; name: string }>()
-    const methods: Array<{ integrationID: string; method: { form: unknown[] }; label?: () => string | undefined }> = []
+    const methods: Array<{ integrationID: string; method: { form: unknown[] }; label?: (credential: unknown) => string | undefined }> = []
     const ctx = {
       integration: {
         transform: async (callback: (draft: unknown) => void) =>
@@ -155,7 +155,8 @@ describe("integration identity", () => {
       { id: "gws-personal", name: "Google Workspace (personal)" },
       { id: "gws-work", name: "Google Workspace (work)" },
     ])
-    expect(methods.map((method) => [method.integrationID, method.label?.(), method.method.form.length])).toEqual([
+    // Before a verified email, the account is named by its alias.
+    expect(methods.map((method) => [method.integrationID, method.label?.(storedSignIn("read", [])), method.method.form.length])).toEqual([
       ["gws-personal", "personal", 7],
       ["gws-work", "work", 7],
     ])

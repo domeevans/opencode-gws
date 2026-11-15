@@ -200,7 +200,7 @@ export const ErrorCode = {
   },
   UI_GRANT_REFUSED: {
     meaning:
-      "The action carried no valid Jelly action grant for this exact input from an owner device: no grant, another host's key, another plugin, action or input, an expired grant, one used already, or no Jelly action key in this engine. Only a person's confirmed click in Jelly carries one. Nothing ran.",
+      "The action carried no valid Jelly action grant for this exact input from an owner device, confirmed every time: no grant, another host's key, another plugin, action or input, an expired grant, one used already, a grant whose confirmation (cfm) is not always, or no Jelly action key in this engine. Only a person's confirmed click in Jelly carries one. Nothing ran.",
     next: "Ask the person to approve the change again in Jelly; an agent or a script makes it with gws_plan and gws_write.",
   },
   GWS_DISCOVERY_ERROR: {

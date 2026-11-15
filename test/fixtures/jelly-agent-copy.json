@@ -1,0 +1,29 @@
+{
+  "source": "hey-jelly 683ed2acb, backend/host/src/plugin-accounts/provision-value.ts (keepsMetadataKey, agentCopy) and provision-value.test.ts (KNOWN_KEPT, KNOWN_REFUSED); model-accounts/constants.ts (REFRESH_SENTINEL, AGENT_ACCESS_TTL_MS)",
+  "sentinel": "jelly-host-owns-refresh",
+  "ttlMs": 86400000,
+  "refusedExact": ["client", "registration", "idtoken", "code"],
+  "refusedPart": "secret|refresh|password|passphrase|privatekey|verifier|apikey",
+  "kept": ["serverUrl", "tokenType", "scope", "issuer", "login", "region", "workspace", "email", "account", "expiresIn", "teamId"],
+  "refused": [
+    "client",
+    "registration",
+    "clientSecret",
+    "client_secret",
+    "Client-Secret",
+    "refresh",
+    "refreshToken",
+    "refresh_token",
+    "idToken",
+    "id_token",
+    "codeVerifier",
+    "code_verifier",
+    "code",
+    "password",
+    "privateKey",
+    "private_key",
+    "apiKey",
+    "api_key",
+    "webhookSecret"
+  ]
+}

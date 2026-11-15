@@ -1,6 +1,6 @@
 import type { Credential } from "@opencode/plugin"
 import { resolveClient, type ClientChoice } from "../auth/client.js"
-import { readSignIn, signInClient } from "../auth/credential.js"
+import { readSignIn, renewableSignIn, signInClient } from "../auth/credential.js"
 import { readAnswer, signInForm, signInScopes, type SignInForm } from "../auth/form.js"
 import {
   GOOGLE_METHOD_ID,
@@ -93,7 +93,9 @@ export function googleIntegration(
       return authorizeGoogle({ alias, client, access, scopes: signInScopes(profile, access), redirect, options: options.auth })
     },
     refresh: (credential) => refreshGoogle({ alias, name, credential, options: options.auth }),
-    label: () => alias,
+    // The account's name in /connect: the verified email the sign-in returned, else the alias. OpenCode keeps the
+    // label it gets at sign-in, so a sign-in made before this names the alias until the person signs in again.
+    label: (credential) => readSignIn(credential.metadata)?.email ?? alias,
   }
 }
 
@@ -128,7 +130,8 @@ export async function registerIntegrations(
         pluginClient: config.oauthClient,
         redirect: config.redirect,
         previous: async () => {
-          const signIn = readSignIn((await resolve(integrationID))?.metadata)
+          // Only a sign-in that kept its client secret has a client to reuse; an agent's copy has none.
+          const signIn = renewableSignIn((await resolve(integrationID))?.metadata)
           return signIn ? signInClient(signIn) : undefined
         },
       })
@@ -233,7 +236,7 @@ export function integrationConnection(
         ? {
             signIn: {
               access: signIn.access,
-              clientSource: signIn.clientSource,
+              ...(signIn.clientSource ? { clientSource: signIn.clientSource } : {}),
               grantedScopes: signIn.grantedScopes,
               ...(signIn.email ? { email: signIn.email } : {}),
               ...(signIn.domain ? { domain: signIn.domain } : {}),

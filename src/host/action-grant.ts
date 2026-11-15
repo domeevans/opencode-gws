@@ -5,7 +5,8 @@ import { createHash, createPublicKey, verify } from "node:crypto"
  * `backend/opencode/src/action-grant.ts`, ADR 0023 section 4), as opencode-browse carries it: a compact JWS with the
  * header `{ alg: "EdDSA", typ: "jelly-act+jwt", kid }` and the claims `iss`, `aud` (`<package>#engine`), `act`, `in`
  * (base64url SHA-256 of the input's canonical JSON), `dev`, `mbr`, `cls`, `iat`, `exp` (at most 60 s after `iat`)
- * and `jti`. Jelly publishes the public half of its action key in the engine at
+ * and `jti`, and, when the app drew one, `cfm`: the confirmation the person saw before choosing (`never`, `session` or
+ * `always`), which the host has already held to the action's declared one. Jelly publishes the public half of its action key in the engine at
  * `globalThis[Symbol.for("jelly.action-key")]` as `{ kid, jwk }`. A grant allows one action, with exactly that input,
  * once, for a minute: the verifier spends each `jti`.
  *
@@ -35,7 +36,11 @@ export interface ActionGrantClaims {
   readonly iat: number
   readonly exp: number
   readonly jti: string
+  readonly cfm?: ActionConfirm
 }
+
+/** The confirmations a grant's `cfm` names. */
+export type ActionConfirm = "never" | "session" | "always"
 
 export class ActionGrantRefused extends Error {
   override readonly name = "ActionGrantRefused"
@@ -111,7 +116,9 @@ function checkGrant(grant: unknown, key: ActionPublicKey, at: number): ActionGra
   if (cls !== "chat" && cls !== "local") throw new ActionGrantRefused("The grant has no class.")
   const jti = text("jti")
   if (jti.length < 22) throw new ActionGrantRefused("The grant's id is too short.")
-  return { iss: text("iss"), aud: text("aud"), act: text("act"), in: text("in"), dev: text("dev"), mbr: text("mbr"), cls, iat, exp, jti }
+  const cfm = claims["cfm"]
+  if (cfm !== undefined && cfm !== "never" && cfm !== "session" && cfm !== "always") throw new ActionGrantRefused("The grant's confirmation is not one.")
+  return { iss: text("iss"), aud: text("aud"), act: text("act"), in: text("in"), dev: text("dev"), mbr: text("mbr"), cls, iat, exp, jti, ...(cfm === undefined ? {} : { cfm }) }
 }
 
 function json(part: string): Record<string, unknown> {
@@ -131,10 +138,12 @@ export interface PersonAct {
 }
 
 /**
- * One verifier for a plugin's actions, from an owner device only. `check(action, call)` verifies the grant in
- * `{ input, grant }` for that action and that exact input, spends it, and refuses any class but `local`: Jelly's host
- * refuses a `local` action from a paired device, so a grant of another class was not minted for an owner-only
- * action. It throws `ActionGrantRefused`; a plugin turns that into its own error.
+ * One verifier for a plugin's actions, from an owner device only, each confirmed every time. `check(action, call)`
+ * verifies the grant in `{ input, grant }` for that action and that exact input, spends it, refuses any class but
+ * `local` (Jelly's host refuses a `local` action from a paired device, so a grant of another class was not minted for
+ * an owner-only action), and refuses a grant whose `cfm` is not `always`: the person must have seen this change's own
+ * confirmation, not a session's standing yes or none. It throws `ActionGrantRefused`; a plugin turns that into its own
+ * error.
  */
 export function personActs(options: { readonly pkg: string; readonly key?: () => ActionPublicKey | undefined; readonly now?: () => number }) {
   const grants = actionGrantVerifier({ audience: actionAudience(options.pkg), key: options.key ?? (() => publishedActionKey()), ...(options.now ? { now: options.now } : {}) })
@@ -143,6 +152,7 @@ export function personActs(options: { readonly pkg: string; readonly key?: () =>
       const { input, grant } = (call !== null && typeof call === "object" ? call : {}) as { input?: unknown; grant?: unknown }
       const claims = grants.verify(action, { input: input ?? null, grant })
       if (claims.cls !== "local") throw new ActionGrantRefused("The grant is not from an owner device.")
+      if (claims.cfm !== "always") throw new ActionGrantRefused("The grant does not say the person confirmed this change.")
       return { input: input ?? null, claims }
     },
   }
