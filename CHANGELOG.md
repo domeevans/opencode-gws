@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.0.5] - 2026-11-15
 
 ### Added
 
@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format follows [Kee
 - `probe`, a tools RPC method (action `gws.probe`): whose a source is, per source, `{ source, account, owner: { id: "mailto:<address>", label }, scopes, trust }`, from the verified email Google returned at sign-in and the scopes granted for that source's service. It calls no Google API and reads no content; an account with no verified email is `AUTH_REQUIRED`.
 
 - **For Jelly:** `calendar_today` (action `gws.calendar_today`) and `images_read` (action `gws.images_read`), tools RPC methods that answer the reads Jelly makes as the contract's snapshots, `{ data, asOf, account, trust }`: today's calendar as an `agenda` (titles and locations cut to 120 characters), and a picture as an `image` data URI (a GIF is `IMAGE_TYPE_REFUSED`; a data URI over the contract's 1 MB less 4 KB is the new `TOO_LARGE`, never cut; an address on Google's image servers is fetched with no account's token, since that fetch is no gws operation a grant could name, so a picture that needs a sign-in there does not show; `images.read` is unchanged). Each account keeps its own reading of today's calendar. `jelly.nativeData`'s calendar hint names the source, `"source": "gws.calendar.today"`, so a Jelly with the source setting on reads Home's calendar from `calendar_today` on `google-workspace.gws.tools` (Jelly to do: bind Home through `nativeData.source`); `view` and `read` stay for a Jelly without it. The three are reads, so `access` never holds them back, and none is a model tool.
+
+### What Jelly should change
+
+- Bind Home's calendar through `nativeData.source` (`gws.calendar.today`): it reads `calendar_today` on `google-workspace.gws.tools`, which answers `{ data: <agenda>, asOf, account, trust }`. `calendar.today` goes at 0.1.0.
+- Reading a picture through the source `gws.image` (`images_read`): a GIF is refused (`IMAGE_TYPE_REFUSED`), a picture is at most about 760 KB (a data URI of 1 MB less 4 KB; a larger one is `TOO_LARGE`), and an address on Google's image servers is fetched without the account's token. `images.read` keeps its 1 MB, GIF and token behaviour until Jelly moves.
 
 ### Changed
 
