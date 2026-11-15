@@ -71,7 +71,6 @@ describe("main package", () => {
       "views/calendar.html",
       "views/gmail-thread.html",
       "views/jelly-view.js",
-      "views/ui-changes.html",
       "README.md",
       "LICENSE",
       "NOTICE",

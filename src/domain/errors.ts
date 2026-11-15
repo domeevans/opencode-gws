@@ -188,21 +188,6 @@ export const ErrorCode = {
       "No single account can read the picture: no account enables drive, or several could and none is the default account. The plugin never tries each account in turn.",
     next: "Add drive to one account's enabledServices, or name an account default.",
   },
-  UI_ACTION_OFF: {
-    meaning:
-      "A person approved a change from a UI an agent made in Jelly, and the uiActions option does not list its operation. It is empty by default, so nothing a UI asks for changes anything. Nothing ran.",
-    next: "Make the change with gws_plan and gws_write, or ask the user to add the operation to the uiActions option.",
-  },
-  UI_ACTION_REFUSED: {
-    meaning:
-      "The change a UI asked for is not one a person may approve there: access is read-only, the operation is not a Sheets value update, the input is not the exact shape the action takes (RAW values only, at most 100 rows of 26 cells), or its preview would not fit Jelly's confirmation. Nothing ran.",
-    next: "Make the change with gws_plan and gws_write instead, or tell the user why it was refused.",
-  },
-  UI_GRANT_REFUSED: {
-    meaning:
-      "The action carried no valid Jelly action grant for this exact input from an owner device, confirmed every time: no grant, another host's key, another plugin, action or input, an expired grant, one used already, a grant whose confirmation (cfm) is not always, or no Jelly action key in this engine. Only a person's confirmed click in Jelly carries one. Nothing ran.",
-    next: "Ask the person to approve the change again in Jelly; an agent or a script makes it with gws_plan and gws_write.",
-  },
   GWS_DISCOVERY_ERROR: {
     meaning: "gws could not load the API description (the Discovery document) it builds requests from.",
     next: "Check that this machine can reach www.googleapis.com, then retry.",

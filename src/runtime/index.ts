@@ -210,11 +210,6 @@ export class Runtime {
     return this.lifetime.track(() => this.accounts.bearer(account, "drive.files.get", { ...ctx, signal }))
   }
 
-  /** The plan `plan` would store for `request`, checked and dry-run, without storing it. */
-  async preview(request: RequestInput, ctx: CallContext): Promise<Omit<PlanOutput, "planId" | "expiresAt">> {
-    return this.invocation(ctx, control => this.operations.preview(request, { ...ctx, ...control }))
-  }
-
   async plan(request: RequestInput, ctx: CallContext): Promise<PlanOutput> {
     return this.invocation(ctx, control => this.operations.plan(request, { ...ctx, ...control }))
   }

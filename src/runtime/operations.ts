@@ -300,7 +300,7 @@ export class Operations {
         category: "read",
         operation: entry.id,
         durationMs: Date.now() - started,
-        ...who(ctx),
+        caller: ctx.caller,
       })
       return {
         ok: true,
@@ -313,7 +313,7 @@ export class Operations {
         trust: { workspaceContent: "untrusted" },
       }
     } catch (error) {
-      this.runtime.audit.emit({ event: "operation.read", outcome: "error", account: request.account, operation: entry.id, durationMs: Date.now() - started, errorCode: auditErrorCode(error), ...who(ctx) })
+      this.runtime.audit.emit({ event: "operation.read", outcome: "error", account: request.account, operation: entry.id, durationMs: Date.now() - started, errorCode: auditErrorCode(error), caller: ctx.caller })
       throw error
     }
   }
@@ -340,23 +340,14 @@ export class Operations {
         throw processError(result, parsed, entry.service, this.accounts.remediation(request.account, entry.scopes, entry.service))
       }
       const bytes = await stage.readCapped(IMAGE_OUTPUT, maxBytes)
-      this.runtime.audit.emit({ event: "operation.read", outcome: "success", account: request.account, category: "read", operation: entry.id, durationMs: Date.now() - started, ...who(ctx) })
+      this.runtime.audit.emit({ event: "operation.read", outcome: "success", account: request.account, category: "read", operation: entry.id, durationMs: Date.now() - started, caller: ctx.caller })
       return bytes
     } catch (error) {
-      this.runtime.audit.emit({ event: "operation.read", outcome: "error", account: request.account, operation: entry.id, durationMs: Date.now() - started, errorCode: auditErrorCode(error), ...who(ctx) })
+      this.runtime.audit.emit({ event: "operation.read", outcome: "error", account: request.account, operation: entry.id, durationMs: Date.now() - started, errorCode: auditErrorCode(error), caller: ctx.caller })
       throw error
     } finally {
       await stage?.dispose().catch(() => undefined)
     }
-  }
-
-  /**
-   * A change's plan without storing it: the same resolve, gate, recipient facts, policy, build and `gws --dry-run` as
-   * `plan`, for `preview`, which shows a person the change a UI asks for before any plan exists.
-   */
-  async preview(input: RequestInput, ctx: CallContext): Promise<Omit<PlanOutput, "planId" | "expiresAt">> {
-    const { category, preview, dryRun } = await this.prepare(input, ctx)
-    return { ok: true, category, preview, dryRun }
   }
 
   async plan(input: RequestInput, ctx: CallContext): Promise<PlanOutput> {
@@ -383,7 +374,7 @@ export class Operations {
       category,
       operation: entry.id,
       durationMs: Date.now() - started,
-      ...who(ctx),
+      caller: ctx.caller,
     })
     return {
       ok: true,
@@ -512,7 +503,7 @@ export class Operations {
         category,
         operation: plan.operation,
         durationMs: Date.now() - started,
-        ...who(ctx),
+        caller: ctx.caller,
       })
       const answer = plan.files?.output ? parsed.data : withoutSavedBody(parsed.data)
       receipt = { ok: true, planId: plan.id, category, operation: plan.operation, result: answer ?? parsed.raw, file, ...(delivered?.cleanupDegraded ? { cleanupDegraded: true } : {}) }
@@ -527,7 +518,7 @@ export class Operations {
         operation: plan.operation,
         durationMs: Date.now() - started,
         errorCode: auditErrorCode(error),
-        ...who(ctx),
+        caller: ctx.caller,
       })
       if (ctx.signal?.aborted) {
         throw new GwsError(
@@ -624,12 +615,6 @@ export class Operations {
     if (!parsed.ok) throw processError(result, parsed, entry.service, this.accounts.remediation(account, entry.scopes, entry.service))
     return parsed.data
   }
-}
-
-/** Who made a call, for the audit: a script, or a person under a Jelly grant with its member and id. */
-function who(ctx: Pick<CallContext, "caller" | "person">): { caller?: "rpc" | "person"; member?: string; grant?: string } {
-  if (ctx.caller === "person") return { caller: "person", member: ctx.person?.member, grant: ctx.person?.grant }
-  return { caller: ctx.caller }
 }
 
 function fileLimits(decision: PolicyDecision): FileLimits {

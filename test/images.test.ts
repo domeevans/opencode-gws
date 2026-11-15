@@ -582,7 +582,7 @@ describe("images.read on the package's RPC", () => {
     await registerJellyRpc(ctx as never, fake.runtime)
     expect(registered).toHaveLength(1)
     expect(registered[0]?.contract).toBe(JellyRpc)
-    expect(Object.keys(registered[0]!.handlers).sort()).toEqual(["act.commit", "calendar.today", "images.read", "plan.preview"])
+    expect(Object.keys(registered[0]!.handlers).sort()).toEqual(["calendar.today", "images.read"])
     const context = { signal: new AbortController().signal, error: (type: string, message: string, data: unknown) => ({ type, message, data }) }
     expect(await registered[0]!.handlers["images.read"]!({ url: "https://evil.com/a.png" }, context)).toEqual({
       type: "failed",

@@ -22,6 +22,12 @@ describe("config", () => {
     )
   })
 
+  it("refuses uiActions, removed in 0.0.8, as it refuses any other unknown option", () => {
+    expect(() => testConfig({ uiActions: ["sheets.spreadsheets.values.update"] })).toThrow(
+      /^OPTIONS_INVALID: The plugin options are not valid \(options: .*uiActions.*\)\. Next step: Fix the plugin options in opencode\.json\.$/,
+    )
+  })
+
   it("takes binary.path as an absolute path and allowUntestedHost as a boolean that defaults to false", () => {
     expect(testConfig()).toMatchObject({ binary: { path: FAKE_GWS }, allowUntestedHost: false })
     expect(testConfig({ allowUntestedHost: true }).allowUntestedHost).toBe(true)

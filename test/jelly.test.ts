@@ -27,6 +27,12 @@ describe("the jelly declaration", () => {
     expect(config.accounts.work).toEqual({ mode: "interactive", enabledServices: loadConfig({}).accounts.default?.enabledServices, access: "read", scopes: [] })
   })
 
+  it("declares no action and no settings section: an agent's UI hands the person's input back to its agent", () => {
+    expect(jelly).not.toHaveProperty("actions")
+    expect((jelly.views as { place: string }[]).map((view) => view.place)).not.toContain("settings-section")
+    expect((jelly.rpc as { name: string }[]).map((method) => method.name)).toEqual(["calendar.today", "images.read"])
+  })
+
   it("declares the flat access option, with Jelly's own words for its three values", () => {
     const settings = (jelly.contributes as { settings: PluginSetting[] }).settings
     expect(settings).toEqual([
@@ -61,10 +67,10 @@ describe("the jelly declaration", () => {
       registered: [...READS, ...CHANGING_ACTIONS],
       actionPermissions: true,
     })
-    // The shared kit's key list predates Jelly's `nativeData`, `imageHosts`, `imageRead` and `actions` (hey-jelly
-    // protocol/contracts/src/plugin-contract.ts, `PluginDeclarationSchema`); test/calendar.test.ts,
-    // test/images.test.ts and test/ui-action.test.ts hold those fields to Jelly's rules. Any other problem fails.
-    const newer = ["nativeData", "imageHosts", "imageRead", "actions"].map((key) => `jelly.${key} is not a key Jelly knows`)
+    // The shared kit's key list predates Jelly's `nativeData`, `imageHosts` and `imageRead` (hey-jelly
+    // protocol/contracts/src/plugin-contract.ts, `PluginDeclarationSchema`); test/calendar.test.ts and
+    // test/images.test.ts hold those fields to Jelly's rules. Any other problem fails.
+    const newer = ["nativeData", "imageHosts", "imageRead"].map((key) => `jelly.${key} is not a key Jelly knows`)
     expect(problems.filter((problem) => !newer.includes(problem))).toEqual([])
   })
 

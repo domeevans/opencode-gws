@@ -32,8 +32,6 @@ describe("the Gmail thread view", () => {
       { v: 1, id: "gmail-thread", place: "tool-result", tools: ["gws_read"], title: "Gmail thread", page: "views/gmail-thread.html", grants: ["data"] },
       // Jelly's native calendar reads through this one (test/calendar.test.ts).
       { v: 1, id: "calendar-native", place: "home-widget", size: "m", title: "Today", page: "views/calendar.html", grants: ["rpc"], rpc: ["calendar.today"] },
-      // The page Jelly's `commit` action names (test/ui-action.test.ts).
-      { v: 1, id: "ui-changes", place: "settings-section", title: "Changes from agent UIs", page: "views/ui-changes.html", grants: [] },
     ])
     expect(manifest.files).toContain("views/gmail-thread.html")
     expect(existsSync(new URL("views/gmail-thread.html", root))).toBe(true)

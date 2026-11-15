@@ -38,12 +38,7 @@ export interface CallContext {
   signal?: AbortSignal
   progress?: (update: Progress) => void
   /** Set when a script made the call through the tools RPC rather than a tool call; the audit records it. */
-  caller?: "rpc" | "person"
-  /**
-   * Set with `caller: "person"`: a change a person approved in a UI an agent made in Jelly. The audit records the
-   * member and the grant's id.
-   */
-  person?: { readonly member: string; readonly grant: string }
+  caller?: "rpc"
   /**
    * Called only when this call must download the gws binary first. It throws to refuse, so the access rules decide
    * whether a download happens on a model's call; without it the download is refused.
