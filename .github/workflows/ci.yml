@@ -46,9 +46,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # A pull request runs the two Linux runners; a push to master, or a run by hand, runs all four, macOS too. macOS
+        # A pull request runs the two Linux runners; a push to master, or a run by hand, runs three: macOS arm64 too. macOS
         # runs on master and for releases only, and the release planner requires that push run with every runner.
-        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"runner":"ubuntu-24.04","target":"linux-x64-gnu"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64-gnu"}]' || '[{"runner":"macos-26","target":"darwin-arm64"},{"runner":"macos-26-intel","target":"darwin-x64"},{"runner":"ubuntu-24.04","target":"linux-x64-gnu"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64-gnu"}]') }}
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"runner":"ubuntu-24.04","target":"linux-x64-gnu"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64-gnu"}]' || '[{"runner":"macos-26","target":"darwin-arm64"},{"runner":"ubuntu-24.04","target":"linux-x64-gnu"},{"runner":"ubuntu-24.04-arm","target":"linux-arm64-gnu"}]') }}
 
     steps:
       - name: Checkout

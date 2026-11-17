@@ -75,7 +75,8 @@ a `## [x.y.z] - YYYY-MM-DD` heading below it, newest first, and the npm history 
    `node scripts/changelog.mjs release`: it turns `## [Unreleased]` into `## [<version>] - <today>`, above the earlier
    releases, and refuses a CHANGELOG it cannot shape. Run `npm run check`.
 2. Push that commit to `master`, and wait for CI to pass on it. A pull request's CI runs the Linux runners only; the
-   push to `master` runs every runner, macOS too, and the release stands on that run.
+   push to `master` runs every runner, Apple-silicon macOS (`macos-26`) too, and the release stands on that run. An
+   Intel Mac (`macos-26-intel`) is not required.
 3. Run the `native` workflow on that commit (`gh workflow run native.yml --ref master`), and wait for it to pass. It
    builds the release files for `v<version>`.
 4. Start the release with that commit's full sha and the native run's id:
