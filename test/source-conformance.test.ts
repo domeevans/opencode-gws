@@ -18,7 +18,7 @@ import type { Runtime } from "../src/runtime/index.js"
 import { account, testRuntime } from "./support/config.js"
 
 /**
- * The source contract's conformance kit (`@we-the-rebel-alliance/source-contract` v0.1.0, `conformance`) over the
+ * The source contract's conformance kit (`@we-the-rebel-alliance/source-contract` v0.2.0, `conformance`) over the
  * declaration this package ships (`package.json` `sources`) and the plugin's real reads: each kit call runs the tools RPC
  * method a consumer calls (`events_list`, `probe`, `calendar_today`, `images_read`) through `scriptMethods`, with the
  * kit's recording permission as the host's assert, so declared equals asserted is proven on the code. Google is the

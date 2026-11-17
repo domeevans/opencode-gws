@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The source contract is pinned at v0.2.0 (`github:we-the-rebel-alliance/source-contract#v0.2.0`), still bundled into `dist/index.js` with no runtime dependency; `NOTICE` names the tag. The declaration and every read are unchanged and carry none of the keys v0.2.0 adds (`removals[]`, an owner's `verified`, `permission.identityRules`, `permission.readsIdentity`, `accounts.server`, a price's `conditions` or `min`, an empty `permission.identity`), so a consumer still on v0.1.x reads them as before.
+- The conformance report names contract 0.2.0 and the kit's two new checks: `gap-once-per-read` runs for `gws.gmail` and `gws.calendar`, and `removals-are-final` is not applicable, as no source sends `removals[]`. `gws.calendar` keeps its `atomicPages` reason; no source needs `noExpiry`, since Gmail's history and Calendar's sync tokens do expire and both expired cases still run.
+
+### What Jelly should change
+
+- Nothing. Narrowing each source's probe with an empty `permission.identity` still waits: v0.2.0 allows it, but its upgrade notes say a consumer on v0.1.x refuses a declaration that carries one, so it ships once jelly and Memory pin v0.2.0. Until then Jelly fences `probe` with all of a source's operations.
+
 ## [0.0.8] - 2026-11-15
 
 ### Removed
