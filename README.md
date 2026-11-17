@@ -15,7 +15,7 @@ Google is a trademark of Google LLC; this unofficial plugin is not endorsed by t
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-gws#v0.0.8
+opencode plugin add github:joe-broadhead/opencode-gws#v0.0.9
 ```
 
 Run `opencode reload`, or restart OpenCode, then run `/gws-status`.
@@ -25,7 +25,7 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.8" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.9" }] }
 ```
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -93,7 +93,7 @@ In the TUI, **Google Workspace: Status** in the command palette, or `/gws`, open
    | `"read-only"` | the reads, events_list included | nothing: the six commits are **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.8", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-gws#v0.0.9", "options": { "access": "read-only" } }] }
    ```
 
    This is not the account's `access`: `accounts.<alias>.access` is the Google sign-in's scope level (Read-only or Read and write). The plugin option decides which tools run.
@@ -217,7 +217,7 @@ Create a Desktop app OAuth client in your organisation's Google Cloud project (u
 {
   "plugins": [
     {
-      "package": "github:joe-broadhead/opencode-gws#v0.0.8",
+      "package": "github:joe-broadhead/opencode-gws#v0.0.9",
       "options": {
         "oauthClient": {
           "clientId": "<your client ID>.apps.googleusercontent.com",
@@ -320,7 +320,7 @@ Each OpenCode server keeps a private work folder, `$TMPDIR/opencode-gws-XXXXXX`,
 2. Remove the plugin:
 
    ```sh
-   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.8
+   opencode plugin remove github:joe-broadhead/opencode-gws#v0.0.9
    ```
 
 3. Delete its folders. The state folder holds the audit log (`audit.jsonl`, and `audit.jsonl.1` once it passes 5 MiB); the cache folder holds Google's API descriptions. Neither holds a credential.
