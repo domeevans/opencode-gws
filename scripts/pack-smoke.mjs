@@ -22,7 +22,7 @@
  *      (2.2.3), and in the one under HOST_SDK_DIR when set (for example a
  *      2.2.4 SDK installed outside the lockfile);
  *    - the bare install in each stock OpenCode of TESTED_HOSTS
- *      (src/domain/host.ts: 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0), through
+ *      (src/domain/host.ts: 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2), through
  *      `opencode serve`. Only a stock CLI supplies @opencode/plugin to a
  *      plugin that does not install it; an embedded SDK host under Node
  *      does not.

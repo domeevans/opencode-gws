@@ -84,7 +84,7 @@ Only `index.ts`, `host/`, `rpc.ts`, and `tui.tsx` import `@opencode/plugin`. Onl
 
 ## Platform facts
 
-Facts about OpenCode 2.2 and 2.3 that this plugin relies on, and how each was checked. These hold on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0.
+Facts about OpenCode 2.2 and 2.3 that this plugin relies on, and how each was checked. These hold on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2.
 
 | Fact | How it was checked |
 | --- | --- |

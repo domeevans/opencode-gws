@@ -44,7 +44,7 @@ Contract: `src/rpc.ts`, id `google-workspace.gws`, method `status` only. It is i
 | Field | Meaning |
 | --- | --- |
 | `version` | This package's version. |
-| `host` | `{ version, range, tested }`: the OpenCode version (`null` when unknown), the supported range `>=2.2.3 <2.4.0`, and `true` only for a tested release (2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0). |
+| `host` | `{ version, range, tested }`: the OpenCode version (`null` when unknown), the supported range `>=2.2.3 <2.4.0`, and `true` only for a tested release (2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1, 2.3.2). |
 | `state` | `sign_in_required` when an interactive account needs signing in, `not_configured` when a headless account's variable is unset, else `connected`. An untested OpenCode release inside the range keeps this state; only `host.tested` and the OpenCode row mark it. |
 | `access` | What the default rules allow, from the plugin option: `all`, `ask-changes` or `read-only`. The dialog and `/gws-status` show it as **Permissions**. |
 | `rpcCommits` | Whether the six commit tools are also tools RPC methods, from the plugin option. The dialog and `/gws-status` show it as **Script commits**, which, when it is on, also names the `unguardedAgents`. `gws_status` carries those names as `rpcCommitsUnguardedAgents` when it is on. |
