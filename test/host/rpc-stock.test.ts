@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { gateOf, rpc, session, startStock, TESTED_HOSTS, type StockHost } from "./stock.js"
 
 /**
- * The tools RPC v2.1 on the stock binaries 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0: a read, a plan, a read an agent asks for
+ * The tools RPC v2.1 on the stock binaries 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2: a read, a plan, a read an agent asks for
  * (refused before gws runs), a deny, a commit that is not a method, describe with a session, and the location error.
  * The plugin is loaded in one project only, with the fake gws fixture as its binary, so the recorded argv says whether
  * gws ran.

@@ -78,7 +78,7 @@ jobs:
       - name: Stock OpenCode binaries
         run: |
           platform="$(node -p 'process.platform')-$(node -p 'process.arch')"
-          for version in 2.2.3 2.2.4 2.2.5 2.2.6 2.2.7 2.3.0; do
+          for version in 2.2.3 2.2.4 2.2.5 2.2.6 2.2.7 2.3.0 2.3.1 2.3.2; do
             dir="$RUNNER_TEMP/stock-$version"
             mkdir -p "$dir"
             (cd "$dir" && npm init -y >/dev/null && npm install "@opencode/cli@$version" "@opencode/cli-$platform@$version" --omit=optional --ignore-scripts --no-audit --no-fund)
