@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`gws.calendar` no longer expands a recurring series far into the future.** Its `events_list` read carried no
+  `timeMax`, so the first read listed every instance Google could expand: one consumer stored 2,610 meetings dated up
+  to 2040 from about four weekly series. A listing now reads one bounded window, and an instance is listed only when
+  it starts no later than seven days ahead. An instance that comes within the horizon is listed on a later call although
+  nothing changed at Google: the cursor advances the window with the clock, rather than following a sync token that
+  reports only changes. A cancelled instance inside the window is still listed as a `cancelled` meeting.
+
+### Changed
+
+- `gws.calendar`'s cursor names the window it read (its start and end), not Google's sync token, so Calendar has no
+  `gap` and no 410 restart. A cursor from 0.0.8 is still accepted: its sync token is dropped and the listing starts at
+  its window (a token-only cursor: the first run's 24 hours), so nothing is refused and no years of meetings are
+  re-read. The `sources` declaration is unchanged.
+
 ## [0.0.11] - 2026-11-20
 
 ### Fixed

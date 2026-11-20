@@ -88,7 +88,7 @@ describe("probe", () => {
 })
 
 describe("events_list for Calendar", () => {
-  it("syncs in full, then follows the sync token, with a cancellation as a meeting with the cancelled label, and refuses a cursor of another calendar", async () => {
+  it("lists the window, then follows its cursor, with a cancellation as a meeting with the cancelled label, and refuses a cursor of another calendar", async () => {
     const calendar = join(dir, "calendar.json")
     copyFileSync(CALENDAR, calendar)
     process.env["FAKE_GWS_CALENDAR"] = calendar

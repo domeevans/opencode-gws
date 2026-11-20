@@ -282,7 +282,7 @@ export const EventsListInput = z
       .regex(/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2}))?$/, "must be an ISO date, or an ISO date-time with Z or an offset")
       .optional()
       .describe("Where to start when there is no cursor: an ISO date (a UTC day) or an ISO date-time with Z or an offset. Default: 24 hours ago"),
-    cursor: z.string().min(1).max(1024).optional().describe("The cursor of the previous result, to list what arrived after it. It wins over since"),
+    cursor: z.string().min(1).max(1024).optional().describe("The cursor of the previous result, to continue from it. It wins over since"),
     limit: z.number().int().min(1).max(500).optional().describe("Most events to return, 1 to 500; 100 by default"),
     account: Account,
     source: z.string().max(64).optional().describe('The source to list: "gmail" (the default) or "calendar"'),
@@ -291,7 +291,7 @@ export const EventsListInput = z
       .optional()
       .describe('Calendar only: the one calendar to read, { "calendars": ["primary"] } by default. Gmail takes no scope'),
   })
-  .describe("List Gmail messages or Calendar events since a cursor, as the source contract's events")
+  .describe("List Gmail messages, or Calendar meetings up to seven days ahead, since a cursor, as the source contract's events")
 
 const EventActor = z.object({ role: z.string(), id: z.string().describe("mailto: and the address"), name: z.string().optional() })
 
