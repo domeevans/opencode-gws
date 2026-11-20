@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The snapshot source `gws.sheets` (`sheets_read` on the tools RPC, action `gws.sheets_read`): one range of one spreadsheet, for `{ spreadsheetId, range }`, as `{ range, sheet, rows }`, the cells as the spreadsheet shows them, at most 1 MB (a larger answer is `TOO_LARGE`, never cut). It runs `sheets.spreadsheets.values.get` and nothing else. Its output `x-gws/sheet` is declared inline. It is the one source declared `private: false`: a spreadsheet is a document its author chooses, so a consumer such as Artifacts may let an app read it through that person's account. Google's not found is `INPUT_INVALID`, and its refusal `PERMISSION_DENIED`. `gws.sheets_read` joins the default read rules, allowed at every `access`.
+
 ## [0.0.11] - 2026-11-20
 
 ### Fixed

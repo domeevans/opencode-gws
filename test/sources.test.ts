@@ -1,4 +1,4 @@
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { deprecatedNote, markCalendarTodayCalled, resetDeprecated } from "../src/host/deprecated.js"
 import type { PermissionRequest } from "../src/host/permissions.js"
 import { scriptMethods } from "../src/host/script-methods.js"
+import { SHEETS_MAX_BYTES, sheetTitle } from "../src/host/sheets.js"
 import { IMAGE_DATA_URI_MAX } from "../src/host/sources.js"
 import type { Runtime } from "../src/runtime/index.js"
 import { account, testRuntime } from "./support/config.js"
@@ -14,7 +15,7 @@ import { account, testRuntime } from "./support/config.js"
 /**
  * The source contract's reads that are tools RPC methods only, beyond what the conformance kit proves
  * (test/source-conformance.test.ts): probe's refusals and scopes, events_list's Calendar source across syncs,
- * calendar_today's and images_read's limits, and the deprecation of Jelly's old calendar.today.
+ * calendar_today's, images_read's and sheets_read's limits and refusals, and the deprecation of Jelly's old calendar.today.
  */
 
 const CALENDAR = fileURLToPath(new URL("./fixtures/calendar-events.json", import.meta.url))
@@ -30,7 +31,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  for (const name of ["FAKE_GWS_CALENDAR", "FAKE_GWS_RESPONSES", "FAKE_GWS_OUTPUT_FILE"]) delete process.env[name]
+  for (const name of ["FAKE_GWS_CALENDAR", "FAKE_GWS_RESPONSES", "FAKE_GWS_OUTPUT_FILE", "FAKE_GWS_LOG"]) delete process.env[name]
   for (const runtime of runtimes.splice(0)) await runtime.close()
   rmSync(dir, { recursive: true, force: true })
   resetDeprecated()
@@ -177,6 +178,85 @@ describe("images_read on Google's image servers", () => {
     expect(answer).toMatchObject({ data: { dataUri: `data:image/png;base64,${Buffer.from(PNG).toString("base64")}` }, trust: "untrusted" })
     expect(answer["account"]).toBeUndefined()
     expect(asserted.map((request) => request.action)).toEqual(["gws.images_read"])
+  })
+})
+
+describe("sheets_read", () => {
+  const SHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+  const answers = (values: unknown) => {
+    process.env["FAKE_GWS_RESPONSES"] = JSON.stringify({ "sheets.spreadsheets.values.get": values })
+  }
+
+  it("answers the range Google resolved, the sheet's title and the rows, after asserting gws.sheets_read and gws.read on values.get alone", async () => {
+    const log = join(dir, "argv.jsonl")
+    process.env["FAKE_GWS_LOG"] = log
+    answers({ range: "'Q3 plan'!A1:C3", majorDimension: "ROWS", values: [["Name", "Amount", "Paid"], ["Ada", "1,200.00", "TRUE"], ["Grace"]] })
+    const { run, asserted } = await harness(["sheets"])
+    const answer = await run("sheets_read", { source: "sheets", account: "personal", spreadsheetId: SHEET_ID, range: "Q3 plan!A1:C3" })
+    expect(answer).toMatchObject({
+      data: { range: "'Q3 plan'!A1:C3", sheet: "Q3 plan", rows: [["Name", "Amount", "Paid"], ["Ada", "1,200.00", "TRUE"], ["Grace"]] },
+      account: "personal",
+      trust: "untrusted",
+    })
+    expect(Number.isNaN(Date.parse(answer["asOf"] as string))).toBe(false)
+    expect(asserted.map((request) => [request.action, request.resources])).toEqual([
+      ["gws.sheets_read", ["*"]],
+      ["gws.read", ["personal:sheets.spreadsheets.values.get"]],
+    ])
+    const ran = readFileSync(log, "utf8").trim().split("\n").map((line) => JSON.parse(line) as string[]).filter((argv) => argv[0] === "sheets")
+    expect(ran).toHaveLength(1)
+    expect(ran[0]!.slice(0, 4)).toEqual(["sheets", "spreadsheets", "values", "get"])
+    expect(JSON.parse(ran[0]![ran[0]!.indexOf("--params") + 1]!)).toMatchObject({ spreadsheetId: SHEET_ID, range: "Q3 plan!A1:C3" })
+  })
+
+  it("reads the default account when none is named, and answers an empty range as no rows", async () => {
+    answers({ range: "Sheet1!A1:Z1000", majorDimension: "ROWS" })
+    const { run } = await harness(["sheets"])
+    expect(await run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1" })).toMatchObject({ data: { range: "Sheet1!A1:Z1000", sheet: "Sheet1", rows: [] }, account: "personal" })
+  })
+
+  it("refuses a missing or malformed spreadsheet id or range, another source and any other input, before any read", async () => {
+    const { run, asserted } = await harness(["sheets"])
+    await expect(run("sheets_read", { range: "Sheet1" })).rejects.toThrow(/^INPUT_INVALID: "spreadsheetId" must be a spreadsheet's id/)
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID })).rejects.toThrow(/^INPUT_INVALID: "range" must be an A1 range/)
+    await expect(run("sheets_read", { spreadsheetId: `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`, range: "Sheet1" })).rejects.toThrow(/^INPUT_INVALID: /)
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1\nA1" })).rejects.toThrow(/^INPUT_INVALID: "range"/)
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "x".repeat(257) })).rejects.toThrow(/^INPUT_INVALID: "range"/)
+    await expect(run("sheets_read", { source: "image", spreadsheetId: SHEET_ID, range: "Sheet1" })).rejects.toThrow(/^INPUT_INVALID: "source" must be "sheets"/)
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1", valueRenderOption: "FORMULA" })).rejects.toThrow(/^INPUT_INVALID: "valueRenderOption" is not an input/)
+    expect(asserted).toEqual([])
+  })
+
+  it("refuses an account that does not enable sheets", async () => {
+    const { run } = await harness(["drive"])
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1" })).rejects.toThrow(/^POLICY_DENIED: /)
+  })
+
+  it("answers Google's not found as INPUT_INVALID and its refusal as PERMISSION_DENIED, the contract's codes", async () => {
+    answers(null)
+    const { run } = await harness(["sheets"])
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1" })).rejects.toThrow(/^INPUT_INVALID: Google has no spreadsheet with this id/)
+    answers({ $error: { code: 400, message: "Unable to parse range: Nope!A1", status: "INVALID_ARGUMENT" } })
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Nope!A1" })).rejects.toThrow(/^INPUT_INVALID: .*Unable to parse range/)
+    answers({ $error: { code: 403, message: "The caller does not have permission", status: "PERMISSION_DENIED" } })
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1" })).rejects.toThrow(/^PERMISSION_DENIED: The account cannot open this spreadsheet/)
+    answers({ $error: { code: 500, message: "Internal error encountered.", status: "INTERNAL" } })
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1" })).rejects.toThrow(/^GWS_API_ERROR: /)
+  })
+
+  it("answers TOO_LARGE for a range whose answer is over the source's maxBytes, rather than cutting it", async () => {
+    const row = ["x".repeat(1000)]
+    const big = join(dir, "values.json")
+    writeFileSync(big, JSON.stringify({ range: "Sheet1!A1:A1100", values: Array.from({ length: Math.ceil(SHEETS_MAX_BYTES / 1000) + 1 }, () => row) }))
+    answers({ $file: big })
+    const { run } = await harness(["sheets"])
+    await expect(run("sheets_read", { spreadsheetId: SHEET_ID, range: "Sheet1!A:A" })).rejects.toThrow(/^TOO_LARGE: .*Next step: Read a smaller range\./)
+  })
+
+  it("reads a quoted sheet title back as the title", () => {
+    expect(sheetTitle("'It''s ours'!B2:C9")).toBe("It's ours")
+    expect(sheetTitle("Sheet1!A1")).toBe("Sheet1")
+    expect(sheetTitle("Sheet1")).toBe("Sheet1")
   })
 })
 

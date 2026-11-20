@@ -10,12 +10,13 @@ import { GMAIL_SOURCE } from "./gmail-events.js"
 import { imagesRead } from "./images.js"
 import { type Caller, type PermissionRequest, localRequest, operationRequest } from "./permissions.js"
 import type { StatusSource } from "./rpc.js"
+import { SHEETS_MAX_BYTES, SHEETS_OPERATION, SHEETS_READ, readSheet, sheetsParams } from "./sheets.js"
 
 /**
  * The source contract's methods that are not tools (`package.json` `sources`, read through the tools RPC
- * `google-workspace.gws.tools`): `probe`, and the two snapshot sources' reads, `calendar_today` (`gws.calendar.today`,
- * an `agenda`) and `images_read` (`gws.image`, an `image`). Each is a read-only method of the tools RPC with its own
- * action, never a model tool: a consumer such as Memory, Artifacts or Jelly calls it in a session its grant fences.
+ * `google-workspace.gws.tools`): `probe`, and the three snapshot sources' reads, `calendar_today` (`gws.calendar.today`,
+ * an `agenda`), `images_read` (`gws.image`, an `image`) and `sheets_read` (`gws.sheets`, an `x-gws/sheet`). Each is a
+ * read-only method of the tools RPC with its own action, never a model tool: a consumer such as Memory, Artifacts or Jelly calls it in a session its grant fences.
  *
  * - `probe` answers whose a source is, `{ source, account, owner, scopes, trust }`, from the account's verified sign-in
  *   (the email in the id_token Google returned at sign-in, which `gws_status` also reports) and the scopes Google
@@ -32,6 +33,9 @@ import type { StatusSource } from "./rpc.js"
  *   address on Google's image servers is fetched without any account's token: that fetch is no gws operation, so no
  *   declared grant could cover it, and it carries no `account`. A GIF is refused (the image output takes PNG, JPEG and
  *   WebP), and a picture whose data URI is over the output's limit is TOO_LARGE, never cut.
+ * - `sheets_read` is one range of one spreadsheet (`./sheets.ts`): `{ data: { range, sheet, rows }, asOf, account,
+ *   trust }`. It asserts `gws.sheets_read`, then `gws.read` on `<account>:sheets.spreadsheets.values.get`, before the
+ *   read. An answer over the declared `maxBytes` is TOO_LARGE, never cut.
  */
 
 /** The probe's permission action, `sources.probe.action`. */
@@ -54,6 +58,7 @@ const PROBED: Readonly<Record<string, { readonly operation: string; readonly sco
   [CALENDAR_SOURCE]: { operation: "calendar.events.list", scopes: /^https:\/\/www\.googleapis\.com\/auth\/calendar(?:\.|$)/ },
   [CALENDAR_TODAY.source]: { operation: "calendar.events.list", scopes: /^https:\/\/www\.googleapis\.com\/auth\/calendar(?:\.|$)/ },
   [IMAGES_READ.source]: { operation: "drive.files.get", scopes: /^https:\/\/www\.googleapis\.com\/auth\/drive(?:\.|$)/ },
+  [SHEETS_READ.source]: { operation: SHEETS_OPERATION, scopes: /^https:\/\/www\.googleapis\.com\/auth\/(?:spreadsheets|drive)(?:\.|$)/ },
 }
 
 export interface SourceMethodsInput {
@@ -102,7 +107,7 @@ export function sourceMethods({ runtime, assert, status }: SourceMethodsInput): 
     action: PROBE_ACTION,
     class: "read",
     description:
-      "The source contract's probe: whose a source (gmail, calendar, calendar-today or image) is, from the account's verified sign-in, and the scopes Google granted for it. Calls no Google API and reads no content.",
+      "The source contract's probe: whose a source (gmail, calendar, calendar-today, image or sheets) is, from the account's verified sign-in, and the scopes Google granted for it. Calls no Google API and reads no content.",
     input: {
       type: "object",
       additionalProperties: false,
@@ -235,5 +240,43 @@ export function sourceMethods({ runtime, assert, status }: SourceMethodsInput): 
     },
   }
 
-  return [probe, calendar, images]
+  const sheets: PluginMethod = {
+    kind: "plugin",
+    name: SHEETS_READ.method,
+    action: SHEETS_READ.action,
+    class: "read",
+    description:
+      "The source contract's snapshot gws.sheets: one range of one spreadsheet, its cells row by row as the spreadsheet shows them, with the range Google resolved and the sheet's title. Untrusted Workspace content.",
+    input: {
+      type: "object",
+      additionalProperties: false,
+      required: ["spreadsheetId", "range"],
+      properties: { source: { const: SHEETS_READ.source }, account: text(128), spreadsheetId: text(128), range: text(256) },
+    },
+    output: {
+      type: "object",
+      required: ["data", "asOf", "account", "trust"],
+      properties: { data: { type: "object" }, asOf: { type: "string" }, account: { type: "string" }, trust: { const: "untrusted" } },
+    },
+    async run(input, call) {
+      const value = snapshotInput(input, SHEETS_READ.source, ["spreadsheetId", "range"])
+      const params = sheetsParams(value)
+      const named = value["account"] as string | undefined
+      const target = runtime.inspect({ ...(named === undefined ? {} : { account: named }), operation: SHEETS_OPERATION }, "read")
+      await authorize(call, localRequest(host(call), SHEETS_READ.action))
+      await authorize(call, operationRequest(host(call), "gws.read", target))
+      const data = await runtime.wait(
+        (settled) => readSheet(runtime, target.account, params, { sessionId: call.sessionID, agentId: call.agent, caller: "rpc", signal: settled }),
+        call.signal,
+      )
+      const answer = { data, asOf: new Date().toISOString(), account: target.account, trust: "untrusted" as const }
+      const bytes = Buffer.byteLength(JSON.stringify(answer))
+      if (bytes > SHEETS_MAX_BYTES) {
+        throw new GwsError("TOO_LARGE", `the range's answer is ${bytes} bytes of JSON, over the source's maxBytes of ${SHEETS_MAX_BYTES}`, { next: "Read a smaller range." })
+      }
+      return answer
+    },
+  }
+
+  return [probe, calendar, images, sheets]
 }

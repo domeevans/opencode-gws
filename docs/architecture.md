@@ -43,7 +43,8 @@ src/
     gmail-events.ts events_list for Gmail: search, then history, as events
     calendar-events.ts events_list for Calendar: a full sync, then the sync token, as events
     source-page.ts  what every events_list page names: the package, the cursor's plugin, the page cap
-    sources.ts      the source contract's probe, calendar_today and images_read
+    sources.ts      the source contract's probe, calendar_today, images_read and sheets_read
+    sheets.ts       gws.sheets: one range of one spreadsheet, read with values.get
     permissions.ts  permission.assert inputs; no signal field
     skills.ts       the two skills
     integrations.ts sign-in
