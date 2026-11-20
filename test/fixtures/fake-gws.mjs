@@ -37,8 +37,9 @@
  *   the next page's index. A call must set `showDeleted: true` and
  *   `singleEvents: true` and carry `timeMin` and `timeMax`; an item is
  *   listed when its end is after `timeMin` and its start is before
- *   `timeMax`, as Google bounds a window. It is re-read on every call, so a
- *   test can change the calendar between calls.
+ *   `timeMax`, as Google bounds a window, and an item with neither a start
+ *   nor an end (a tombstone) is always answered. It is re-read on every
+ *   call, so a test can change the calendar between calls.
  */
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -178,7 +179,8 @@ function calendar(box) {
   const pages = box.pages
   if (!Array.isArray(pages) || !Number.isInteger(index) || index < 0 || index >= pages.length) return invalid("the fake calendar has no such page")
   const source = pages[index]
-  // A window bounds an event by its end (timeMin) and its start (timeMax); a cancellation keeps its slot.
+  // A window bounds an event by its end (timeMin) and its start (timeMax); a cancellation keeps its slot. An item with
+  // neither a start nor an end is a tombstone (a cancellation Google answers without a slot) and is always answered.
   const moment = (value) => {
     const time = typeof value?.dateTime === "string" ? value.dateTime : typeof value?.date === "string" ? `${value.date}T00:00:00Z` : undefined
     return time === undefined ? undefined : Date.parse(time)
@@ -186,6 +188,7 @@ function calendar(box) {
   const items = (Array.isArray(source.items) ? source.items : []).filter((item) => {
     const start = moment(item.start)
     const end = moment(item.end)
+    if (start === undefined && end === undefined) return true
     return start !== undefined && end !== undefined && end > from && start < to
   })
   const page = { ...(items.length > 0 ? { items } : {}) }

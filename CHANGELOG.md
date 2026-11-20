@@ -16,19 +16,24 @@ All notable changes to this project are documented here. The format follows [Kee
   last call's time, not at the previous window's far edge, so the next run re-reads that hour and everything since; a
   run that came late reads from the missed call and catches up. The one-hour overlap only repeats what Memory drops by
   external id and hash.
-- **A deleted recurring series is retracted.** A window read sends no instance for a series deleted whole, so the cursor
-  keeps the instance ids it listed inside the window, with their starts (at most 20, trimmed to the contract's cursor
-  length); a later run that no longer sees one whose start is still inside its window answers `removals[]` with reason
-  `deleted`, and drops an id whose start has passed out of the window. A cancellation Google answers without a start is
-  a removal too. The conformance report now runs `removals-are-final` and passes it.
+- **A cancellation Google answers without a start is retracted.** It cannot be a meeting, so its id is answered in
+  `removals[]` with reason `deleted`; the conformance report runs `removals-are-final` for it. A single cancelled
+  instance inside the window is still a `cancelled` meeting.
+
+### Known gap
+
+- **A recurring series deleted whole is not retracted.** A window read sends no instance for it, so the source cannot
+  see the deletion without guessing from an absence, and that guess cannot tell a deletion from a meeting moved beyond
+  the window: it would remove a real meeting for up to a week. The instances already listed age out by Memory's
+  retention instead.
 
 ### Changed
 
 - `gws.calendar`'s cursor names the window it is reading and the call that finished the last one, not Google's sync
-  token, so Calendar has no `gap` and no 410 restart. A cursor from 0.0.8 is still accepted: it names no window this
-  source can resume, so the listing starts a fresh window 24 hours back; nothing is refused and no years of meetings
-  are re-read. A `since` in the future is clamped so the window's start stays before its end. The `sources`
-  declaration is unchanged.
+  token, so Calendar has no `gap` and no 410 restart and the cursor holds no list of ids. A cursor from 0.0.8 is still
+  accepted: it names no window this source can resume, so the listing starts a fresh window 24 hours back; nothing is
+  refused and no years of meetings are re-read. A `since` in the future is read as now, so the window keeps its seven
+  days ahead instead of collapsing to an instant. The `sources` declaration is unchanged.
 
 ## [0.0.11] - 2026-11-20
 

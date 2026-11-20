@@ -202,12 +202,6 @@ describe("the conformance kit", () => {
     process.env["FAKE_GWS_CALENDAR"] = calendar
     const { run, tools } = await harness(["calendar"])
     const { item: source } = await sourceOf("gws.calendar")
-    const digest = createHash("sha256").update(ADDRESS).digest("hex").slice(0, 16)
-    // A cursor that tracked one instance inside the window which Google no longer answers: the page must retract it.
-    const deleted = encodeBoundCursor(
-      { plugin: "gws", source: "calendar", account: ACCOUNT, scope: { calendars: ["primary"] } },
-      { a: ACCOUNT, o: digest, r: Date.now(), k: [["evt-deleted-series", Date.now() + 24 * 60 * 60 * 1000]] },
-    )
     const report = await conform({
       source,
       tools,
@@ -217,7 +211,6 @@ describe("the conformance kit", () => {
       },
       cases: [
         { name: "the first window", input: { source: "calendar", account: ACCOUNT, since: SINCE, limit: 500 }, expect: "page" },
-        { name: "a series deleted inside the window", input: { source: "calendar", account: ACCOUNT, cursor: deleted }, expect: "page" },
         { name: "another person's calendar", input: { source: "calendar", account: ACCOUNT, scope: { calendars: ["someone.else@example.com"] } }, expect: { refuses: "INPUT_INVALID" } },
       ],
       atomicPages: { reason: "calendar.events.list answers a whole page in one provider call, so no single event can fail on its own" },

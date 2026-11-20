@@ -6,6 +6,12 @@
     {
       "items": [
           {
+            "id": "evt-gone",
+            "status": "cancelled",
+            "summary": "Gone",
+            "updated": "2026-11-01T09:00:00Z"
+          },
+          {
             "id": "evt-a",
             "status": "confirmed",
             "summary": "Quarterly plan",

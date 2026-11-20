@@ -96,7 +96,6 @@ const list = (runtime: Pick<Runtime, "read">, request: Partial<EventsListRequest
   calendarEvents(runtime, ACCOUNT, { source: "calendar", ...request, limit: request.limit ?? 500 }, ctx, now)
 
 const ids = (events: readonly SourceEvent[]) => events.map((event) => event.external_id)
-const removalIds = (result: { removals?: ReadonlyArray<{ external_id: string }> }) => (result.removals ?? []).map((removal) => removal.external_id).sort()
 
 describe("the calendar horizon", () => {
   it("never yields an instance a weekly series would place beyond now + 7 days", async () => {
@@ -225,7 +224,7 @@ describe("a change after the last run", () => {
 })
 
 describe("removals", () => {
-  it("retracts a whole recurring series that vanishes, keeping only ids still inside the window", async () => {
+  it("does not retract a whole recurring series that vanishes", async () => {
     const items: Item[] = [
       meeting("series_early", iso(NOW - 30 * 60 * 1000)),
       meeting("series_1", iso(NOW + 2 * HOUR)),
@@ -236,15 +235,23 @@ describe("removals", () => {
     const first = await list(runtime, { since: NOW - HOUR }, NOW)
     expect(ids(first.events)).toEqual(["series_early", "series_1", "series_2", "series_3"])
     expect(first.removals).toBeUndefined()
-    // Still there on the next run: a re-read is not a removal.
-    const second = await list(runtime, { cursor: first.cursor }, NOW + 2 * HOUR)
-    expect(second.removals).toBeUndefined()
     items.length = 0
-    // The series is gone. The early instance's start has left the window; the three still inside are retracted.
-    const third = await list(runtime, { cursor: second.cursor }, NOW + 3 * HOUR)
-    expect(third.events).toEqual([])
-    expect(removalIds(third)).toEqual(["series_1", "series_2", "series_3"])
-    expect(third.removals?.every((removal) => removal.reason === "deleted" && removal.at === iso(NOW + 3 * HOUR))).toBe(true)
+    // A deleted series sends no instance under showDeleted and singleEvents; the gap is documented, not guessed at.
+    const second = await list(runtime, { cursor: first.cursor }, NOW + 2 * HOUR)
+    expect(second.events).toEqual([])
+    expect(second.removals).toBeUndefined()
+  })
+
+  it("does not retract a meeting moved beyond seven days", async () => {
+    const items: Item[] = [meeting("evt-moved-out", "2026-11-02T10:00:00Z")]
+    const { runtime } = google(items)
+    const first = await list(runtime, { since: Date.parse("2026-11-01T00:00:00Z") }, NOW)
+    expect(ids(first.events)).toEqual(["evt-moved-out"])
+    items[0] = meeting("evt-moved-out", "2040-12-31T10:00:00Z")
+    const second = await list(runtime, { cursor: first.cursor }, NOW + HOUR)
+    expect(second.events).toEqual([])
+    // Absent from the window is not deleted: Memory must keep the meeting, not lose it for up to a week.
+    expect(second.removals).toBeUndefined()
   })
 
   it("retracts a cancelled event Google answers without a start", async () => {
@@ -256,28 +263,29 @@ describe("removals", () => {
 })
 
 describe("the window", () => {
-  it("keeps its start before its end when since is in the future", async () => {
+  it("treats a since in the future as now, not a one-millisecond window", async () => {
     const { runtime, calls } = google([])
     const result = await list(runtime, { since: Date.parse("2027-06-01T00:00:00Z") }, NOW)
-    expect(calls[0]).toMatchObject({ timeMin: iso(NOW + HORIZON), timeMax: iso(NOW + HORIZON + 1) })
-    expect(Date.parse(String(calls[0]?.["timeMin"]))).toBeLessThan(Date.parse(String(calls[0]?.["timeMax"])))
+    expect(calls[0]).toMatchObject({ timeMin: iso(NOW), timeMax: iso(NOW + HORIZON + 1) })
     expect(result.events).toEqual([])
   })
 
-  it("bounds the cursor with many meetings in the window", async () => {
+  it("keeps the cursor small with many meetings in the window", async () => {
     const items = Array.from({ length: 60 }, (_, index) =>
       meeting(`evt_many_${String(index).padStart(2, "0")}_20261120T100000Z`, iso(NOW + (index + 1) * HOUR)),
     )
     const { runtime } = google(items)
     const first = await list(runtime, { since: NOW - HOUR }, NOW)
     expect(first.events).toHaveLength(60)
+    expect(first.cursor.length).toBeLessThan(200)
     expect(first.cursor.length).toBeLessThanOrEqual(1024)
     const decoded = decodeBoundCursor({ plugin: "gws", source: "calendar", account: ACCOUNT, scope: { calendars: ["primary"] } }, first.cursor)
     expect(decoded.ok).toBe(true)
-    if (decoded.ok) expect((decoded.state["k"] as unknown[]).length).toBeLessThanOrEqual(20)
-    // The bounded cursor still resumes: the next run reads the same window and lists every meeting.
+    // The cursor is the window state only: no list of ids for a removal guess.
+    if (decoded.ok) expect(decoded.state["k"]).toBeUndefined()
+    // It still resumes: the next run reads the same window and lists every meeting.
     const second = await list(runtime, { cursor: first.cursor }, NOW + HOUR)
     expect(second.events).toHaveLength(60)
-    expect(second.cursor.length).toBeLessThanOrEqual(1024)
+    expect(second.cursor.length).toBeLessThan(200)
   })
 })
