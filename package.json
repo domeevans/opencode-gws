@@ -174,7 +174,10 @@
         "cost": {
           "class": "free"
         },
-        "maxBytes": 262144
+        "maxBytes": 262144,
+        "urlHosts": [
+          "www.google.com"
+        ]
       },
       {
         "id": "gws.calendar.today",
