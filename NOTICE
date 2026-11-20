@@ -33,7 +33,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 dist/index.js bundles the source contract's events, cursor and tools-rpc
 modules (https://github.com/we-the-rebel-alliance/source-contract, tag
-v0.2.0) under the MIT License:
+v0.3.0) under the MIT License:
 
 MIT License
 

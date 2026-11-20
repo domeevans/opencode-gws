@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.11] - 2026-11-20
+
+### Fixed
+
+- `gws.calendar` declares `urlHosts` `www.google.com`, the host its events set as `url` from Google's `htmlLink`. A consumer that checks `urlHosts` can show that link. `gws.gmail` already declared `mail.google.com`.
+
+### Changed
+
+- The source-contract devDependency is pinned at v0.3.0, still bundled into `dist/index.js`. gws declares no fact, hint or routine, so a page reads the same for a consumer still on v0.2.0.
+
 ## [0.0.10] - 2026-11-18
 
 ### Changed
