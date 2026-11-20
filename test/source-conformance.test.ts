@@ -196,17 +196,12 @@ describe("the conformance kit", () => {
     expect(report.ok).toBe(true)
   }, 60_000)
 
-  it("passes for gws.calendar: a full sync with a refused secret, a cancellation, an expired sync token, with atomic pages", async () => {
+  it("passes for gws.calendar: a window with a refused secret, a cancellation, and atomic pages", async () => {
     const calendar = join(dir, "calendar.json")
     copyFileSync(CALENDAR, calendar)
     process.env["FAKE_GWS_CALENDAR"] = calendar
     const { run, tools } = await harness(["calendar"])
     const { item: source } = await sourceOf("gws.calendar")
-    const digest = createHash("sha256").update(ADDRESS).digest("hex").slice(0, 16)
-    const expired = encodeBoundCursor(
-      { plugin: "gws", source: "calendar", account: ACCOUNT, scope: { calendars: ["primary"] } },
-      { a: ACCOUNT, o: digest, y: "sync-expired", w: 0, t: Date.parse(SINCE), n: 0 },
-    )
     const report = await conform({
       source,
       tools,
@@ -215,11 +210,11 @@ describe("the conformance kit", () => {
         probe: (input, context) => run("probe", input, context),
       },
       cases: [
-        { name: "the first full sync", input: { source: "calendar", account: ACCOUNT, since: SINCE, limit: 500 }, expect: "page" },
-        { name: "an expired sync token", input: { source: "calendar", account: ACCOUNT, cursor: expired }, expect: "expired" },
+        { name: "the first window", input: { source: "calendar", account: ACCOUNT, since: SINCE, limit: 500 }, expect: "page" },
         { name: "another person's calendar", input: { source: "calendar", account: ACCOUNT, scope: { calendars: ["someone.else@example.com"] } }, expect: { refuses: "INPUT_INVALID" } },
       ],
       atomicPages: { reason: "calendar.events.list answers a whole page in one provider call, so no single event can fail on its own" },
+      noExpiry: { reason: "the cursor names a bounded window, never a Google sync token, so it cannot expire" },
     })
     expect(problemsOf(report)).toEqual({ problems: [], incomplete: [] })
   }, 60_000)

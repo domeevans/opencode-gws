@@ -2,6 +2,39 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`gws.calendar` no longer expands a recurring series far into the future.** Its `events_list` read carried no
+  `timeMax`, so the first read listed every instance Google could expand: one consumer stored 2,610 meetings dated up
+  to 2040 from about four weekly series. A listing now reads one bounded window, and an instance is listed only when
+  it starts no later than seven days ahead. An instance that comes within the horizon is listed on a later call although
+  nothing changed at Google: the cursor advances the window with the clock, rather than following a sync token that
+  reports only changes. A cancelled instance inside the window is still listed as a `cancelled` meeting.
+- **A meeting created, moved or cancelled after a run arrives on the next one.** Each window starts an hour before the
+  last call's time, not at the previous window's far edge, so the next run re-reads that hour and everything since; a
+  run that came late reads from the missed call and catches up. The one-hour overlap only repeats what Memory drops by
+  external id and hash.
+- **A cancellation Google answers without a start is retracted.** It cannot be a meeting, so its id is answered in
+  `removals[]` with reason `deleted`; the conformance report runs `removals-are-final` for it. A single cancelled
+  instance inside the window is still a `cancelled` meeting.
+
+### Known gap
+
+- **A recurring series deleted whole is not retracted.** A window read sends no instance for it, so the source cannot
+  see the deletion without guessing from an absence, and that guess cannot tell a deletion from a meeting moved beyond
+  the window: it would remove a real meeting for up to a week. The instances already listed age out by Memory's
+  retention instead.
+
+### Changed
+
+- `gws.calendar`'s cursor names the window it is reading and the call that finished the last one, not Google's sync
+  token, so Calendar has no `gap` and no 410 restart and the cursor holds no list of ids. A cursor from 0.0.8 is still
+  accepted: it names no window this source can resume, so the listing starts a fresh window 24 hours back; nothing is
+  refused and no years of meetings are re-read. A `since` in the future is read as now, so the window keeps its seven
+  days ahead instead of collapsing to an instant. The `sources` declaration is unchanged.
+
 ## [0.0.11] - 2026-11-20
 
 ### Fixed

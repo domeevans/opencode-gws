@@ -41,7 +41,7 @@ src/
     tools.ts        the 12 tool adapters
     event-sources.ts events_list's sources (gws.gmail, gws.calendar) on the source contract package
     gmail-events.ts events_list for Gmail: search, then history, as events
-    calendar-events.ts events_list for Calendar: a full sync, then the sync token, as events
+    calendar-events.ts events_list for Calendar: a bounded window of meetings, as events
     source-page.ts  what every events_list page names: the package, the cursor's plugin, the page cap
     sources.ts      the source contract's probe, calendar_today and images_read
     permissions.ts  permission.assert inputs; no signal field

@@ -2,10 +2,15 @@
   "id": "sam.rivera@example.com",
   "summary": "Sam Rivera",
   "timeZone": "Europe/London",
-  "listings": {
-    "full": [
-      {
-        "items": [
+  "pages": [
+    {
+      "items": [
+          {
+            "id": "evt-gone",
+            "status": "cancelled",
+            "summary": "Gone",
+            "updated": "2026-11-01T09:00:00Z"
+          },
           {
             "id": "evt-a",
             "status": "confirmed",
@@ -93,22 +98,7 @@
               }
             ]
           }
-        ],
-        "nextSyncToken": "sync-1"
+        ]
       }
-    ],
-    "sync-1": [
-      {
-        "items": [],
-        "nextSyncToken": "sync-2"
-      }
-    ],
-    "sync-2": [
-      {
-        "items": [],
-        "nextSyncToken": "sync-3"
-      }
-    ],
-    "sync-expired": 410
-  }
+  ]
 }
