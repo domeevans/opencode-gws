@@ -187,7 +187,7 @@ Two skills load automatically: `opencode-gws` (how the tools work: accounts, pla
 ## Events list
 
 `gws_events_list` (tools RPC method `events_list`) is this plugin's side of the source contract
-([`@we-the-rebel-alliance/source-contract`](https://github.com/we-the-rebel-alliance/source-contract) v0.2.0, which the
+([`@we-the-rebel-alliance/source-contract`](https://github.com/we-the-rebel-alliance/source-contract) v0.3.0, which the
 plugin bundles): the events sources `gws.gmail` and `gws.calendar` that `package.json` `sources` declares. Memory's
 collector and any other consumer call it with no model and no one there. See [Sources](#sources) for the declaration
 and the other source reads.
