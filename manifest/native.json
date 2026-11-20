@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "plugin": "opencode-gws",
+  "repository": "joe-broadhead/opencode-gws",
+  "tag": "v0.0.11",
+  "built": {
+    "commit": "bf2e5b436e818055c34974773739e592366803d3",
+    "run": 44737713579,
+    "workflow": "native"
+  },
+  "modules": {
+    "gws": {
+      "darwin-arm64": {
+        "name": "gws-darwin-arm64.gz",
+        "url": "https://github.com/joe-broadhead/opencode-gws/releases/download/v0.0.11/gws-darwin-arm64.gz",
+        "bytes": 6247829,
+        "sha256": "6bc944e69490d2a826235d6ad96e95e18bbecb6f412c54a54d3b8ecb988c87c3",
+        "executable": {
+          "name": "gws",
+          "bytes": 15371280,
+          "sha256": "0f27b8b0815bf09cdf95da48d3c604f05ceb8f16bf5c9f0ba355b1f957cdd47e"
+        }
+      },
+      "darwin-x64": {
+        "name": "gws-darwin-x64.gz",
+        "url": "https://github.com/joe-broadhead/opencode-gws/releases/download/v0.0.11/gws-darwin-x64.gz",
+        "bytes": 6424868,
+        "sha256": "d55a4a32b1aa5b8ad39d5a07948760a551dcceeff7336f61b2487be6e5db60a0",
+        "executable": {
+          "name": "gws",
+          "bytes": 16210932,
+          "sha256": "cfaf3c184ffe4ed4609cc6fbd75cc64ffa97b4cb7a71ceb7302ab8e89cd3f163"
+        }
+      },
+      "linux-arm64-gnu": {
+        "name": "gws-linux-arm64-gnu.gz",
+        "url": "https://github.com/joe-broadhead/opencode-gws/releases/download/v0.0.11/gws-linux-arm64-gnu.gz",
+        "bytes": 6742568,
+        "sha256": "4877f811c4237e64bfb46177c75f357ed4b621ba5dc2ac607fed91857b2897ab",
+        "executable": {
+          "name": "gws",
+          "bytes": 18113600,
+          "sha256": "b68337faf1436fb2b3a287207cd57fef784a20fb4ab4f2429e51c4e0cfa0b50b"
+        }
+      },
+      "linux-x64-gnu": {
+        "name": "gws-linux-x64-gnu.gz",
+        "url": "https://github.com/joe-broadhead/opencode-gws/releases/download/v0.0.11/gws-linux-x64-gnu.gz",
+        "bytes": 6790472,
+        "sha256": "e32496e20905603b8660611f0e3563c44256e0c5b7ec72bcf342f4ec22017fbd",
+        "executable": {
+          "name": "gws",
+          "bytes": 19259000,
+          "sha256": "ab59c4bab4e7848740ba8cc3ef186152dab90121c45835b49bd1bf2a5c259b86"
+        }
+      }
+    }
+  }
+}

@@ -75,7 +75,6 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "node scripts/clean.mjs && node scripts/bundle.mjs",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "lint": "biome check && node scripts/check-copies.mjs && node scripts/check-icons.mjs && node scripts/check-forbidden.mjs && node scripts/check-workflows.mjs",
     "test": "vitest run",
