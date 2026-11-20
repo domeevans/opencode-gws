@@ -263,6 +263,18 @@ describe("removals", () => {
 })
 
 describe("the window", () => {
+  it("returns no events and a valid cursor for a window with no meetings", async () => {
+    const { runtime, calls } = google([])
+    const first = await list(runtime, {}, NOW)
+    expect(first.events).toEqual([])
+    expect(first.more).toBe(false)
+    expect(first.cursor.length).toBeLessThan(200)
+    const second = await list(runtime, { cursor: first.cursor }, NOW + HOUR)
+    expect(second.events).toEqual([])
+    expect(second.more).toBe(false)
+    expect(calls).toHaveLength(2)
+  })
+
   it("treats a since in the future as now, not a one-millisecond window", async () => {
     const { runtime, calls } = google([])
     const result = await list(runtime, { since: Date.parse("2027-06-01T00:00:00Z") }, NOW)

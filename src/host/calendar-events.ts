@@ -296,14 +296,17 @@ export async function calendarEvents(runtime: Pick<Runtime, "read">, account: st
     request.limit,
     PAGE_MAX_BYTES,
   )
-  // A page or item cap left part of the window unread: resume at that place, inside that window.
+  // A page or item cap left part of the window unread: resume at that place, inside that window. With nothing carried
+  // there is no place after an event to resume from, so the window is read again rather than indexed at -1.
   const trimmed = kept < listed.length
-  const cursor = trimmed
-    ? { a: account, o: digest(calendar), ...listed[kept - 1]!.after }
-    : complete
-      ? { a: account, o: digest(calendar), r: now }
-      : { a: account, o: digest(calendar), w: state.w, x: state.x, ...(state.p === undefined ? {} : { p: state.p }), n: state.n }
-  const reach = trimmed ? walked.indexOf(listed[kept - 1]!) : walked.length
+  const resume = trimmed && kept > 0 ? listed[kept - 1]!.after : undefined
+  const cursor =
+    resume !== undefined
+      ? { a: account, o: digest(calendar), ...resume }
+      : complete && !trimmed
+        ? { a: account, o: digest(calendar), r: now }
+        : { a: account, o: digest(calendar), w: state.w, x: state.x, ...(state.p === undefined ? {} : { p: state.p }), n: trimmed ? 0 : state.n }
+  const reach = resume !== undefined ? walked.indexOf(listed[kept - 1]!) : walked.length
   const refused = walked.slice(0, reach).flatMap((item) => (item.refused === undefined ? [] : [item.refused]))
   return eventsListResult(
     { source: CALENDAR_SOURCE, account, owner },
