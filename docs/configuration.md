@@ -213,14 +213,18 @@ primary calendar's id and name from `calendar.calendarList.get`.
 - `failed[]` lists a Gmail message Google failed to answer this time (a 5xx is `UNAVAILABLE`, a 429 `RATE_LIMITED`).
   The page then answers the cursor it was called with, so the next call reads that message again. Calendar never
   answers `failed[]`: a page is one `calendar.events.list` answer.
+- `removals[]` lists, for good, what the source listed before and no longer stands behind, as
+  `{ external_id, at, reason }`: Calendar retracts an instance it listed inside the window that Google no longer
+  answers (a recurring series deleted whole) and a cancellation Google answers without a start, both with reason
+  `deleted`. A removal is an answer, not a drop: it never holds the cursor back, and it is never in `failed[]`.
 - `gap: { reason: "expired", since }` says the history behind the cursor is gone (Gmail no longer keeps the history id),
   and the source read on from `since`, the last event it had listed. Calendar never answers `gap`: its cursor names a
   bounded window, not Google's sync token, so there is no history to expire.
 
 The cursor is the contract's version 2, bound to the plugin (`gws`), the source, the account and Calendar's calendar. A
 Gmail cursor from before this release (contract 1) is read for one release. A Calendar cursor from 0.0.8 is accepted:
-its sync token is dropped, and the listing starts a fresh window at the start that cursor recorded (a token-only cursor:
-24 hours back), so nothing is refused and no years of meetings are re-read.
+it names a Google sync token and no window this source can resume, so the listing starts a fresh window 24 hours back;
+nothing is refused and no years of meetings are re-read.
 
 Each Gmail event is one message:
 
@@ -238,7 +242,7 @@ Each Gmail event is one message:
 
 Spam, trash, drafts, Promotions and Social are never events. The first listing (no cursor) notes the mailbox's history id, then searches `messages.list` for the messages after `since`, at most 10,000, and lists them oldest first. After that it follows `history.list` from the noted id, so a message that arrives meanwhile is listed too, at worst twice; Memory drops the repeat. When Gmail no longer keeps a cursor's history id, it searches again from the last event it listed, with `gap`. A message deleted after it was listed is skipped. The cursor holds where the listing stands, so calling again with an older cursor lists the same events again. A result stops early, with `more`, before its JSON passes 262,144 bytes, the declared `maxBytes`.
 
-Each Calendar event is one event of the primary calendar, `kind` `meeting`: `occurred_at` when it starts (a cancellation: when it was cancelled), the organizer and attendees as `mailto:` actors, the title, the description and location as text, the event's `htmlLink` on `www.google.com`, and its status (`confirmed`, `tentative` or `cancelled`) as its label; a cancelled meeting carries no text or actors. Each listing reads a bounded window with `showDeleted` and `singleEvents` on: from the cursor's window end less an hour (the first listing: `since`) to seven days ahead. An instance is listed only when it starts no later than `now + 7 days`, so a recurring series is never expanded far into the future, and an instance that comes within the horizon is listed on the next call although nothing changed at Google. There is no sync token: a token reports changes, not the passing of time.
+Each Calendar event is one event of the primary calendar, `kind` `meeting`: `occurred_at` when it starts (a cancellation: when it was cancelled), the organizer and attendees as `mailto:` actors, the title, the description and location as text, the event's `htmlLink` on `www.google.com`, and its status (`confirmed`, `tentative` or `cancelled`) as its label; a cancelled meeting carries no text or actors. Each listing reads a bounded window with `showDeleted` and `singleEvents` on: from the last call's time less an hour (the first listing: `since`) to seven days ahead, with the start clamped before the end. An instance is listed only when it starts no later than `now + 7 days`, so a recurring series is never expanded far into the future; an instance that comes within the horizon is listed on the next call although nothing changed at Google, and a meeting created, moved or cancelled after the last call is listed too. A late run reads from the last call and catches up. There is no sync token: a token reports changes, not the passing of time. The cursor keeps at most 20 instance ids listed inside the window, with their starts, trimmed to the contract's cursor length; a later run that no longer sees one whose start is still inside its window answers `removals[]`, and an id whose start has passed out of the window is dropped.
 
 It only reads and never asks: it asserts `gws.events_list` on `<account>:<operation>` for the operation the source follows (`gmail.users.history.list`, `calendar.events.list`), then `gws.read` on `<account>:<operation>` for every operation the source runs (Gmail: `gmail.users.getProfile`, `gmail.users.history.list`, `gmail.users.messages.list` and `gmail.users.messages.get`; Calendar: `calendar.calendarList.get` and `calendar.events.list`), before any read runs. Each read passes the plugin's read policy and audit like a `gws_read`. A deny rule on `gws.events_list` turns it off without touching `gws_read`.
 

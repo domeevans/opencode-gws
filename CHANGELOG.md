@@ -12,13 +12,23 @@ All notable changes to this project are documented here. The format follows [Kee
   it starts no later than seven days ahead. An instance that comes within the horizon is listed on a later call although
   nothing changed at Google: the cursor advances the window with the clock, rather than following a sync token that
   reports only changes. A cancelled instance inside the window is still listed as a `cancelled` meeting.
+- **A meeting created, moved or cancelled after a run arrives on the next one.** Each window starts an hour before the
+  last call's time, not at the previous window's far edge, so the next run re-reads that hour and everything since; a
+  run that came late reads from the missed call and catches up. The one-hour overlap only repeats what Memory drops by
+  external id and hash.
+- **A deleted recurring series is retracted.** A window read sends no instance for a series deleted whole, so the cursor
+  keeps the instance ids it listed inside the window, with their starts (at most 20, trimmed to the contract's cursor
+  length); a later run that no longer sees one whose start is still inside its window answers `removals[]` with reason
+  `deleted`, and drops an id whose start has passed out of the window. A cancellation Google answers without a start is
+  a removal too. The conformance report now runs `removals-are-final` and passes it.
 
 ### Changed
 
-- `gws.calendar`'s cursor names the window it read (its start and end), not Google's sync token, so Calendar has no
-  `gap` and no 410 restart. A cursor from 0.0.8 is still accepted: its sync token is dropped and the listing starts at
-  its window (a token-only cursor: the first run's 24 hours), so nothing is refused and no years of meetings are
-  re-read. The `sources` declaration is unchanged.
+- `gws.calendar`'s cursor names the window it is reading and the call that finished the last one, not Google's sync
+  token, so Calendar has no `gap` and no 410 restart. A cursor from 0.0.8 is still accepted: it names no window this
+  source can resume, so the listing starts a fresh window 24 hours back; nothing is refused and no years of meetings
+  are re-read. A `since` in the future is clamped so the window's start stays before its end. The `sources`
+  declaration is unchanged.
 
 ## [0.0.11] - 2026-11-20
 
