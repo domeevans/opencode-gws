@@ -13,6 +13,7 @@ import type { PluginMethod, ToolCall } from "@we-the-rebel-alliance/source-contr
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest"
 import type { PermissionRequest } from "../src/host/permissions.js"
 import { scriptMethods } from "../src/host/script-methods.js"
+import { SHEET_OUTPUT_SCHEMA, SHEETS_MAX_BYTES } from "../src/host/sheets.js"
 import { IMAGE_DATA_URI_MAX } from "../src/host/sources.js"
 import type { Runtime } from "../src/runtime/index.js"
 import { account, testRuntime } from "./support/config.js"
@@ -20,13 +21,13 @@ import { account, testRuntime } from "./support/config.js"
 /**
  * The source contract's conformance kit (`@we-the-rebel-alliance/source-contract` v0.2.0, `conformance`) over the
  * declaration this package ships (`package.json` `sources`) and the plugin's real reads: each kit call runs the tools RPC
- * method a consumer calls (`events_list`, `probe`, `calendar_today`, `images_read`) through `scriptMethods`, with the
+ * method a consumer calls (`events_list`, `probe`, `calendar_today`, `images_read`, `sheets_read`) through `scriptMethods`, with the
  * kit's recording permission as the host's assert, so declared equals asserted is proven on the code. Google is the
  * fake gws answering from recorded, synthetic fixtures (test/fixtures/gmail-mailbox.json, calendar-events.json and the
  * responses below); nothing reaches the network and no fixture holds account data.
  *
  * Every snapshot answer is also passed through the contract's `read.acceptAnswer`, as a consumer accepts it: the
- * output schema (`agenda`, `image`), `asOf`, the account, `trust` and `maxBytes`. The kit's report for every source is
+ * output schema (`agenda`, `image`, and `gws.sheets`' inline `x-gws/sheet`), `asOf`, the account, `trust` and `maxBytes`. The kit's report for every source is
  * written to reports/conformance-report.json, the file a release attaches.
  */
 
@@ -94,6 +95,7 @@ const status = async () => ({
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/calendar.readonly",
         "https://www.googleapis.com/auth/drive.readonly",
+        "https://www.googleapis.com/auth/spreadsheets.readonly",
       ],
     },
   ],
@@ -148,7 +150,7 @@ describe("the declaration", () => {
   it("validates as a consumer reads it from the installed package, and names only read tools", async () => {
     const { tools } = await harness(["gmail"])
     const descriptor = await installed()
-    expect(descriptor.sources.items.map((item) => item.id)).toEqual(["gws.gmail", "gws.calendar", "gws.calendar.today", "gws.image"])
+    expect(descriptor.sources.items.map((item) => item.id)).toEqual(["gws.gmail", "gws.calendar", "gws.calendar.today", "gws.image", "gws.sheets"])
     expect(() => assertDeclaration(descriptor.sources, { tools })).not.toThrow()
     expect(descriptor.sources.rpc).toBe("google-workspace.gws.tools")
   })
@@ -286,6 +288,53 @@ describe("the conformance kit", () => {
     expect(problemsOf(report)).toEqual({ problems: [], incomplete: [] })
     expect(accepted).toMatchObject([{ kind: "snapshot", snapshot: { data: { dataUri: `data:image/png;base64,${Buffer.from(PNG).toString("base64")}` } } }])
   }, 60_000)
+})
+
+/** A spreadsheet's range as Google answers values.get. */
+const SHEET_ID = "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+
+describe("gws.sheets", () => {
+  it("is not private, and its permission is values.get alone", async () => {
+    const { frame } = await sourceOf("gws.sheets")
+    expect(frame).toMatchObject({ kind: "snapshot", tool: "sheets_read", output: "x-gws/sheet", private: false, maxBytes: SHEETS_MAX_BYTES, permission: { tool: "gws.sheets_read", operations: ["sheets.spreadsheets.values.get"] } })
+  })
+
+  it("keeps the declared output schema equal to the one the code documents", async () => {
+    const { frame } = await sourceOf("gws.sheets")
+    expect((frame as { outputSchema?: unknown }).outputSchema).toEqual(SHEET_OUTPUT_SCHEMA)
+  })
+
+  it("passes the conformance kit, and a consumer accepts its answer as an x-gws/sheet", async () => {
+    process.env["FAKE_GWS_RESPONSES"] = JSON.stringify({
+      "sheets.spreadsheets.values.get": { range: "Budget!A1:B3", majorDimension: "ROWS", values: [["Item", "Cost"], ["Venue", "1,200.00"], ["Food", "450.00"]] },
+    })
+    const { run, tools } = await harness(["sheets"])
+    const { item: source, frame } = await sourceOf("gws.sheets")
+    const accepted: unknown[] = []
+    const report = await conform({
+      source,
+      tools,
+      calls: {
+        probe: (input, context) => run("probe", input, context),
+        snapshot: async (input, context) => {
+          const answer = await run("sheets_read", { ...source.input, account: ACCOUNT, ...input }, context)
+          const outcome = acceptAnswer(frame, ACCOUNT, answer)
+          if (!outcome.ok) throw new Error(`${outcome.failure.code}: ${outcome.failure.message}`)
+          accepted.push(outcome)
+          return answer
+        },
+      },
+      snapshotCases: [{ spreadsheetId: SHEET_ID, range: "Budget!A1:B3" }],
+    })
+    expect(problemsOf(report)).toEqual({ problems: [], incomplete: [] })
+    expect(accepted).toMatchObject([{ kind: "snapshot", snapshot: { data: { range: "Budget!A1:B3", sheet: "Budget", rows: [["Item", "Cost"], ["Venue", "1,200.00"], ["Food", "450.00"]] } } }])
+  }, 60_000)
+
+  it("is refused by a consumer when its answer breaks the output schema", async () => {
+    const { frame } = await sourceOf("gws.sheets")
+    const outcome = acceptAnswer(frame, ACCOUNT, { data: { range: "A1", rows: [[{ formula: "=1" }]] }, asOf: new Date().toISOString(), account: ACCOUNT, trust: "untrusted" })
+    expect(outcome.ok).toBe(false)
+  })
 })
 
 /** Mail that arrives after a listing, as history records: one message each, with a subject and a plain body. */

@@ -17,7 +17,10 @@
  *   Kinds: api, auth, scope, disabled, validation.
  * - FAKE_GWS_RESPONSES, a JSON object keyed by method id (for example
  *   "gmail.users.messages.get"), answers that method with its value. A
- *   value of null fails the call with a 404 API error. A value
+ *   value of null fails the call with a 404 API error, and a value
+ *   {"$error": {"code", "message", "status"}} with that API error. A value
+ *   {"$file": "<path>"} answers with that file's bytes, for an answer too
+ *   large for the environment. A value
  *   {"$saved": {"name", "content", "mimeType"}} answers as gws does for a
  *   body that is not JSON: it writes the body to that file in its working
  *   directory and prints where.
@@ -213,8 +216,15 @@ if (!argv.includes("--dry-run") && Object.hasOwn(responses, id)) {
     out({ error: FAILURES.api[1] })
     process.exit(1)
   }
+  const failed = responses[id]?.$error
   const saved = responses[id]?.$saved
-  if (saved) {
+  const file = responses[id]?.$file
+  if (failed) {
+    out({ error: failed })
+    process.exit(1)
+  } else if (file) {
+    process.stdout.write(readFileSync(file))
+  } else if (saved) {
     writeFileSync(saved.name, saved.content)
     out({ bytes: Buffer.byteLength(saved.content), mimeType: saved.mimeType, saved_file: saved.name, status: "success" })
   } else out(responses[id])

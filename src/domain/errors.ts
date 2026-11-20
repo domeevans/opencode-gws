@@ -45,16 +45,16 @@ export const ErrorCode = {
   },
   INPUT_INVALID: {
     meaning:
-      "A source read refused its input: events_list, probe, calendar_today or images_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, or a calendar other than the primary one. Nothing ran.",
+      "A source read refused its input: events_list, probe, calendar_today, images_read or sheets_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, a calendar other than the primary one, or a spreadsheet id or range Google has no spreadsheet or sheet for.",
     next: "Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry.",
   },
   SOURCE_UNKNOWN: {
     meaning: "A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran.",
-    next: "Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today or image for probe.",
+    next: "Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today, image or sheets for probe.",
   },
   TOO_LARGE: {
-    meaning: "A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture). Nothing is cut short.",
-    next: "Read a smaller picture, such as the file's thumbnail.",
+    meaning: "A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture), or a spreadsheet range whose answer is over 1 MB. Nothing is cut short.",
+    next: "Read a smaller picture, such as the file's thumbnail, or a smaller range.",
   },
   FIELDS_INVALID: {
     meaning: "The fields mask's parentheses do not balance, so gws was not called.",
@@ -109,7 +109,7 @@ export const ErrorCode = {
   },
   PERMISSION_DENIED: {
     meaning:
-      "The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run.",
+      "The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. From sheets_read: Google says the account cannot open the spreadsheet.",
     next: "Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it.",
   },
 

@@ -94,9 +94,9 @@ A Calendar event write (`insert`, `patch`, `update`, `move`, `quickAdd`) becomes
 
 ## Approvals
 
-**Every tool is allowed by default.** The plugin inserts its default rules through `ctx.agent.transform`, immediately after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets none, so its default deny stays a deny. The block is the `gws.*` namespace, then the five reads, then the six commits; the `access` option decides the effect, and the README prints the block for each value:
+**Every tool is allowed by default.** The plugin inserts its default rules through `ctx.agent.transform`, immediately after each agent's base `{ "action": "*", "resource": "*", "effect": "allow" }` rule. An agent without that rule gets none, so its default deny stays a deny. The block is the `gws.*` namespace, then the reads, then the six commits; the `access` option decides the effect, and the README prints the block for each value:
 
-| `access` | The namespace and the six commits | The six read tools, events_list included, and the source reads probe, calendar_today and images_read |
+| `access` | The namespace and the six commits | The six read tools, events_list included, and the source reads probe, calendar_today, images_read and sheets_read |
 | --- | --- | --- |
 | `"all"` (the default) | `allow` | `allow` |
 | `"ask-changes"` | `ask` | `allow` |
@@ -250,7 +250,9 @@ It only reads and never asks: it asserts `gws.events_list` on `<account>:<operat
 ## Sources
 
 `package.json` `sources` declares what any consumer may read (contract version 1), read from the installed package,
-never over RPC. Every source is private, free, and read over the tools RPC `google-workspace.gws.tools` (`sources.rpc`).
+never over RPC. Every source is free and read over the tools RPC `google-workspace.gws.tools` (`sources.rpc`). Every
+source is private except `gws.sheets`: a spreadsheet is a document the author chooses, not the account's own mail or
+calendar.
 
 | Source | Kind | Method and action | Operations | Answer |
 | --- | --- | --- | --- | --- |
@@ -258,9 +260,10 @@ never over RPC. Every source is private, free, and read over the tools RPC `goog
 | `gws.calendar` | events (`meeting`), scope `calendars` | `events_list`, `gws.events_list` | `calendar.calendarList.get`, `calendar.events.list` | pages of at most 256 KB |
 | `gws.calendar.today` | snapshot, `agenda` | `calendar_today`, `gws.calendar_today` | `calendar.calendars.get`, `calendar.events.list` | today's events, at most 64 KB, reused for 60 seconds |
 | `gws.image` | snapshot, `image`, param `url` | `images_read`, `gws.images_read` | `drive.files.get` | one picture, at most 1 MB |
+| `gws.sheets` | snapshot, `x-gws/sheet`, params `spreadsheetId` and `range`, not private | `sheets_read`, `gws.sheets_read` | `sheets.spreadsheets.values.get` | one range's rows, at most 1 MB |
 
 - **`probe`** (action `gws.probe`, `sources.probe`) answers whose a source is, per source (`gmail`, `calendar`,
-  `calendar-today` or `image`): `{ source, account, owner: { id: "mailto:<address>", label }, scopes, trust }`, from the
+  `calendar-today`, `image` or `sheets`): `{ source, account, owner: { id: "mailto:<address>", label }, scopes, trust }`, from the
   verified email Google returned at sign-in (the one `gws_status` shows) and the scopes Google granted for that source's
   service. It calls no Google API and reads no content. An account with no verified email is `AUTH_REQUIRED`.
 - **`calendar_today`** answers Jelly's `calendar.today` read as the contract's snapshot, `{ data: { items }, asOf,
@@ -273,8 +276,16 @@ never over RPC. Every source is private, free, and read over the tools RPC `goog
   declared grant could cover it), and answered with no `account`. A GIF is `IMAGE_TYPE_REFUSED`, and a
   picture whose data URI is over the contract's limit (1 MB less 4 KB, about 760 KB of picture) is `TOO_LARGE`, never
   cut. It asserts `gws.images_read`, then `gws.read` on `<account>:drive.files.get` before a Drive read.
+- **`sheets_read`** answers one range of one spreadsheet as the contract's snapshot, `{ data: { range, sheet, rows },
+  asOf, account, trust }`, for `{ spreadsheetId, range, account? }`: `spreadsheetId` is the part of the spreadsheet's
+  link after `/spreadsheets/d/`, and `range` an A1 range such as `Sheet1!A1:D50`, or a sheet's name for all of it. The
+  answer holds the range Google resolved, the sheet's title, and the cells row by row as the spreadsheet shows them;
+  Google leaves out trailing empty rows and cells. Its output, `x-gws/sheet`, is declared inline (`outputSchema`).
+  Google's 404 or 400 (no such spreadsheet, or a range it cannot read) is `INPUT_INVALID`, its 403 (the account cannot
+  open the spreadsheet) is `PERMISSION_DENIED`, and an answer over 1 MB is `TOO_LARGE`, never cut. It asserts
+  `gws.sheets_read`, then `gws.read` on `<account>:sheets.spreadsheets.values.get`, before the read.
 
-The three are tools RPC methods only, never model tools, and reads, so `access` never holds them back. Jelly's
+The four are tools RPC methods only, never model tools, and reads, so `access` never holds them back. Jelly's
 `calendar.today` on the RPC named after the package answers as before until 0.1.0; once it is called, status says
 `Deprecated: …` with the method to use instead. `npm run check` runs the source contract's conformance kit over every
 source and writes its report to `reports/conformance-report.json`.
@@ -295,9 +306,9 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `HELPER_UNSUPPORTED` | The helper is in the catalog but cannot run. | Use the Discovery method gws_catalog names as the helper's alternative. |
 | `GWS_VALIDATION_ERROR` | The request is malformed: a schema violation, a field helpers do not take, a missing field mask on list or search, a relative path, a download on gws_read, or arguments gws rejected. | Fix the request as the message says; gws_schema shows the parameters and request body. |
 | `CURSOR_INVALID` | The events_list cursor was not issued by events_list for this source, account and scope: another account's, source's or calendar's cursor, one from before the account signed in as another address, or a malformed one. Nothing ran. | Call events_list without cursor, with since where the listing should start; Memory drops events it already has. |
-| `INPUT_INVALID` | A source read refused its input: events_list, probe, calendar_today or images_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, or a calendar other than the primary one. Nothing ran. | Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry. |
-| `SOURCE_UNKNOWN` | A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran. | Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today or image for probe. |
-| `TOO_LARGE` | A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture). Nothing is cut short. | Read a smaller picture, such as the file's thumbnail. |
+| `INPUT_INVALID` | A source read refused its input: events_list, probe, calendar_today, images_read or sheets_read was given a field it does not take, a limit out of range, a since that is not a time, a scope key the source does not declare, a calendar other than the primary one, or a spreadsheet id or range Google has no spreadsheet or sheet for. | Compare the input with the source's declaration (package.json sources) and the installed plugin, then retry. |
+| `SOURCE_UNKNOWN` | A source read was asked for a source this plugin does not declare: events_list for one it does not list, or probe for one it does not know. Nothing ran. | Pass a source the plugin declares: gmail or calendar for events_list, and also calendar-today, image or sheets for probe. |
+| `TOO_LARGE` | A source read's answer is over the source's maxBytes: a picture whose data URI is over the image output's limit (1 MB less 4 KB, about 760 KB of picture), or a spreadsheet range whose answer is over 1 MB. Nothing is cut short. | Read a smaller picture, such as the file's thumbnail, or a smaller range. |
 | `FIELDS_INVALID` | The fields mask's parentheses do not balance, so gws was not called. | Give each '(' one ')' after it, or write a single path with slashes, such as body/content(paragraph/elements/textRun/content), then retry. |
 | `POLICY_DENIED` | Plugin policy refused the call: a deny rule, a category the plugin never runs (deploy, watch), the service, recipients, public sharing, the admin gate, or a path outside the allowed roots. A deny is final. | Do not work around it; tell the user, who can change the plugin policy. |
 | `RECIPIENTS_UNKNOWN` | A policy rule limits recipients, and the plugin could not tell who this send or share reaches: a raw message without readable To, Cc or Bcc headers, a draft, message or event it could not read, a draft that names no recipient, or a method whose recipients it does not know. Nothing ran. | Name the recipients in the request (to, cc and bcc, or the To, Cc and Bcc headers of raw), or tell the user the policy rule refuses this method. |
@@ -309,7 +320,7 @@ Every plugin error reads `CODE: What happened. Next step: What to do.` A tool er
 | `CATEGORY_MISMATCH` | The tool does not match the operation's or the plan's category: a change sent to gws_read, a read sent to gws_plan, or a plan committed with another category's tool. | Call the tool the message names. |
 | `SESSION_UNKNOWN` | A script named a session that does not exist. A script runs as a session, under that session's agent and its permission rules. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
 | `SESSION_AGENT_REQUIRED` | A script named a session that names no agent. A script runs as its session's agent, so its permissions and plans never depend on the default agent. | Create a session that names an agent, such as POST /api/session with {"agent":"build"}, and pass its id. |
-| `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. | Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it. |
+| `PERMISSION_DENIED` | The permission rules of the session's agent deny the call, or ask for an approval that a script cannot give, so the call did not run. From sheets_read: Google says the account cannot open the spreadsheet. | Add an allow rule for the tool to the session's agent or to the session, or use a session whose agent allows it. |
 | `AUTH_REQUIRED` | The account is not signed in, its sign-in expired or was revoked, or a headless credential variable is unset. A call that fails this way before gws runs changes nothing. | Ask the user to sign in as the message says, then retry. |
 | `AUTH_SCOPE_MISSING` | The sign-in has not granted a scope this operation needs. The plugin checks before gws runs, so nothing ran. | Ask the user to sign in again with the access the message names, or to add the scope to the account's scopes, then retry. For a method only an app's credentials can run, use another method. |
 | `ADMIN_PRIVILEGE_REQUIRED` | The sign-in is valid, but an Admin SDK service (admin-reports) refused the call because the account lacks a Workspace admin privilege the API needs, such as Reports. Signing in again as the same account does not help, and the sign-in is not marked as needing renewal. Another service's refusal is never this code. | Ask the user to add a separate account alias for a Workspace admin who has the needed privilege (Reports for admin-reports) and sign in to it, or to remove the service from enabledServices. |

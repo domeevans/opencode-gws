@@ -67,7 +67,7 @@ for (const version of TESTED_HOSTS) {
     it("describe lists the read methods with their class and schemas, and with a session each one's permission", async () => {
       const withSession = await host.api("POST", "/api/rpc/google-workspace.gws.tools/describe", { input: { sessionID: build } }, host.project)
       const methods = unwrap(withSession.data).methods as { name: string; class: string; input?: unknown; output?: unknown; permission?: string }[]
-      expect(methods.map((method) => method.name).sort()).toEqual(["calendar_today", "catalog", "events_list", "images_read", "plan", "probe", "read", "schema", "status"])
+      expect(methods.map((method) => method.name).sort()).toEqual(["calendar_today", "catalog", "events_list", "images_read", "plan", "probe", "read", "schema", "sheets_read", "status"])
       for (const method of methods) expect(method).toMatchObject({ class: "read", input: { type: "object" }, output: { type: "object" }, permission: "allow" })
       const plain = unwrap((await host.api("POST", "/api/rpc/google-workspace.gws.tools/describe", { input: {} }, host.project)).data)
       expect(plain.methods.every((method: object) => !Object.hasOwn(method, "permission"))).toBe(true)

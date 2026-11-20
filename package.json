@@ -233,6 +233,71 @@
           "class": "free"
         },
         "maxBytes": 1048576
+      },
+      {
+        "id": "gws.sheets",
+        "kind": "snapshot",
+        "tool": "sheets_read",
+        "input": {
+          "source": "sheets"
+        },
+        "output": "x-gws/sheet",
+        "outputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "range",
+            "sheet",
+            "rows"
+          ],
+          "properties": {
+            "range": {
+              "type": "string"
+            },
+            "sheet": {
+              "type": "string"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "params": {
+          "spreadsheetId": {
+            "type": "string",
+            "required": true,
+            "describe": "The spreadsheet id: the part of its link after /spreadsheets/d/"
+          },
+          "range": {
+            "type": "string",
+            "required": true,
+            "describe": "An A1 range, such as Sheet1!A1:D50, or a sheet name for the whole sheet"
+          }
+        },
+        "accounts": {
+          "named": true
+        },
+        "permission": {
+          "tool": "gws.sheets_read",
+          "operations": [
+            "sheets.spreadsheets.values.get"
+          ]
+        },
+        "private": false,
+        "cost": {
+          "class": "free"
+        },
+        "maxBytes": 1048576
       }
     ]
   },

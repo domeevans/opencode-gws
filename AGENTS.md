@@ -58,8 +58,8 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
   `plan`, bound to the session, agent and account. The default allow is a
   permission default, not a shortcut past the plan.
 - The tools RPC's methods are the six read tools and the source contract's
-  three reads (`probe`, `calendar_today`, `images_read`, each with its own
-  `gws.<name>` read action). The `rpcCommits` option, off
+  four reads (`probe`, `calendar_today`, `images_read`, `sheets_read`, each
+  with its own `gws.<name>` read action). The `rpcCommits` option, off
   by default, makes the six commits methods too (`write`, `send`, `share`,
   `delete`, `export`, `admin`), for a host that confirms each change
   itself. Then a script whose session resolves the commit's action to
@@ -126,8 +126,9 @@ Also never: imported OAuth grants, credentials from `gws auth login`, or a
 - `package.json` `sources` declares the plugin's sources under the source
   contract (`@we-the-rebel-alliance/source-contract`, pinned by tag as a
   devDependency and bundled into `dist/index.js`): `gws.gmail` and
-  `gws.calendar` (`events_list`), `gws.calendar.today` and `gws.image`
-  (snapshots), with `probe`. The page, event, screening, cursor and the
+  `gws.calendar` (`events_list`), `gws.calendar.today`, `gws.image` and
+  `gws.sheets` (snapshots), with `probe`. `gws.sheets` alone is
+  `private: false`: a spreadsheet is a document its author chooses. The page, event, screening, cursor and the
   tools RPC transport are the package's; never copy them back. Every tool
   a source names is a read, and its `permission.operations` are exactly
   what its code asserts: `test/source-conformance.test.ts` runs the
