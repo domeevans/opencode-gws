@@ -9,20 +9,37 @@ import { request } from "./support/requests.js"
  * Export delivery: the commit publishes the staged file into the
  * destination, reports cleanup failures without hiding a delivered file,
  * and never publishes after the runtime is revoked.
+ *
+ * The final publication is controlled after the real destination-side
+ * link/rename has succeeded, not before it. `crossDevice` forces the
+ * fallback deterministically, so these cases no longer depend on the test's
+ * work directory and destination sharing a filesystem.
  */
 
-const hooks = vi.hoisted(() => ({ crossDevice: false, failUnlink: false, beforePublish: undefined as undefined | (() => Promise<void>) }))
+const hooks = vi.hoisted(() => ({
+  crossDevice: false,
+  failUnlink: false,
+  afterPublish: undefined as undefined | ((published: { method: "link" | "rename"; from: string; to: string }) => Promise<void>),
+  beforePartialOpen: undefined as undefined | ((path: string) => Promise<void>),
+}))
 vi.mock("node:fs/promises", async importOriginal => {
   const fs = await importOriginal<typeof import("node:fs/promises")>()
   const publish = async (method: "link" | "rename", from: string, to: string) => {
     if (hooks.crossDevice && from.includes("/call-")) throw Object.assign(new Error("synthetic cross-device boundary"), { code: "EXDEV" })
-    await hooks.beforePublish?.()
-    return fs[method](from, to)
+    // Let the real final publication land first; only then may a test hold its return.
+    const result = await fs[method](from, to)
+    await hooks.afterPublish?.({ method, from, to })
+    return result
   }
   return {
     ...fs,
     link: (from: string, to: string) => publish("link", from, to),
     rename: (from: string, to: string) => publish("rename", from, to),
+    open: async (path: Parameters<typeof fs.open>[0], flags: Parameters<typeof fs.open>[1], mode?: Parameters<typeof fs.open>[2]) => {
+      const handle = await fs.open(path, flags, mode)
+      if (hooks.beforePartialOpen && String(path).endsWith(".partial")) await hooks.beforePartialOpen(String(path))
+      return handle
+    },
     unlink: async (path: string) => {
       if (hooks.failUnlink && path.endsWith(".partial")) throw Object.assign(new Error("synthetic cleanup failure"), { code: "EACCES" })
       return fs.unlink(path)
@@ -34,11 +51,27 @@ const cleaners: Array<() => Promise<void>> = []
 afterEach(async () => {
   hooks.crossDevice = false
   hooks.failUnlink = false
-  hooks.beforePublish = undefined
+  hooks.afterPublish = undefined
+  hooks.beforePartialOpen = undefined
   for (const clean of cleaners.splice(0)) await clean()
   vi.restoreAllMocks()
 })
 const call = { sessionId: "session", agentId: "agent" }
+
+type Settlement<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: unknown }
+
+/** Observe a promise once, immediately, so a rejection before the publication hook is never unhandled. */
+const observe = <T>(pending: Promise<T>): Promise<Settlement<T>> =>
+  pending.then(value => ({ ok: true as const, value }), error => ({ ok: false as const, error }))
+
+/** Wait for the publication hook, but report an early commit settlement at once instead of hanging. */
+async function awaitReached<T>(reached: Promise<void>, settlement: Promise<Settlement<T>>): Promise<void> {
+  const first = await Promise.race([reached.then(() => "reached" as const), settlement.then(() => "settled" as const)])
+  if (first !== "settled") return
+  const outcome = await settlement
+  if (!outcome.ok) throw outcome.error
+  throw new Error("the commit completed before its publication was reached")
+}
 async function fixture(overwrite = false) {
   const dir = mkdtempSync(join(process.cwd(), ".export-test-")), binary = join(dir, "gws"), log = join(dir, "calls")
   writeFileSync(binary, `#!/bin/sh
@@ -86,20 +119,67 @@ describe("export delivery", () => {
     expect(readdirSync(f.dir).filter(name => name.endsWith(".partial"))).toEqual([])
   })
 
-  it("preserves the receipt when an already dispatched filesystem publication wins close", async () => {
-    const f = await fixture()
+  it.each([false, true])("preserves the receipt when an already published final link or rename wins close (overwrite=%s)", async overwrite => {
+    const f = await fixture(overwrite)
+    hooks.crossDevice = true
     let entered!: () => void, release!: () => void
     const reached = new Promise<void>(resolve => { entered = resolve })
     const held = new Promise<void>(resolve => { release = resolve })
-    hooks.beforePublish = async () => { entered(); await held }
+    const published: Array<{ method: string; from: string; to: string }> = []
+    hooks.afterPublish = async publication => { published.push(publication); entered(); await held }
     const pending = f.runtime.commit("export", { planId: f.plan.planId }, call)
-    await reached
-    const close = f.runtime.close()
-    release()
-    const result = await pending
-    await close
-    expect(result.ok).toBe(true)
-    expect(readFileSync(f.destination, "utf8")).toBe("exported bytes")
+    const settled = observe(pending)
+    try {
+      await awaitReached(reached, settled)
+      // The real destination-side final link or rename has succeeded before the test holds its return.
+      expect(published).toEqual([{ method: overwrite ? "rename" : "link", from: expect.stringMatching(/\.partial$/), to: f.destination }])
+      expect(readFileSync(f.destination, "utf8")).toBe("exported bytes")
+      const close = f.runtime.close()
+      release()
+      const outcome = await settled
+      await close
+      if (!outcome.ok) throw outcome.error
+      expect(outcome.value).toMatchObject({ ok: true, file: { path: f.destination, bytes: 14 } })
+      expect(readFileSync(f.destination, "utf8")).toBe("exported bytes")
+    } finally {
+      release()
+    }
+  })
+
+  it("returns CANCELLED when close lands before the cross-device fallback publication", async () => {
+    const f = await fixture(true)
+    hooks.crossDevice = true
+    let entered!: () => void, release!: () => void
+    const reached = new Promise<void>(resolve => { entered = resolve })
+    const held = new Promise<void>(resolve => { release = resolve })
+    const partials: string[] = []
+    hooks.beforePartialOpen = async path => { partials.push(path); entered(); await held }
+    const pending = f.runtime.commit("export", { planId: f.plan.planId }, call)
+    const settled = observe(pending)
+    try {
+      await awaitReached(reached, settled)
+      // The fallback has opened its sibling .partial, but has not published or touched the destination.
+      expect(partials).toEqual([expect.stringMatching(/\.partial$/)])
+      expect(readFileSync(f.destination, "utf8")).toBe("original bytes")
+      const close = f.runtime.close()
+      release()
+      const outcome = await settled
+      await close
+      if (outcome.ok) throw new Error("expected the fallback publication to be cancelled")
+      expect(String((outcome.error as { message?: string }).message ?? outcome.error)).toMatch(/^CANCELLED:/)
+      expect(readFileSync(f.destination, "utf8")).toBe("original bytes")
+      expect(readdirSync(f.dir).filter(name => name.endsWith(".partial"))).toEqual([])
+    } finally {
+      release()
+    }
+  })
+
+  it("reports an early commit failure promptly when its publication hook is never reached", async () => {
+    const never = new Promise<void>(() => undefined)
+    const early = observe(Promise.reject(new Error("synthetic early failure")))
+    const started = Date.now()
+    await expect(awaitReached(never, early)).rejects.toThrow("synthetic early failure")
+    expect(Date.now() - started).toBeLessThan(1000)
   })
 
   it.each(["cleanup failure", "close after publication"])("preserves a delivered export after %s", async mode => {
