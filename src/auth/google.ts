@@ -22,6 +22,11 @@ export const GOOGLE_AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/v
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 export const GOOGLE_METHOD_ID = "google"
 const DEFAULT_AUTH_TIMEOUT_MS = 10 * 60 * 1000
+/**
+ * How long one request to Google's token endpoint may take. OpenCode stops a renewal (the `refresh` hook) after 30
+ * seconds, so a slow renewal must fail before that, with the plugin's own error, rather than with OpenCode's timeout.
+ */
+const TOKEN_REQUEST_TIMEOUT_MS = 20_000
 
 /**
  * Structural twin of the host's `Credential.OAuth`. Declared here so this
@@ -223,7 +228,7 @@ async function postToken(
       },
       body: body.toString(),
       redirect: "error",
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
     })
   } catch {
     throw new Error("Google token request failed: could not reach the token endpoint.")

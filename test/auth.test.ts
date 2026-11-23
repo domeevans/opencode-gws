@@ -509,6 +509,31 @@ describe("refresh", () => {
     }
   })
 
+  it("gives up on Google's token endpoint after 20 seconds, inside OpenCode's 30-second limit, with its own error", async () => {
+    // OpenCode stops a renewal after 30 seconds: a request that waits as long never fails with the plugin's own error.
+    const OPENCODE_REFRESH_LIMIT_MS = 30_000
+    const timeouts: number[] = []
+    const deadline = new AbortController()
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+      timeouts.push(ms)
+      return deadline.signal
+    })
+    try {
+      const hung = vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("The operation timed out.", "TimeoutError")))),
+      )
+      const refresh = refreshGoogle({ alias: "default", name: "Google Workspace", credential: signedIn(), options: { fetch: hung as never } })
+      await vi.waitFor(() => expect(hung).toHaveBeenCalled())
+      expect(timeouts).toEqual([20_000])
+      expect(timeouts[0]).toBeLessThan(OPENCODE_REFRESH_LIMIT_MS)
+      deadline.abort()
+      await expect(refresh).rejects.toThrow("Google token request failed: could not reach the token endpoint.")
+    } finally {
+      timeout.mockRestore()
+    }
+  })
+
   it("asks for a new sign-in when the credential has no stored client", async () => {
     const fetchSpy = vi.fn()
     await expect(refreshGoogle({ alias: "default", name: "Google Workspace", credential: { ...signedIn(), metadata: { clientId: "x" } }, options: { fetch: fetchSpy as never } })).rejects.toThrow(
