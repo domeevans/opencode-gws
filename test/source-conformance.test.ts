@@ -153,6 +153,16 @@ describe("the declaration", () => {
     expect(descriptor.sources.rpc).toBe("google-workspace.gws.tools")
   })
 
+  it("groups its sources into the services a person turns on or off", () => {
+    const items = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { sources: { items: Array<{ id: string; service?: unknown }> } }).sources.items
+    expect(Object.fromEntries(items.map((item) => [item.id, item.service]))).toEqual({
+      "gws.gmail": { id: "gws.gmail", label: "Gmail" },
+      "gws.calendar": { id: "gws.calendar", label: "Calendar" },
+      "gws.calendar.today": { id: "gws.calendar", label: "Calendar" },
+      "gws.image": { id: "gws.drive", label: "Drive" },
+    })
+  })
+
   it("keeps the image output's limit equal to the contract's registry", () => {
     expect(IMAGE_DATA_URI_MAX).toBe(REGISTRY_IMAGE_DATA_URI_MAX)
   })

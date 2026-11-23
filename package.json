@@ -144,7 +144,11 @@
         "maxBytes": 262144,
         "urlHosts": [
           "mail.google.com"
-        ]
+        ],
+        "service": {
+          "id": "gws.gmail",
+          "label": "Gmail"
+        }
       },
       {
         "id": "gws.calendar",
@@ -177,7 +181,11 @@
         "maxBytes": 262144,
         "urlHosts": [
           "www.google.com"
-        ]
+        ],
+        "service": {
+          "id": "gws.calendar",
+          "label": "Calendar"
+        }
       },
       {
         "id": "gws.calendar.today",
@@ -202,7 +210,11 @@
           "class": "free"
         },
         "maxAgeSec": 60,
-        "maxBytes": 65536
+        "maxBytes": 65536,
+        "service": {
+          "id": "gws.calendar",
+          "label": "Calendar"
+        }
       },
       {
         "id": "gws.image",
@@ -232,7 +244,11 @@
         "cost": {
           "class": "free"
         },
-        "maxBytes": 1048576
+        "maxBytes": 1048576,
+        "service": {
+          "id": "gws.drive",
+          "label": "Drive"
+        }
       }
     ]
   },
